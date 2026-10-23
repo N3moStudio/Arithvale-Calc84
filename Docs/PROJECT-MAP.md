@@ -43,3 +43,12 @@ and reproducible build/recovery steps live in Docs/BUILDING.md.
 | `Tests/CalcCoreTests/BackupFileProbeTests.swift` | Folder enumeration and renamed-backup restore regression checks |
 
 See Docs/UPDATE-0.5.1.md for the iOS/LiveContainer evidence and outstanding phone checks.
+
+
+## 0.5.2 picker ownership
+
+`BackupInputModel` (BackupChooserView.swift) owns request identity, selections,
+folder listing and preparation. `AccessView` and `RecoveryTestView` each retain
+one model and attach `backupPicker` to their Form. `BackupInputSection` renders
+controls only. `BackupDocumentPicker` cleanup invalidates callbacks without
+changing presentation state; only delegate events complete a selection.
