@@ -214,3 +214,19 @@ Backup picker follow-up: Test and Restore now share an import-as-copy chooser wi
   return must show the calculator and cached plaintext must be removed.
 - Measure frame timing and memory with Instruments on a Mac/device when available;
   this build's automated tests do not substitute for performance measurements.
+
+
+## 0.5.2 picker lifecycle regression
+
+- Verify 0.5.2 (8) in calculator Help → About.
+- On fresh-install recovery, open Choose Backup File and wait ten seconds before
+  touching Files. Browse, cancel, reopen, then select a backup with its original key.
+- Repeat with Choose Backup Folder; Open returns to the filename list in Arithvale.
+- Repeat both paths in Test a Backup after setup, including multiple Cancel/retry cycles.
+- Cancel a later selection and verify the previously selected backup remains selected.
+- Rotate while Files is open and repeat after backgrounding/reopening the app.
+  Backgrounding must still lock the private library.
+- If Files closes immediately, record whether the recovery form or calculator is
+  shown, any picker notice, the LiveContainer version and Fix File Picker setting.
+  Do not include recovery keys, private filenames or media in diagnostic reports.
+- These checks require a phone; core tests do not exercise UIKit presentation.

@@ -4,10 +4,10 @@
 
 <h1 align="center">Arithvale</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.5.1 testing · iOS 17+ · SwiftUI · MIT licensed</p>
+<p align="center">0.5.2 testing · iOS 17+ · SwiftUI · MIT licensed</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
-  <a href="Docs/UPDATE-0.5.1.md">What’s new</a> &nbsp;·&nbsp;
+  <a href="Docs/UPDATE-0.5.2.md">What’s new</a> &nbsp;·&nbsp;
   <a href="Docs/CLOUD-BACKUP.md">Cloud choices</a> &nbsp;·&nbsp;
   <a href="Docs/BUILDING.md">Build from source</a>
 </p>
@@ -26,15 +26,16 @@ control over which memories leave your phone. Previously **Calc 84**, by **N3mo 
 
 ## The latest
 
-**0.5.1** puts separate backup-file and backup-folder controls directly on the
-restore screen, adds visible version/build labels, and introduces horizontal media
-paging with details hidden until you swipe up or tap Info. It retains 0.5.0's cloud
-selection, exclusions, folder imports, and optional Trash controls.
+**0.5.2** corrects picker dismissal handling and moves presentation to the recovery
+form to address a reported immediate Files closure. It retains 0.5.1's direct
+file/folder controls, visible build number, horizontal media paging and swipe-up
+details, plus 0.5.0's cloud selection, exclusions and optional Trash controls.
+The reported LiveContainer behavior still needs confirmation on a phone.
 
 Your existing library identity and recovery key stay compatible. The IPA contains
 the app, not anyone’s photos, recovery key, or cloud credentials.
 
-[Read the update notes →](Docs/UPDATE-0.5.1.md)
+[Read the update notes →](Docs/UPDATE-0.5.2.md)
 
 ## Get Arithvale
 
