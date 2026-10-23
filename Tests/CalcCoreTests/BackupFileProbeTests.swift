@@ -2,6 +2,22 @@ import XCTest
 @testable import CalcCore
 
 final class BackupFileProbeTests: XCTestCase {
+    func testFolderBrowsingKeepsRenamedFilesAndSkipsDirectoriesLinksAndHiddenFiles() throws {
+        let fm = FileManager.default, root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        for name in ["renamed.bin", "Library.c84backup", ".hidden.c84backup", "music.mp3"] {
+            try Data("sample".utf8).write(to: root.appendingPathComponent(name))
+        }
+        try fm.createDirectory(at: root.appendingPathComponent("child"), withIntermediateDirectories: false)
+        try fm.createSymbolicLink(at: root.appendingPathComponent("linked.c84backup"), withDestinationURL: root.appendingPathComponent("Library.c84backup"))
+        let files = try BackupFileProbe.files(in: root)
+        XCTAssertEqual(files.first?.lastPathComponent, "Library.c84backup")
+        XCTAssertEqual(Set(files.map(\.lastPathComponent)), ["Library.c84backup", "renamed.bin", "music.mp3"])
+        XCTAssertThrowsError(try BackupFileProbe.files(in: files[0]))
+        XCTAssertThrowsError(try BackupFileProbe.validate(files[0])) // Listing is not authentication.
+    }
+
     func testExportCanBeSelectedByContentAndRestoredAfterRename() throws {
         let fm = FileManager.default, root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? fm.removeItem(at: root) }
