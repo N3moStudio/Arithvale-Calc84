@@ -30,10 +30,10 @@ private struct AccessView: View {
     @State private var confirmation = ""
     @State private var restoring = false
     @State private var backup: BackupSelection?
-    @State private var picker = false
+    @State private var choosingBackup = false
     private var creating: Bool { !vault.exists && !restoring }
     private var canContinue: Bool {
-        !vault.busy && VaultCode.valid(code) && code == confirmation
+        !vault.busy && !choosingBackup && VaultCode.valid(code) && code == confirmation
         && (creating ? setup.canCreate : !password.isEmpty)
         && (!restoring || backup != nil)
     }
@@ -62,10 +62,7 @@ private struct AccessView: View {
                 }
             }
             if restoring {
-                Section("Encrypted Backup") {
-                    Button(backup == nil ? "Choose Backup" : "Choose a Different Backup", systemImage: "folder") { picker = true }
-                    if let backup { Text(backup.displayName).font(.footnote).foregroundStyle(.secondary) }
-                }
+                BackupInputSection(backup: $backup, enabled: !vault.busy, working: $choosingBackup)
             }
             Section(creating ? "Save Your Recovery Key" : "Recovery Secret") {
                 if creating {
@@ -101,14 +98,12 @@ private struct AccessView: View {
                 }.disabled(!canContinue)
             }
         }
+        .safeAreaInset(edge: .bottom) { Text(AppBrand.name + " " + AppBrand.version).font(.caption).foregroundStyle(.secondary).padding(6).frame(maxWidth: .infinity).background(.bar) }
         .navigationTitle(creating ? "Welcome" : "Recovery").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Calculator") { clearSecrets(); close() } } }
-        .sheet(isPresented: $picker) {
-            BackupChooserView { backup = $0; picker = false }
-        }
         .onChange(of: vault.unlocked) { _, unlocked in if unlocked { clearSecrets() } }
         .onChange(of: vault.generation) { _, _ in clearSecrets() }
-        .alert("Couldn’t Complete", isPresented: Binding(get: { !picker && vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
+        .alert("Couldn’t Complete", isPresented: Binding(get: { vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
             Button("Close", role: .cancel) { vault.message = nil }
         } message: { Text(vault.message ?? "") }
     }

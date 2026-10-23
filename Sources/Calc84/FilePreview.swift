@@ -11,123 +11,6 @@ import _AVKit_SwiftUI
 import UniformTypeIdentifiers
 import CalcCore
 
-struct FilePreview: View {
-    let item: VaultItem
-    var previous: (() -> Void)? = nil
-    var next: (() -> Void)? = nil
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @EnvironmentObject private var vault: VaultModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var image: UIImage?
-    @State private var livePhoto: PHLivePhoto?
-    @State private var livePhotoError: String?
-    @State private var companion: URL?
-    @State private var player: AVPlayer?
-    @State private var temporary: URL?
-    @State private var showingExport = false
-    @State private var showingBackup = false
-    @State private var error: String?
-    var body: some View {
-        NavigationStack {
-            Group {
-                if let error { ContentUnavailableView("Couldn’t Open", systemImage: "exclamationmark.triangle", description: Text(error)) }
-                else if let player { VideoPlayer(player: player) }
-                else if let temporary, UTType(item.contentType)?.conforms(to: .pdf) == true { PDFPreview(url: temporary) }
-                else if let livePhoto { LivePhotoPreview(photo: livePhoto) }
-                else if let image { ZoomableImage(image: image) }
-                else if temporary != nil { ContentUnavailableView("File Is Stored", systemImage: "doc", description: Text("Save or share a copy to open it in another app.")) }
-                else { ProgressView("Opening…") }
-            }
-            .navigationTitle(item.chronologicalDate.formatted(date: .abbreviated, time: .shortened)).navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .secondaryAction) {
-                    Button("Backup Status", systemImage: "icloud") { showingBackup = true }
-                }
-                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Share or Save", systemImage: "square.and.arrow.up") { showingExport = true }.disabled(temporary == nil)
-                }
-            }
-            .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 8) {
-                    HStack {
-                        Button("Previous", systemImage: "chevron.left") { previous?() }.disabled(previous == nil).frame(minHeight: 44)
-                        Spacer()
-                        Button(item.favorite == true ? "Unfavorite" : "Favorite", systemImage: item.favorite == true ? "heart.fill" : "heart") {
-                            vault.update(item, favorite: item.favorite != true)
-                        }.disabled(vault.busy).frame(minHeight: 44)
-                        Spacer()
-                        Button("Next", systemImage: "chevron.right") { next?() }.disabled(next == nil).frame(minHeight: 44)
-                    }.labelStyle(.iconOnly)
-                    HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.name).font(.subheadline).lineLimit(2)
-                        Text(item.captured == nil ? "Original date unavailable · showing import date" : "Original capture date preserved")
-                            .font(.caption).foregroundStyle(.secondary)
-                        if item.companionID != nil { Text(livePhotoError ?? "Live Photo · hold the image to play").font(.caption).foregroundStyle(.secondary) }
-                    }
-                    Spacer()
-                    }
-                }.padding().background { if reduceTransparency { Color(uiColor: .systemBackground) } else { Rectangle().fill(.regularMaterial) } }
-            }
-            .sheet(isPresented: $showingExport) { ExportMediaView(items: [item]).environmentObject(vault) }
-            .sheet(isPresented: $showingBackup) {
-                NavigationStack { CloudItemStatusView(item: item).environmentObject(vault.cloud) }
-            }
-        }
-        .task {
-            let ticket = vault.generation
-            var created: URL?
-            do {
-                let url = try TemporaryFiles.fresh(extension: UTType(item.contentType)?.preferredFilenameExtension ?? "bin")
-                created = url
-                try await vault.engine.materialize(id: item.id, to: url)
-                guard !Task.isCancelled, vault.unlocked, ticket == vault.generation else {
-                    try? FileManager.default.removeItem(at: url); return
-                }
-                if UTType(item.contentType)?.conforms(to: .movie) == true { player = AVPlayer(url: url) }
-                else if UTType(item.contentType)?.conforms(to: .image) == true {
-                    image = await Task.detached(priority: .userInitiated) {
-                        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                              let bitmap = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                                kCGImageSourceThumbnailMaxPixelSize: 4096,
-                                kCGImageSourceCreateThumbnailWithTransform: true] as CFDictionary) else { return UIImage?.none }
-                        return UIImage(cgImage: bitmap)
-                    }.value
-                }
-                guard !Task.isCancelled, ticket == vault.generation else {
-                    player?.pause(); player = nil; image = nil; try? FileManager.default.removeItem(at: url); return
-                }
-                temporary = url
-                if let id = item.companionID {
-                    let pair = try TemporaryFiles.fresh(extension: "mov")
-                    companion = pair
-                    try await vault.engine.materialize(id: id, to: pair)
-                    let photo: PHLivePhoto
-                    do { photo = try await LivePhotoLoader.load([url, pair]) }
-                    catch {
-                        if !Task.isCancelled, ticket == vault.generation { livePhotoError = "Motion preview unavailable. Both originals are retained for export." }
-                        return
-                    }
-                    guard !Task.isCancelled, ticket == vault.generation else {
-                        try? FileManager.default.removeItem(at: pair); return
-                    }
-                    livePhoto = photo
-                }
-            } catch {
-                if let created { try? FileManager.default.removeItem(at: created) }
-                if !Task.isCancelled, ticket == vault.generation { self.error = error.localizedDescription }
-            }
-        }
-        .onDisappear {
-            player?.pause(); player?.replaceCurrentItem(with: nil); player = nil; image = nil; livePhoto = nil
-            if let companion { try? FileManager.default.removeItem(at: companion) }; companion = nil
-            if let temporary { try? FileManager.default.removeItem(at: temporary) }; temporary = nil
-        }
-    }
-}
-
 struct MediaExport: Identifiable {
     let id = UUID()
     let urls: [URL]
@@ -292,9 +175,15 @@ struct PDFPreview: UIViewRepresentable {
 }
 struct ZoomableImage: UIViewRepresentable {
     let image: UIImage
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    var zoomChanged: (Bool) -> Void = { _ in }
+    func makeCoordinator() -> Coordinator { Coordinator(zoomChanged) }
     func makeUIView(context: Context) -> UIScrollView {
         let scroll = UIScrollView(); scroll.minimumZoomScale = 1; scroll.maximumZoomScale = 5; scroll.delegate = context.coordinator
+        scroll.showsHorizontalScrollIndicator = false; scroll.showsVerticalScrollIndicator = false
+        scroll.panGestureRecognizer.isEnabled = false
+        let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.doubleTap(_:)))
+        doubleTap.numberOfTapsRequired = 2; scroll.addGestureRecognizer(doubleTap)
+        context.coordinator.scroll = scroll
         let view = context.coordinator.imageView; view.image = image; view.contentMode = .scaleAspectFit
         view.isAccessibilityElement = true; view.accessibilityLabel = "Imported image"; view.translatesAutoresizingMaskIntoConstraints = false
         scroll.addSubview(view)
@@ -304,11 +193,32 @@ struct ZoomableImage: UIViewRepresentable {
             view.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor), view.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor)])
         return scroll
     }
-    func updateUIView(_ view: UIScrollView, context: Context) {}
+    func updateUIView(_ view: UIScrollView, context: Context) {
+        context.coordinator.zoomChanged = zoomChanged
+        if context.coordinator.imageView.image !== image { context.coordinator.imageView.image = image }
+    }
     static func dismantleUIView(_ view: UIScrollView, coordinator: Coordinator) { coordinator.imageView.image = nil }
     final class Coordinator: NSObject, UIScrollViewDelegate {
         let imageView = UIImageView()
+        weak var scroll: UIScrollView?
+        var zoomChanged: (Bool) -> Void
+        private var wasZoomed = false
+        init(_ zoomChanged: @escaping (Bool) -> Void) { self.zoomChanged = zoomChanged }
         func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
+        func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            let zoomed = scrollView.zoomScale > 1.01
+            scrollView.panGestureRecognizer.isEnabled = zoomed
+            if wasZoomed != zoomed { wasZoomed = zoomed; zoomChanged(zoomed) }
+        }
+        @objc func doubleTap(_ gesture: UITapGestureRecognizer) {
+            guard let scroll else { return }
+            if scroll.zoomScale > 1.01 { scroll.setZoomScale(1, animated: !UIAccessibility.isReduceMotionEnabled) }
+            else {
+                let point = gesture.location(in: imageView), size = scroll.bounds.size
+                scroll.zoom(to: CGRect(x: point.x - size.width / 4, y: point.y - size.height / 4,
+                                       width: size.width / 2, height: size.height / 2), animated: !UIAccessibility.isReduceMotionEnabled)
+            }
+        }
     }
 }
 #endif

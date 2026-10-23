@@ -26,30 +26,27 @@ struct ChangeCodeView: View {
 }
 struct RecoveryTestView: View {
     @EnvironmentObject private var vault: VaultModel
-    @State private var picker = false
     @State private var backup: BackupSelection?
+    @State private var choosingBackup = false
     @State private var secret = ""
     @State private var passed = false
     var body: some View {
         Form {
+            BackupInputSection(backup: $backup, enabled: !vault.busy, working: $choosingBackup)
             Section {
                 Text("This decrypts and checks the complete backup in a separate temporary library. Your current library is left in place. You need free space for another encrypted copy.")
-                Button(backup == nil ? "Choose Backup" : "Choose a Different Backup") { picker = true }.disabled(vault.busy)
-                Text("Choose a file, or use Browse a Folder Instead if the host grays it out.").font(.footnote).foregroundStyle(.secondary)
-                if let backup { Text(backup.displayName).font(.footnote) }
                 SecureField("Recovery key or original password", text: $secret)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                 Button("Test Recovery") {
                     if let backup { Task { passed = await vault.verifyBackup(url: backup.url, recovery: secret); secret = "" } }
-                }.disabled(backup == nil || secret.isEmpty || vault.busy)
+                }.disabled(backup == nil || secret.isEmpty || vault.busy || choosingBackup)
                 if vault.busy { ProgressView("Authenticating backup…") }
                 if passed { Label("Recovery test passed", systemImage: "checkmark.shield.fill") }
             }
+            Section { LabeledContent(AppBrand.name, value: AppBrand.version) }
         }.navigationTitle("Test a Backup")
-            .sheet(isPresented: $picker) {
-                BackupChooserView { backup = $0; passed = false; picker = false }
-            }
-            .alert("Couldn’t Test Backup", isPresented: Binding(get: { !picker && vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
+            .onChange(of: backup?.url) { _, _ in passed = false }
+            .alert("Couldn’t Test Backup", isPresented: Binding(get: { vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
                 Button("Close", role: .cancel) { vault.message = nil }
             } message: { Text(vault.message ?? "") }
             .onDisappear { secret = "" }

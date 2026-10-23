@@ -5,9 +5,9 @@
 	<key>CFBundleDisplayName</key>
 	<string>Arithvale</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.5.0</string>
+	<string>0.5.1</string>
 	<key>CFBundleVersion</key>
-	<string>6</string>
+	<string>7</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Arithvale imports your selected photos and videos with their original dates and Live Photo resources. After verified import, you can choose to delete those originals from Photos with your confirmation.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

@@ -67,6 +67,7 @@ struct CalculatorView: View {
                     Section("Calculator") {
                         Text("Use the calculator button for scientific functions. DEG and RAD change angle units. C clears the current entry; AC clears everything. Enter a calculation, then tap =.")
                     }
+                    Section("About") { LabeledContent(AppBrand.name, value: AppBrand.version) }
                 }.navigationTitle("Help")
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { help = false } } }
             }

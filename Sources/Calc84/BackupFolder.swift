@@ -136,12 +136,12 @@ struct BackupDocumentPicker: UIViewControllerRepresentable {
         switch purpose {
         case .folder:
             picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
-            picker.title = "Choose Backup Folder"
+            picker.title = "Choose Folder, Then Tap Open"
             // Do not force Files to reopen a stale provider URL.
         case .openBackup:
             // LiveContainer may not register the guest app's exported UTI. The archive
             // reader still authenticates the content; the picker must not hide the file.
-            picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item, .data, .content], asCopy: true)
+            picker = UIDocumentPickerViewController(forOpeningContentTypes: [.data], asCopy: true)
             picker.title = "Import Backup File"
         case .save(let url):
             picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)

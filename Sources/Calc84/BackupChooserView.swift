@@ -2,81 +2,113 @@
 import SwiftUI
 import CalcCore
 
-/// Both recovery flows share this picker. Folder browsing avoids host UTI filters.
-struct BackupChooserView: View {
-    let selected: (BackupSelection) -> Void
-    @Environment(\.dismiss) private var dismiss
+/// Embedded directly in each recovery form: no intermediate chooser sheet.
+struct BackupInputSection: View {
+    @Binding var backup: BackupSelection?
+    var enabled = true
+    @Binding var working: Bool
     @State private var picker: Choice?
+    @State private var pending: (Choice, BackupSelection)?
     @State private var folder: BackupSelection?
     @State private var entries: [URL] = []
     @State private var error: String?
-    @State private var working = false
     @State private var preparation: Task<Void, Never>?
     private enum Choice: String, Identifiable { case file, folder; var id: String { rawValue } }
+
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    Button("Choose Backup File", systemImage: "doc") { picker = .file }
-                    Button("Browse a Folder Instead", systemImage: "folder") { picker = .folder }
-                } footer: {
-                    Text("If Files grays out your backup, choose its folder using Browse a Folder Instead, tap Open, then tap the backup below. This bypasses file-type filtering in the host app. A renamed backup can also be selected; its contents are checked.")
+        Section {
+            Button("Choose Backup File", systemImage: "doc") { picker = .file }
+                .accessibilityIdentifier("backup.chooseFile")
+            Button("Choose Backup Folder", systemImage: "folder") { picker = .folder }
+                .accessibilityIdentifier("backup.chooseFolder")
+            if let backup {
+                Label(backup.displayName, systemImage: "doc.badge.checkmark")
+                    .font(.subheadline).textSelection(.enabled)
+                Text("Backup selected. Enter its original recovery key below.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            if let folder {
+                Text("Files in \(folder.displayName)").font(.headline)
+                Text("Tap the backup filename here to select it.").font(.footnote)
+                if entries.isEmpty && !working {
+                    Text("No files found. Choose the folder containing your backup, or download it in Files first.")
+                        .foregroundStyle(.secondary)
                 }
-                if let folder {
-                    Section(folder.displayName) {
-                        if entries.isEmpty { Text("No files found in this folder. Try another folder or download the backup in Files first.") }
-                        ForEach(entries, id: \.self) { url in
-                            Button(url.lastPathComponent) { prepare(url) }.frame(minHeight: 44)
-                        }
-                    }
-                }
-                if working { Section { ProgressView("Copying backup for safe access…") } }
-                if let error { Section { Text(error).foregroundStyle(.secondary) } }
-            }.disabled(working)
-            .navigationTitle("Choose Backup").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { preparation?.cancel(); dismiss() } } }
-            .sheet(item: $picker) { choice in
-                BackupDocumentPicker(purpose: choice == .file ? .openBackup : .folder) { url in
-                    picker = nil
-                    guard let url else { return }
-                    if choice == .file { prepare(url) } else { browse(url) }
+                ForEach(entries, id: \.self) { url in
+                    Button { prepare(url) } label: {
+                        Label(url.lastPathComponent, systemImage: "doc")
+                            .lineLimit(3).frame(minHeight: 44, alignment: .leading)
+                    }.buttonStyle(.borderless)
                 }
             }
+            if working { ProgressView("Preparing backup…") }
+            if let error { Text(error).foregroundStyle(.secondary).accessibilityIdentifier("backup.error") }
+        } header: { Text("Encrypted Backup") } footer: {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("File: tap the backup itself. Folder: open the folder containing it, tap Open, then tap the filename in the list above. Opening a folder alone does not select a backup.")
+                Text("If LiveContainer’s picker does not respond, enable Fix File Picker in this app’s LiveContainer settings, then relaunch it.")
+            }
         }
-        .interactiveDismissDisabled(working)
+        .disabled(working || !enabled)
+        .sheet(item: $picker, onDismiss: consumeSelection) { choice in
+            BackupDocumentPicker(purpose: choice == .file ? .openBackup : .folder) { url in
+                // Take the temporary permission before the document controller dismisses.
+                pending = url.map { (choice, BackupSelection($0)) }
+                picker = nil
+            }
+        }
         .onDisappear { preparation?.cancel() }
     }
-    private func browse(_ url: URL) {
-        let scope = BackupSelection(url); folder = scope; error = nil; entries = []; working = true
+
+    private func consumeSelection() {
+        guard let request = pending else { return }
+        pending = nil
+        if request.0 == .folder { browse(request.1) }
+        else { prepare(request.1.url, scope: request.1) }
+    }
+
+    private func browse(_ scope: BackupSelection) {
+        folder = scope; entries = []; error = nil; working = true
         preparation = Task {
             defer { working = false }
+            let worker = Task.detached(priority: .userInitiated) {
+                defer { withExtendedLifetime(scope) {} }
+                var coordinationError: NSError?
+                var result: Result<[URL], Error>?
+                NSFileCoordinator().coordinate(readingItemAt: scope.url, options: [], error: &coordinationError) { url in
+                    result = Result { try BackupFileProbe.files(in: url) }
+                }
+                if let coordinationError { throw coordinationError }
+                guard let result else { throw CocoaError(.fileReadUnknown) }
+                return try result.get()
+            }
             do {
-                let values = try await Task.detached {
-                    defer { withExtendedLifetime(scope) {} }
-                    let files = try FileManager.default.contentsOfDirectory(at: url,
-                        includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])
-                    guard files.count <= 10_000 else { throw VaultError.limit }
-                    return try files.filter { try $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory != true }
-                        .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
-                }.value
-                try Task.checkCancellation(); entries = values
-            } catch { if !Task.isCancelled { self.error = "Couldn’t read this folder. Download the backup in Files and try again. " + error.localizedDescription } }
+                let files = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
+                try Task.checkCancellation(); entries = files
+            } catch {
+                if !Task.isCancelled { self.error = "Couldn’t read this folder. " + error.localizedDescription }
+            }
         }
     }
-    private func prepare(_ url: URL) {
+
+    private func prepare(_ url: URL, scope: BackupSelection? = nil) {
         working = true; error = nil
-        let scope = BackupSelection(url); let parentScope = folder
+        let access = scope ?? BackupSelection(url); let parent = folder
         preparation = Task {
             defer { working = false }
-            let worker = Task.detached {
-                defer { withExtendedLifetime(scope) {}; withExtendedLifetime(parentScope) {} }
+            let worker = Task.detached(priority: .userInitiated) {
+                defer { withExtendedLifetime(access) {}; withExtendedLifetime(parent) {} }
                 return try BackupSelection.backupFile(url)
             }
             do {
                 let value = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
                 try Task.checkCancellation()
-                selected(value); dismiss()
-            } catch { if !Task.isCancelled { self.error = "Couldn’t import this backup. Try Browse a Folder Instead or download the file in Files first. " + error.localizedDescription } }
+                backup = value; entries = []; folder = nil
+            } catch {
+                if !Task.isCancelled {
+                    self.error = "Couldn’t select this backup. Use Choose Backup Folder if the file picker cannot open it. " + error.localizedDescription
+                }
+            }
         }
     }
 }
