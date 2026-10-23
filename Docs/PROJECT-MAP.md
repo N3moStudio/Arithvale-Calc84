@@ -5,9 +5,9 @@
 | Calculator/access | CalculatorView, PrivateSpaceView, SetupSession, DeviceAccess | Calculation, explicit hold-to-unlock, recovery key setup, throttled device access |
 | Library operations | VaultModel, VaultEngine, VaultRepository | Import transactions, cancellation, encrypted storage, backup/restore |
 | Photo pipeline | MediaBridge, PhotoResourceWriter, PhotoImportReview | Original resources, cancellable protected streaming, verified optional deletion |
-| Browsing | LibraryView, MemoryGrid, MediaBrowser, FilePreview, LivePhotoPreview | Grid/search/filter, accessible cells, current-item preview, paired motion |
+| Browsing | LibraryView, MemoryGrid, MediaBrowser, MediaPreviewStore, FilePreview, LivePhotoPreview | Grid/search/filter, native paging, bounded prepared previews, zoom, paired motion |
 | Selection | GridDragSelection, LibrarySelectionSweep | Horizontal sweep, reversible ranges, edge scrolling and tap/VoiceOver fallback |
-| Files picker | BackupFolder, RecoveryViews, PrivateSpaceView | Host-compatible backup picking, scoped file access and clear invalid-selection feedback |
+| Files picker | BackupChooserView, BackupFolder, BackupFileProbe, RecoveryViews, PrivateSpaceView | Direct file/folder selection, scoped candidate list, verified local copies and clear invalid-selection feedback |
 | Export | FilePreview, PrivatePhotoCopy | Original sharing and optional metadata-free JPEG derivatives |
 | Backup status | BackupStatus, BackupSummaryView, VaultSettingsView | Destination-aware summary and recovery-test identity |
 | Cloud | CloudBackupModel, CloudDiscovery, CloudBackup, BlompStore, MegaStore, CalcMega | Cursor pages, resilient discovery, verified encrypted transfers |
@@ -31,3 +31,15 @@ Use `Scripts/verify_release.py --ipa --python <recovery-venv-python>` after `Scr
 
 Start with README.md and SETUP.md; provider behavior lives in Docs/CLOUD-BACKUP.md,
 and reproducible build/recovery steps live in Docs/BUILDING.md.
+
+## 0.5.1 additions
+
+| Files | Responsibility |
+| --- | --- |
+| `Sources/Calc84/MediaPreviewStore.swift` | Current/neighbor cache, background decoding, bounded prefetch, cancellation and plaintext cleanup |
+| `Sources/Calc84/MediaBrowser.swift` | Native horizontal pager, current video player, swipe-up details and accessibility controls |
+| `Sources/Calc84/BackupChooserView.swift` | Inline recovery file/folder buttons and filename selection after opening a folder |
+| `Sources/CalcCore/BackupFileProbe.swift` | Non-downloading folder candidates and content-based backup validation |
+| `Tests/CalcCoreTests/BackupFileProbeTests.swift` | Folder enumeration and renamed-backup restore regression checks |
+
+See Docs/UPDATE-0.5.1.md for the iOS/LiveContainer evidence and outstanding phone checks.
