@@ -53,7 +53,7 @@ final class ReliabilityTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let repo = VaultRepository(root: root.appendingPathComponent("library"))
         try repo.create(password: "a disposable recovery secret")
-        let first = try repo.cloudPlan().snapshot, second = try repo.cloudPlan().snapshot
+        let first = try repo.cloudPlanIncludingAllForTest().snapshot, second = try repo.cloudPlanIncludingAllForTest().snapshot
         let broken = first.prefix + "snapshots/" + UUID().uuidString + ".c84cloud"
         let missing = first.prefix + "snapshots/" + UUID().uuidString + ".c84cloud"
         let store = CatalogStore([first.path: try JSONEncoder().encode(first), second.path: try JSONEncoder().encode(second), broken: Data("corrupt".utf8)])
