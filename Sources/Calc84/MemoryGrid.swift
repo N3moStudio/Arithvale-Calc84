@@ -276,7 +276,7 @@ private final class MemoryCell: UICollectionViewCell {
         super.init(frame: frame)
         contentView.backgroundColor = .secondarySystemBackground; contentView.clipsToBounds = true
         photo.contentMode = .scaleAspectFill; photo.clipsToBounds = true
-        duration.font = .preferredFont(forTextStyle: .caption1); duration.textColor = .white
+        duration.font = .preferredFont(forTextStyle: .caption1); duration.adjustsFontForContentSizeCategory = true; duration.textColor = .white
         duration.layer.shadowColor = UIColor.black.cgColor; duration.layer.shadowOpacity = 1; duration.layer.shadowRadius = 3; duration.layer.shadowOffset = .zero
         favorite.image = UIImage(systemName: "heart.fill"); favorite.tintColor = .white
         favorite.layer.shadowColor = UIColor.black.cgColor; favorite.layer.shadowOpacity = 1; favorite.layer.shadowRadius = 3
@@ -287,7 +287,8 @@ private final class MemoryCell: UICollectionViewCell {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override func layoutSubviews() {
         super.layoutSubviews(); photo.frame = contentView.bounds
-        duration.frame = CGRect(x: 6, y: bounds.height - 28, width: bounds.width - 12, height: 22)
+        let height = ceil(duration.font.lineHeight) + 8
+        duration.frame = CGRect(x: 6, y: max(0, bounds.height - height - 6), width: max(0, bounds.width - 12), height: height)
         favorite.frame = CGRect(x: 7, y: 7, width: 17, height: 17)
         check.frame = CGRect(x: bounds.width - 32, y: 6, width: 26, height: 26)
     }
@@ -298,6 +299,10 @@ private final class MemoryCell: UICollectionViewCell {
         if let seconds = item.duration, seconds.isFinite, seconds >= 0, seconds < Double(Int.max) {
             duration.text = String(format: "%d:%02d", Int(seconds) / 60, Int(seconds) % 60)
         } else { duration.text = nil }
+        let kind = UTType(item.contentType)?.conforms(to: .movie) == true ? "Video" : item.companionID != nil ? "Live Photo" : UTType(item.contentType)?.conforms(to: .image) == true ? "Photo" : "File"
+        accessibilityLabel = [kind, item.name, item.chronologicalDate.formatted(date: .abbreviated, time: .omitted),
+                              duration.text, item.favorite == true ? "Favorite" : nil].compactMap { $0 }.joined(separator: ", ")
+        setNeedsLayout()
         if let image = cache.object(forKey: item.id as NSUUID) { photo.image = image; return }
         photo.image = UIImage(systemName: item.duration != nil ? "film" : "doc"); photo.tintColor = .tertiaryLabel
         task = Task { [weak self] in

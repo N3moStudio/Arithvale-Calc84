@@ -11,7 +11,7 @@ let sdkSources = nativeRoot.appendingPathComponent("Vendor/MEGASDK").path
 let coreOnly = ProcessInfo.processInfo.environment["CALC84_CORE_ONLY"] == "1"
 
 let package = Package(
-    name: "Calc84",
+    name: "Arithvale",
     platforms: [
         .iOS(.v17),
         .macOS(.v14),
@@ -20,7 +20,7 @@ let package = Package(
         // An xtool project should contain exactly one library product,
         // representing the main app.
         .library(
-            name: "Calc84",
+            name: "Arithvale",
             targets: ["Calc84"]
         ),
     ],
@@ -30,7 +30,7 @@ let package = Package(
     targets: [
         .target(
             name: "Calc84", dependencies: coreOnly ? ["CalcCore"] : ["CalcCore", .target(name: "CalcMega", condition: .when(platforms: [.iOS]))],
-            exclude: ["Info.plist"], resources: [.copy("Resources")],
+            exclude: ["Info.plist"], resources: [.copy("Resources"), .copy("PrivacyInfo.xcprivacy")],
             // The Linux Swift Build linker otherwise records the deployment target
             // as the SDK version. Match the installed iOS 27.1 SDK while retaining iOS 17 support.
             linkerSettings: [.unsafeFlags([

@@ -14,22 +14,14 @@ struct VaultSettingsView: View {
     var body: some View {
         List {
             Section {
-                NavigationLink { CloudBackupView() } label: {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Label("Cloud Backup", systemImage: "icloud")
-                        Text("Blomp & MEGA · connections, progress, and recovery").font(.footnote).foregroundStyle(.secondary)
-                    }.padding(.vertical, 6)
-                }
-            }
-            Section {
                 NavigationLink { BackupSettingsView() } label: {
                     VStack(alignment: .leading, spacing: 5) {
                         Label("Backup & Recovery", systemImage: "externaldrive")
-                        Text(lastExport == 0 ? "Save your first backup outside the app." : needsBackup ? "Your latest changes need a backup." : "Your last backup was saved and checked.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                        BackupSummaryView().environmentObject(vault.cloud).font(.footnote).foregroundStyle(.secondary)
                     }.padding(.vertical, 6)
                 }
             }
+            Section { NavigationLink("About " + AppBrand.name) { AboutView() } }
             Section("Your gallery") {
                 Picker("View", selection: $layout) {
                     Text("Memories grid").tag(LibraryLayout.timeline.rawValue)
@@ -51,7 +43,7 @@ struct VaultSettingsView: View {
                 NavigationLink("Privacy & storage") {
                     List {
                         Section("Private library") {
-                            Text("Your library is encrypted in private app storage. No Calc 84 account or analytics. Optional cloud backups use your own Blomp or MEGA account.")
+                            Text("Your library is encrypted in private app storage. No \(AppBrand.name) account or analytics. Optional cloud backups use your own Blomp or MEGA account.")
                             Text("Deleting the app or its data container can delete that copy. Keep an external backup and its recovery key.")
                         }
                         Section("Copies you save") {
@@ -87,6 +79,7 @@ struct BackupSettingsView: View {
     @AppStorage("lastBackupFolder") private var savedFolder = ""
     @AppStorage("libraryNeedsBackup") private var needsBackup = true
     @AppStorage("lastRecoveryTest") private var lastTest = 0.0
+    @AppStorage("lastRecoveryTestIdentity") private var lastTestIdentity = ""
     @State private var sheet: BackupSheet?
     @State private var activeExport: PreparedBackup?
     @State private var picked: BackupSelection?
@@ -94,7 +87,8 @@ struct BackupSettingsView: View {
     var body: some View {
         List {
             Section {
-                Text("Keep a copy outside the app.").font(.title3.bold())
+                NavigationLink { CloudBackupView() } label: { Label("MEGA & Blomp", systemImage: "icloud") }
+                Text("Files backup").font(.title3.bold())
                 Text("Save an encrypted backup to Files. Keep its recovery key separately—you need both after reinstalling.").foregroundStyle(.secondary)
                 Button {
                     preparation = Task {
@@ -104,7 +98,7 @@ struct BackupSettingsView: View {
                     }
                 } label: { Label("Save Backup to Files", systemImage: "square.and.arrow.down").fontWeight(.semibold).frame(minHeight: 44) }
                 .disabled(vault.busy)
-            } footer: { Text("Choose a location outside Calc 84 / LiveContainer. No folder connection is required for this save.") }
+            } footer: { Text("Choose a location outside \(AppBrand.name) / LiveContainer. No folder connection is required for this save.") }
             if vault.busy || !vault.status.isEmpty {
                 Section {
                     HStack(spacing: 12) {
@@ -129,12 +123,13 @@ struct BackupSettingsView: View {
                 NavigationLink { RecoveryTestView() } label: { Label("Test a Backup", systemImage: "checkmark.shield") }
                     .disabled(vault.busy)
                 if lastTest > 0 {
+                    Text(lastTestIdentity.isEmpty ? "Older test · snapshot identity was not recorded" : lastTestIdentity).font(.caption).textSelection(.enabled)
                     LabeledContent("Last test") { Text(Date(timeIntervalSince1970: lastTest), format: .dateTime.month().day().hour().minute()) }
                 }
                 NavigationLink("Restore after reinstalling") {
                     List {
                         Text("1. Before deleting anything, save a backup outside the app and test that exact file. Wait for your Files provider to finish uploading.")
-                        Text("2. In a fresh installation, enter 160160 and press =. Choose Restore an Existing Backup before creating a new library.")
+                        Text("2. In a fresh installation, enter 160160 and hold =. Choose Restore an Existing Backup before creating a new library.")
                         Text("3. Select the .c84backup file. Enter its original recovery key, then choose a calculator code.")
                         Text("4. Check photos, videos, and dates. Reconnect your backup folder if you used one.")
                         Text("A normal update using the same app identity or LiveContainer data container should retain your library. Make a verified backup first; do not uninstall just to update.")

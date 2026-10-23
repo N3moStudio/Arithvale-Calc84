@@ -1,4 +1,4 @@
-# Calc 84 · 0.3.0 design notes
+# Arithvale · 0.4.0 design notes
 
 The vault now follows the supplied Memories / My Eyes Only screenshots: photographs occupy the screen, with a compact header and direct controls. This replaces the earlier iOS glass/gallery treatment. The calculator remains a separate surface; its requested Apple Calculator redesign has not been implemented in this revision.
 
@@ -33,7 +33,7 @@ Only a completed, checked save updates the last-backup timestamp and filename. S
 
 ## Cloud backup
 
-Settings has a dedicated Cloud Backup entry with overall status, separate service connections, a progress indicator, and Pause. Backup after changes and cellular transfers are optional and off initially. Provider screens offer Back Up, Recheck All Remote Files, and Test Cloud Recovery. Item previews show each provider's last completed backup inclusion without adding badges to every gallery tile.
+Settings → Backup & Recovery has a MEGA & Blomp entry with overall status, separate service connections, a progress indicator, and Pause. Backup after changes and cellular transfers are optional and off initially. Provider screens offer Back Up, Recheck All Remote Files, and Test Cloud Recovery. Item previews show each provider's last completed backup inclusion without adding badges to every gallery tile.
 
 On an empty installation, Restore from Cloud reconnects a service, lists completed catalogs, and requests the original recovery key plus a new local calculator code. Recovery never replaces an existing library. The UI explains that transfers need an open, unlocked app and that backups are separate copies rather than live multi-phone synchronization.
 
@@ -41,4 +41,8 @@ MEGA uses direct SDK sign-in, with an application key field for this personal te
 
 ## Verification limits
 
-All 38 core tests and 11 independent Python recovery tests passed, including cloud backup round-trips, original dates, interrupted upload recovery, corruption rejection, preserving earlier backups, date-handle boundaries, and refusing source deletion when committed copies or Live Photo companions cannot be verified. Native build evidence is included in the test kit. The earlier interactive gallery preview does not include the new cloud screens. Actual rendering, Photos deletion confirmation, picker callbacks, provider permissions, app lifecycle, and LiveContainer behavior still need device testing; there is no claim of a visual or runtime pass on an iPhone.
+Fresh automated results are recorded by Scripts/verify_release.py and shipped in BUILD-RESULT.json. Device rendering, Photos confirmation, gestures, provider permissions, app lifecycle and LiveContainer behavior require the phone checks; compilation is not a device pass.
+
+## 0.4.0 interaction changes
+
+The everyday calculator uses five rows, with extra functions behind 2nd. Hold Equals after a directly entered code to request access; taps calculate only. Setup owns its recovery key through child navigation. Import progress/retry/cancel precede automatic backups, which are coalesced after changes. The gallery opens a current-item full-screen browser with Previous, Next and Favorite; native Live Photo playback retains a still fallback. Video labels follow Dynamic Type and include media type/duration/favorite in VoiceOver. Settings includes About, storage capacity and recovery-test identity. Private JPEG export is an explicit derivative choice.

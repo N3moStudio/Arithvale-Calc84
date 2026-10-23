@@ -40,7 +40,7 @@ private let megaCallback: C84MegaCallback = { context, error, result in
     }
 }
 
-/// Official MEGA SDK handles its account encryption and protocol. Calc 84 sends
+/// Official MEGA SDK handles its account encryption and protocol. Arithvale sends
 /// only its own ciphertext through it; it never implements MEGA cryptography.
 final class MegaStore: CloudStore, @unchecked Sendable {
     private let client: UnsafeMutableRawPointer
@@ -108,13 +108,13 @@ final class MegaStore: CloudStore, @unchecked Sendable {
     private func validate(_ path: String) throws {
         _ = try BlompEndpoint.object(base: URL(string: "https://swiftproxy.acs.ai.net/v1/AUTH_validation")!, container: "validation", path: path)
     }
-    func list(prefix: String) async throws -> [String] {
-        guard prefix == "c84/v1/" else { throw CloudError.configuration }
-        _ = try await request { c84mega_fetch(client, $0, $1) }
-        let listing = try await request { c84mega_list(client, $0, $1) }
+    func listPage(prefix: String, after: String?, limit: Int) async throws -> CloudListingPage {
+        guard prefix == "c84/v1/", (1...CloudDiscovery.pageSize).contains(limit) else { throw CloudError.configuration }
+        if after == nil { try await refresh() }
+        let listing = try await request { c84mega_list(client, after ?? "", Int32(limit), $0, $1) }
         let paths = listing.split(separator: "\n").map(String.init)
-        for path in paths { try validate(path) }
-        return paths
+        guard paths.count <= limit, paths == paths.sorted(), paths.allSatisfy({ $0 > (after ?? "") }) else { throw CloudError.service }
+        return CloudListingPage(paths: paths, next: paths.count == limit ? paths.last : nil)
     }
     func size(path: String) async throws -> Int? {
         try validate(path); try await checkNetwork()

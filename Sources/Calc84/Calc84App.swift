@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 @main
-struct Calc84App: App {
+struct ArithvaleApp: App {
     @UIApplicationDelegateAdaptor(PrivacyDelegate.self) private var delegate
     @StateObject private var vault = VaultModel()
     var body: some Scene {

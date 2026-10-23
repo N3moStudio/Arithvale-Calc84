@@ -117,7 +117,7 @@ struct CloudProviderView: View {
             }
             Section("Your encrypted copy") {
                 Text("Your normal gallery stays on this phone. This connection stores separate encrypted files and recovery catalogs in c84/v1 inside your account.")
-                Text("Keep your Calc 84 recovery key separately. The cloud service cannot use your calculator code to recover this library.")
+                Text("Keep your Arithvale recovery key separately. The cloud service cannot use your calculator code to recover this library.")
                 if provider == .blomp {
                     Text("Blomp’s storage connection must pass HTTPS checks. If the service returns an insecure address or an invalid certificate, the connection stops.")
                 } else {
@@ -146,15 +146,15 @@ struct CloudRestoreView: View {
         List {
             Section {
                 Text(testOnly ? "Download and authenticate a backup without replacing your library." : "Restore into this empty installation. Your saved capture dates and recovery key stay the same.")
-                Button("Find Backups") { cloud.findBackups(provider, vault: vault) }.disabled(vault.busy)
+                Button("Find Backups") { selected = nil; cloud.findBackups(provider, vault: vault) }.disabled(vault.busy)
             }
             Section("Saved backups") {
                 ForEach(cloud.snapshots) { record in
                     Button { selected = record.id } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(record.snapshot.created, format: .dateTime.year().month().day().hour().minute())
-                                Text("Library " + String(record.snapshot.vaultID.uuidString.prefix(8))).font(.caption).foregroundStyle(.secondary)
+                                Text(record.created, format: .dateTime.year().month().day().hour().minute())
+                                Text("Library " + String(record.vaultID.uuidString.prefix(8))).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
                             if selected == record.id { Image(systemName: "checkmark").accessibilityLabel("Selected") }
@@ -162,15 +162,18 @@ struct CloudRestoreView: View {
                     }.disabled(vault.busy)
                 }
             }
+            if cloud.nextPage != nil {
+                Button("Next Page of Backups") { selected = nil; cloud.findBackups(provider, vault: vault, next: true) }.disabled(vault.busy)
+            }
             if selected != nil {
                 Section {
-                    SecureField("Calc 84 recovery key", text: $recovery).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    SecureField("\(AppBrand.name) recovery key", text: $recovery).textInputAutocapitalization(.never).autocorrectionDisabled()
                     if !testOnly {
                         SecureField("New calculator code", text: $code).keyboardType(.numberPad)
                         SecureField("Repeat code", text: $repeatCode).keyboardType(.numberPad)
                     }
                     Button(testOnly ? "Test Recovery" : "Restore Library") {
-                        if let snapshot = cloud.snapshots.first(where: { $0.id == selected })?.snapshot {
+                        if let snapshot = cloud.snapshots.first(where: { $0.id == selected }) {
                             cloud.restore(snapshot, provider: provider, recovery: recovery, code: code, vault: vault, testOnly: testOnly)
                             recovery = ""; code = ""; repeatCode = ""
                         }
@@ -184,7 +187,7 @@ struct CloudRestoreView: View {
             }
         }
         .navigationTitle(testOnly ? "Test Recovery" : "Restore Library").navigationBarTitleDisplayMode(.inline)
-        .onAppear { cloud.snapshots = [] }
+        .onAppear { cloud.snapshots = []; cloud.nextPage = nil }
         .onDisappear { recovery = ""; code = ""; repeatCode = "" }
     }
 }

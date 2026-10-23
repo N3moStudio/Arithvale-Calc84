@@ -9,7 +9,10 @@ private actor MemoryCloud: CloudStore {
     func configure(failAfter: Int? = nil, corruptDownload: Bool = false) {
         self.failAfter = failAfter; self.corruptDownload = corruptDownload
     }
-    func list(prefix: String) async throws -> [String] { files.keys.filter { $0.hasPrefix(prefix) }.sorted() }
+    func listPage(prefix: String, after: String?, limit: Int) async throws -> CloudListingPage {
+        let paths = Array(files.keys.filter { $0.hasPrefix(prefix) && $0 > (after ?? "") }.sorted().prefix(limit))
+        return CloudListingPage(paths: paths, next: paths.count == limit ? paths.last : nil)
+    }
     func size(path: String) async throws -> Int? { files[path]?.count }
     func upload(file: URL, path: String) async throws {
         if let failAfter, uploaded.count >= failAfter { throw CloudError.retry }

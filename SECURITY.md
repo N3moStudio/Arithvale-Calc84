@@ -1,10 +1,10 @@
-# Storage and recovery design · 0.3.0
+# Storage and recovery design · 0.4.0
 
 ## Scope and trust
 
 Encrypt photo/video/file contents and library metadata at rest and in portable backups. The calculator is an appearance choice, not encryption or proof of concealment.
 
-No Calc 84 account, application telemetry, developer server, or embedded cloud credentials. Optional Blomp and MEGA connections contact the user's provider directly. PhotoKit can fetch iCloud originals when importing; a selected Files provider can also handle snapshot transport. System backups can include encrypted app files, but are not a substitute for tested portable recovery.
+No Arithvale account, application telemetry, developer server, or embedded cloud credentials. Optional Blomp and MEGA connections contact the user's provider directly. PhotoKit can fetch iCloud originals when importing; a selected Files provider can also handle snapshot transport. System backups can include encrypted app files, but are not a substitute for tested portable recovery.
 
 ## Optional cloud transport
 

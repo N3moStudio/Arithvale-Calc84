@@ -1,19 +1,19 @@
-# Calc 84 · phone test guide
-Version 0.3.0 alpha · Build 3
+# Arithvale · phone test guide
+Version 0.4.0 alpha · Build 4
 
 ## Cloud backup checks
 
 Use disposable samples first. Do not delete your only library to test recovery.
 
 1. Update over the old app using the same installer/signing identity. Check that the existing calculator code, photos, videos, and recovery key still work.
-2. Open Settings → Cloud Backup. Sign in to your own service. MEGA also asks for a developer app key from https://mega.nz/sdk; this is not a recovery key. Blomp must pass HTTPS checks; stop and use another destination if it reports a certificate error.
+2. Open Settings → Backup & Recovery → MEGA & Blomp. Sign in to your own service. MEGA also asks for a developer app key from https://mega.nz/sdk; this is not a recovery key. Blomp must pass HTTPS checks; stop and use another destination if it reports a certificate error.
 3. Import one old-dated photo, one video, and a Live Photo if available. Back Up Now. Wait for the completed catalog, not just an individual upload. Open a photo → Backup Status; check the provider and saved time.
-4. Check the cloud account in its own website/app. Files under c84/v1 should be opaque encrypted objects, with no ordinary media thumbnails or original filenames. Save the Calc 84 recovery key separately.
+4. Check the cloud account in its own website/app. Files under c84/v1 should be opaque encrypted objects, with no ordinary media thumbnails or original filenames. Save the Arithvale recovery key separately.
 5. Add another sample. Back up again: it should upload only new resource objects plus a catalog. Recheck All Remote Files also downloads unchanged files and consumes bandwidth.
 6. Interrupt a transfer with Pause, app backgrounding, and loss of Wi-Fi. Unlock and retry. No interrupted catalog should replace an older complete backup. Completed files should be reusable; the currently interrupted file can restart from the beginning.
 7. Confirm Wi-Fi-only behavior; then explicitly test the cellular toggle. Verify MEGA transfer-limit errors leave a usable app and retry path.
 8. Cloud Backup → service → Test Cloud Recovery. Choose a completed snapshot and its original recovery key. A wrong key must fail before media download. A correct test authenticates files without replacing the library. Allow up to 3× the backup size in free phone space for this alpha.
-9. With a separate test installation/container, choose Restore from Cloud before creating a new library. Connect the same account, select the snapshot, enter its original Calc 84 key, and choose a new calculator code. Compare media, albums, favorites, original dates and Live Photo pairing.
+9. With a separate test installation/container, choose Restore from Cloud before creating a new library. Connect the same account, select the snapshot, enter its original Arithvale key, and choose a new calculator code. Compare media, albums, favorites, original dates and Live Photo pairing.
 10. Save the old-dated photo/video back to Photos. Check chronological date order, then separately inspect Recently Added (which can show today). Check that original bytes and metadata were retained; do not infer date correctness just from the displayed filename.
 11. Delete a sample locally and back up. An older remote snapshot must still restore it. No automatic cloud cleanup is implemented, so retained history uses storage.
 12. Disconnect a provider. Its cloud data must remain, while this phone requires sign-in again. Download a complete cloud library folder to a computer and test Scripts/recover.py on one snapshots/*.c84cloud file for independent recovery.
@@ -38,10 +38,10 @@ The checks below cover both new and existing features.
 
 ## 1. Install and enter
 
-- Install Calc 84 0.3.0.ipa directly with SideStore. No extension is included. Keep your normal signing/refresh process.
+- Install Arithvale-0.4.0-test.ipa directly with SideStore. No extension is included. Keep your normal signing/refresh process.
 - Launch: calculator first, no photo permission request.
-- Type 160160 and =. Save the recovery key outside the app, confirm its final eight characters, and choose a unique 6–12 digit code.
-- Lock; your new code and = should reopen it. The public starter must no longer open the configured library.
+- Type 160160 and hold =. Save the recovery key outside the app, confirm its final eight characters, and choose a unique 6–12 digit code.
+- Lock; your new code and hold = should reopen it. The public starter must no longer open the configured library.
 - Check 2+3×4 = 14, (2+3)×4 = 20, sin(30) = 0.5 in DEG, plus AC, backspace, sign change, scientific controls, and RAD.
 - A calculation whose answer equals your code must not unlock the library. Long-pressing the answer must do nothing special.
 
@@ -65,7 +65,7 @@ Prepare an old photo, a photo whose date you adjusted in Photos, a screenshot, a
 - Import photos/videos using Import; other files using the folder button.
 - Test Selected Photos access, full access if desired, and denied access.
 - Confirm counts, image zoom, video audio/seeking, PDF viewing, and that originals remain.
-- A Live Photo should say its paired video is retained; vault preview is still-only.
+- A Live Photo should say its paired video is retained; hold the preview to play its motion; try the VoiceOver Play Live Photo action too.
 - Cancel pickers. Try a cloud-only photo with and without connectivity. A failed import must retain the source.
 - Interrupt an import. Completed items may remain; an incomplete Live Photo must not appear as fully imported.
 - After a successful Photos import, choose Keep Originals: sources and vault copies must both remain. Dismiss the review sheet for the same result.
@@ -73,7 +73,7 @@ Prepare an old photo, a photo whose date you adjusted in Photos, a screenshot, a
 - Import a mix with an unavailable cloud item: only completed imports may be offered for deletion. All failed/unprocessed originals must remain.
 - Edited photos, alternate/RAW resources, missing asset identifiers, and limited-access fallback imports must be excluded from in-app deletion. Files imports must never offer this action.
 - Change an original in Photos, revoke access, or remove/corrupt a disposable vault copy before deletion: the request must be refused. Background/lock during verification must not start a stale deletion request. Once an OS-confirmed Photos transaction has begun, iOS controls its completion.
-- For a Live Photo, confirm both vault resources work before confirming deletion. Check iCloud Photos propagation on a disposable sample; Calc 84 must never empty Recently Deleted.
+- For a Live Photo, confirm both vault resources work before confirming deletion. Check iCloud Photos propagation on a disposable sample; Arithvale must never empty Recently Deleted.
 - Change Vault Timeline / Photos Layout, grid size, date source, and oldest/newest.
 - Check capture month/day against the samples. Unknown dates should use import date and say so in preview.
 - Favorite items, move multiple items to an album, search names/albums, and remove from album.
@@ -96,7 +96,7 @@ Exports are plain media and may include GPS. Original resources do not include e
 
 ## 5. External backups
 
-1. Choose your own iCloud Drive or other external folder, outside Calc 84/LiveContainer.
+1. Choose your own iCloud Drive or other external folder, outside Arithvale/LiveContainer.
 2. Back Up Now; wait for completion and record the displayed filename/date.
 3. In Files, locate the .c84backup. It must not open as ordinary photos/videos. Its existence remains visible.
 4. Check provider upload status; keep a second copy on a computer/external drive for important files.
@@ -113,7 +113,7 @@ Each snapshot is full-sized. Export/restore/testing can need several times your 
 Prefer a second device or separate empty app-data container while keeping the original installation.
 
 1. Keep the external backup and its secret.
-2. Empty installation: 160160 and = → Restore an Existing Backup.
+2. Empty installation: 160160 and hold = → Restore an Existing Backup.
 3. Select backup, enter key (or original 0.1 password), choose a new calculator code.
 4. Check samples, dates, albums, favorites, Recently Deleted, videos, and Live Photo re-save.
 5. Lock/relaunch and repeat. Re-select the backup folder.
@@ -142,10 +142,25 @@ Recovered media are unencrypted. The sidecar retains app metadata; importing int
 - VoiceOver: digits, Equals, selection, setting labels, code/recovery forms.
 - Both gallery styles, empty library, long names, and multi-select.
 - SideStore direct first; LiveContainer separately if intended. Repeat Keychain, app-switcher, folder access, and restore tests in each.
-- Calculator works offline. No Calc 84 account, analytics, or subscription is required. Cloud backups use your optional provider accounts.
+- Calculator works offline. No Arithvale account, analytics, or subscription is required. Cloud backups use your optional provider accounts.
 
 ## Send useful results
 
 Include build number, iOS version, installer/host, exact steps, expected result, and actual result. Use disposable samples in screenshots. Never send your recovery key, private originals, or unredacted backups.
 
 Mark each group passed/failed after your own run. Computer tests are separate from these real-device checks.
+
+## 0.4.0 regression checks — pending on a real phone
+
+1. Update over an existing installation without uninstalling. The Home Screen, permission prompts, calculator and About must say Arithvale; existing code/recovery files still work. Enter the code and hold Equals.
+2. On a fresh disposable container, visit cloud recovery and Back repeatedly. The setup key must stay identical and usable; cancel/background then reopen creates a fresh setup session. An empty key can never enable Create.
+3. With disposable cloud catalogs, place a corrupt catalog between two valid ones. Both valid rows remain selectable; skipped damage is explained. Try Next Page and refresh; an account/network failure offers retry and never pretends the account has no backups.
+4. Complete MEGA-only, Blomp-only and Files-only backups. Gallery reports an actual checked destination. Change an item; the corresponding destinations must say changes need backup. Disconnecting does not imply the files were deleted.
+5. Import accessible / unavailable / accessible samples. Both accessible samples finish. Retry only the failures; cancel an iCloud resource download and background midway. No source deletion should be offered for unverified items and abandoned temporary files should disappear.
+6. Import review appears before automatic backup. Dismiss it and check that rapid edits coalesce into one later backup. Pause cloud transfers from the gallery. Byte totals describe completed resource checks; a single resource is still counted after its transfer/check finishes.
+7. Enter six ordinary six-digit numbers and TAP Equals; later enter the real code and HOLD Equals. Normal calculations must not consume the PIN retry allowance. An incorrect held code must still be throttled.
+8. Open a middle gallery item, use Previous/Next, favorite it, play a Live Photo, open Share and return, then lock. Check for stuck playback, stale images and temporary plaintext after each exit. Try small screens, landscape, largest text and VoiceOver.
+9. Share Photo Copies without Metadata from a disposable GPS-tagged photo. Inspect the JPEG for GPS/EXIF and confirm <=4096 pixels, upright orientation and unchanged encrypted original. Live Photos become stills in this mode; videos keep original-only export.
+10. Low storage must fail before substantial staging when an estimate is available, preserve the library, and leave retry available. Test recovery records the selected snapshot/filename digest, not a blanket assurance about every backup.
+
+These checks require a signed installation. Linux core tests and an arm64 compile cannot execute UIKit, PhotoKit, Keychain, UI gestures or actual provider login.

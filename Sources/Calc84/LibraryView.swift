@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 
 struct LibraryView: View {
     @EnvironmentObject private var vault: VaultModel
+    @EnvironmentObject private var cloud: CloudBackupModel
     @Environment(\.dynamicTypeSize) private var textSize
     @AppStorage("libraryLayout") private var layout = LibraryLayout.timeline.rawValue
     @AppStorage("libraryDateSource") private var dateSource = LibraryDateSource.captured.rawValue
@@ -42,6 +43,7 @@ struct LibraryView: View {
             switch filter {
             case "Photos": return UTType(item.contentType)?.conforms(to: .image) == true
             case "Videos": return UTType(item.contentType)?.conforms(to: .movie) == true
+            case "Files": return UTType(item.contentType)?.conforms(to: .image) != true && UTType(item.contentType)?.conforms(to: .movie) != true
             case "Favorites": return item.favorite == true
             case "All", "Recently Deleted": return true
             default: return filter.hasPrefix("album:") && item.album == String(filter.dropFirst(6))
@@ -69,7 +71,7 @@ struct LibraryView: View {
                 Text(selecting ? "\(selection.count) selected" : "\(visible.count) items").fontWeight(.semibold)
                 Spacer()
                 Button { settings = true } label: {
-                    Label(lastExport == 0 ? "Back up" : needsBackup ? "Back up changes" : "Backup saved", systemImage: lastExport == 0 || needsBackup ? "externaldrive" : "checkmark.shield")
+                    BackupSummaryView().environmentObject(vault.cloud)
                         .font(.caption.weight(.semibold)).multilineTextAlignment(.trailing).frame(minHeight: 44)
                 }.disabled(vault.busy)
             }.font(.subheadline).padding(.horizontal, 16)
@@ -79,8 +81,17 @@ struct LibraryView: View {
                 }.pickerStyle(.segmented).padding(.horizontal, 16).padding(.bottom, 8)
             }
             if vault.busy {
-                HStack(spacing: 10) { ProgressView(); Text(vault.status.isEmpty ? "Working…" : vault.status).font(.footnote) }
+                HStack(spacing: 10) {
+                    if vault.importing { ProgressView(value: vault.progress).frame(width: 60) } else { ProgressView() }
+                    Text(cloud.running ? cloud.phase : vault.status.isEmpty ? "Working…" : vault.status).font(.footnote)
+                    Spacer(minLength: 0)
+                    if vault.importing { Button("Cancel") { vault.cancelImport() }.frame(minHeight: 44) }
+                    if vault.cloud.running { Button("Pause") { vault.cloud.pause() }.frame(minHeight: 44) }
+                }
                     .frame(maxWidth: .infinity, alignment: .leading).padding(12).background(Color(uiColor: .secondarySystemBackground))
+            }
+            if vault.failedImportCount > 0 && !vault.busy {
+                Button("Retry \(vault.failedImportCount) Unimported Items") { vault.retryImports() }.frame(minHeight: 44)
             }
             if visible.isEmpty {
                 Spacer()
@@ -99,7 +110,7 @@ struct LibraryView: View {
         .background(Color(uiColor: .systemBackground)).tint(.primary)
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $settings) { NavigationStack { VaultSettingsView().environmentObject(vault) } }
-        .sheet(item: $selected) { FilePreview(item: $0).environmentObject(vault) }
+        .fullScreenCover(item: $selected) { MediaBrowser(items: sections.flatMap(\.items), initial: $0.id).environmentObject(vault) }
         .sheet(isPresented: $showingExports) { ExportMediaView(items: exportItems).environmentObject(vault) }
         .sheet(isPresented: $albumSheet) { albumEditor }
         .sheet(item: $vault.photoImportReview) { PhotoImportReviewView(review: $0).environmentObject(vault) }
@@ -116,7 +127,7 @@ struct LibraryView: View {
                 Task { await vault.updateMany(chosen, deleted: true, permanently: filter == "Recently Deleted"); selection = []; selecting = false }
             }
         } message: { Text(filter == "Recently Deleted" ? "This removes these local copies. Older backups and exported originals keep theirs." : "Restore them from Albums → Recently Deleted. Nothing is automatically erased.") }
-        .onDisappear { selected = nil; photos = []; selection = []; search = "" }
+        .onChange(of: vault.unlocked) { _, unlocked in if !unlocked { selected = nil; photos = []; selection = []; search = "" } }
         .alert("Couldn’t Complete", isPresented: Binding(get: { !settings && vault.photoImportReview == nil && vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
             Button("Close", role: .cancel) { vault.message = nil }
         } message: { Text(vault.message ?? "") }
@@ -137,7 +148,7 @@ struct LibraryView: View {
     private var filters: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 22) {
-                ForEach(["All", "Photos", "Videos", "Favorites"], id: \.self) { value in
+                ForEach(["All", "Photos", "Videos", "Favorites", "Files"], id: \.self) { value in
                     Button { filter = value; selection = [] } label: {
                         Text(value).font(.headline).foregroundStyle(filter == value ? .primary : .secondary).frame(minHeight: 44)
                             .overlay(alignment: .bottom) { if filter == value { Capsule().frame(height: 3) } }

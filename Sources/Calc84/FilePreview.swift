@@ -1,6 +1,8 @@
 #if os(iOS)
 import SwiftUI
 import UIKit
+import Photos
+import PhotosUI
 import PDFKit
 import AVKit
 #if canImport(_AVKit_SwiftUI)
@@ -11,9 +13,15 @@ import CalcCore
 
 struct FilePreview: View {
     let item: VaultItem
+    var previous: (() -> Void)? = nil
+    var next: (() -> Void)? = nil
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @EnvironmentObject private var vault: VaultModel
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
+    @State private var livePhoto: PHLivePhoto?
+    @State private var livePhotoError: String?
+    @State private var companion: URL?
     @State private var player: AVPlayer?
     @State private var temporary: URL?
     @State private var showingExport = false
@@ -25,6 +33,7 @@ struct FilePreview: View {
                 if let error { ContentUnavailableView("Couldn’t Open", systemImage: "exclamationmark.triangle", description: Text(error)) }
                 else if let player { VideoPlayer(player: player) }
                 else if let temporary, UTType(item.contentType)?.conforms(to: .pdf) == true { PDFPreview(url: temporary) }
+                else if let livePhoto { LivePhotoPreview(photo: livePhoto) }
                 else if let image { ZoomableImage(image: image) }
                 else if temporary != nil { ContentUnavailableView("File Is Stored", systemImage: "doc", description: Text("Save or share a copy to open it in another app.")) }
                 else { ProgressView("Opening…") }
@@ -40,15 +49,26 @@ struct FilePreview: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                HStack {
+                VStack(spacing: 8) {
+                    HStack {
+                        Button("Previous", systemImage: "chevron.left") { previous?() }.disabled(previous == nil).frame(minHeight: 44)
+                        Spacer()
+                        Button(item.favorite == true ? "Unfavorite" : "Favorite", systemImage: item.favorite == true ? "heart.fill" : "heart") {
+                            vault.update(item, favorite: item.favorite != true)
+                        }.disabled(vault.busy).frame(minHeight: 44)
+                        Spacer()
+                        Button("Next", systemImage: "chevron.right") { next?() }.disabled(next == nil).frame(minHeight: 44)
+                    }.labelStyle(.iconOnly)
+                    HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(item.name).font(.subheadline).lineLimit(2)
                         Text(item.captured == nil ? "Original date unavailable · showing import date" : "Original capture date preserved")
                             .font(.caption).foregroundStyle(.secondary)
-                        if item.companionID != nil { Text("Live Photo · paired video retained").font(.caption).foregroundStyle(.secondary) }
+                        if item.companionID != nil { Text(livePhotoError ?? "Live Photo · hold the image to play").font(.caption).foregroundStyle(.secondary) }
                     }
                     Spacer()
-                }.padding().background(.regularMaterial)
+                    }
+                }.padding().background { if reduceTransparency { Color(uiColor: .systemBackground) } else { Rectangle().fill(.regularMaterial) } }
             }
             .sheet(isPresented: $showingExport) { ExportMediaView(items: [item]).environmentObject(vault) }
             .sheet(isPresented: $showingBackup) {
@@ -80,13 +100,29 @@ struct FilePreview: View {
                     player?.pause(); player = nil; image = nil; try? FileManager.default.removeItem(at: url); return
                 }
                 temporary = url
+                if let id = item.companionID {
+                    let pair = try TemporaryFiles.fresh(extension: "mov")
+                    companion = pair
+                    try await vault.engine.materialize(id: id, to: pair)
+                    let photo: PHLivePhoto
+                    do { photo = try await LivePhotoLoader.load([url, pair]) }
+                    catch {
+                        if !Task.isCancelled, ticket == vault.generation { livePhotoError = "Motion preview unavailable. Both originals are retained for export." }
+                        return
+                    }
+                    guard !Task.isCancelled, ticket == vault.generation else {
+                        try? FileManager.default.removeItem(at: pair); return
+                    }
+                    livePhoto = photo
+                }
             } catch {
                 if let created { try? FileManager.default.removeItem(at: created) }
                 if !Task.isCancelled, ticket == vault.generation { self.error = error.localizedDescription }
             }
         }
         .onDisappear {
-            player?.pause(); player?.replaceCurrentItem(with: nil); player = nil; image = nil
+            player?.pause(); player?.replaceCurrentItem(with: nil); player = nil; image = nil; livePhoto = nil
+            if let companion { try? FileManager.default.removeItem(at: companion) }; companion = nil
             if let temporary { try? FileManager.default.removeItem(at: temporary) }; temporary = nil
         }
     }
@@ -121,6 +157,9 @@ struct ExportMediaView: View {
                     Button("Save to Photos", systemImage: "photo.badge.arrow.down") { start(mode: "photos") }.disabled(!allMedia)
                     Button("Save Originals to Files", systemImage: "folder") { start(mode: "files") }
                     Button("Share / AirDrop Originals", systemImage: "square.and.arrow.up") { start(mode: "share") }
+                    Button("Share Photo Copies without Metadata", systemImage: "location.slash") { start(mode: "privatePhotos") }
+                        .disabled(!items.allSatisfy { UTType($0.contentType)?.conforms(to: .image) == true })
+                    Text("Photo copies are new JPEGs up to 4096 pixels, with location and original metadata omitted. Live Photos become stills. Visible details in the picture remain. Originals stay unchanged.").font(.footnote).foregroundStyle(.secondary)
                 }.disabled(working || vault.busy)
                 if working { Section { ProgressView("Preparing originals…") } }
                 if !result.isEmpty { Section { Label(result, systemImage: "checkmark.circle") } }
@@ -172,6 +211,13 @@ struct ExportMediaView: View {
                     let main = folder.appendingPathComponent("\(index + 1)-\(safe)")
                     try await vault.engine.materialize(id: item.id, to: main)
                     if let captured = item.captured { try? FileManager.default.setAttributes([.creationDate: captured, .modificationDate: captured], ofItemAtPath: main.path) }
+                    if mode == "privatePhotos" {
+                        let copy = folder.appendingPathComponent("Photo-\(index + 1).jpg")
+                        try await Task.detached(priority: .utility) { try PrivatePhotoCopy.make(from: main, to: copy) }.value
+                        try? FileManager.default.removeItem(at: main)
+                        urls.append(copy)
+                        continue
+                    }
                     var companion: URL?
                     if let id = item.companionID {
                         let url = folder.appendingPathComponent("\(index + 1)-LivePhoto.mov")
@@ -189,7 +235,7 @@ struct ExportMediaView: View {
                 try Task.checkCancellation()
                 guard vault.unlocked, ticket == vault.generation else { throw VaultError.locked }
                 if mode == "photos" { result = "Saved \(saved) to Photos with their stored dates." }
-                else { export = MediaExport(urls: urls, share: mode == "share", folder: folder); handedOff = true }
+                else { export = MediaExport(urls: urls, share: mode == "share" || mode == "privatePhotos", folder: folder); handedOff = true }
             } catch {
                 if !Task.isCancelled, ticket == vault.generation { self.error = (saved > 0 ? "Saved \(saved) items. " : "") + error.localizedDescription }
             }

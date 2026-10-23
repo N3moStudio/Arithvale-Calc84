@@ -24,6 +24,12 @@ final class VaultModel: ObservableObject {
     @Published var message: String?
     @Published var status = ""
     @Published var progress = 0.0
+    @Published var importing = false
+    @Published var failedImportCount = 0
+    private var importTask: Task<Void, Never>?
+    private var automaticBackupTask: Task<Void, Never>?
+    private var failedPhotos: [PhotosPickerItem] = []
+    private var failedFiles: [URL] = []
     @Published var photoImportReview: PhotoImportReview?
     let engine: VaultEngine
     let cloud = CloudBackupModel()
@@ -100,55 +106,83 @@ final class VaultModel: ObservableObject {
         } catch { if ticket == generation { message = error.localizedDescription }; return false }
     }
     func lock() {
+        importTask?.cancel(); automaticBackupTask?.cancel()
+        failedPhotos = []; failedFiles = []; failedImportCount = 0
         cloud.lock()
         generation = UUID(); unlocked = false; items = []; status = ""; message = nil; photoImportReview = nil
         if let pendingBackup { finishBackupExport(pendingBackup, destination: nil) }
         lockTask = Task { await engine.lock(); exists = await engine.exists() }
     }
     private func changed() { UserDefaults.standard.set(true, forKey: "libraryNeedsBackup"); cloud.changed() }
-    func importFiles(_ urls: [URL]) {
+    func cancelImport() { importTask?.cancel(); status = "Cancelling import…" }
+    func retryImports() {
         guard unlocked, !busy else { return }
-        busy = true; progress = 0; let ticket = generation
-        Task {
+        if !failedPhotos.isEmpty { let values = failedPhotos; importPhotos(values) }
+        else if !failedFiles.isEmpty { let values = failedFiles; importFiles(values) }
+    }
+    private func importStopped(_ error: Error) -> Bool {
+        Task.isCancelled || (error as NSError).domain == NSCocoaErrorDomain && (error as NSError).code == NSFileWriteOutOfSpaceError
+    }
+    func importFiles(_ urls: [URL]) {
+        guard unlocked, !busy, !urls.isEmpty else { return }
+        busy = true; importing = true; progress = 0; let ticket = generation
+        failedFiles = []; failedPhotos = []; failedImportCount = 0
+        importTask = Task {
             var completed = 0
-            do {
-                for url in urls {
-                    guard ticket == generation else { break }
-                    let access = url.startAccessingSecurityScopedResource()
-                    defer { if access { url.stopAccessingSecurityScopedResource() } }
+            var failures: [URL] = []
+            var errors: [String] = []
+            for (position, url) in urls.enumerated() {
+                guard ticket == generation, !Task.isCancelled else { failures += urls.dropFirst(position); break }
+                status = "Importing file \(position + 1) of \(urls.count)…"
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    try StoragePreflight.require(bytes: Int64(try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) * 2)
                     let type = UTType(filenameExtension: url.pathExtension)?.identifier ?? UTType.data.identifier
                     let details = await MediaBridge.metadata(url, type: type)
                     let thumb = await MediaBridge.thumbnail(url, type: type)
+                    try Task.checkCancellation()
                     guard ticket == generation else { break }
                     let result = try await engine.add(file: url, name: url.lastPathComponent, contentType: type, details: details, thumbnail: thumb)
                     changed(); completed += 1
-                    guard ticket == generation else { break }
-                    items = result; progress = Double(completed) / Double(max(1, urls.count))
+                    if ticket == generation { items = result }
+                } catch {
+                    failures.append(url); errors.append(url.lastPathComponent + ": " + error.localizedDescription)
+                    if importStopped(error) { failures += urls.dropFirst(position + 1); break }
                 }
-                if ticket == generation { status = "Imported \(completed). Originals stay where they are." }
-            } catch { if ticket == generation { message = "Imported \(completed). " + error.localizedDescription } }
-            busy = false
-            if completed > 0, ticket == generation { await autoBackup() }
+                progress = Double(position + 1) / Double(urls.count)
+            }
+            busy = false; importing = false; importTask = nil
+            guard ticket == generation, unlocked else { return }
+            failedFiles = failures; failedImportCount = failures.count
+            status = "Imported \(completed) of \(urls.count). Originals stay where they are."
+            if !failures.isEmpty { message = "\(failures.count) items weren’t imported. You can retry them.\n" + errors.prefix(3).joined(separator: "\n") }
+            if completed > 0 { scheduleAutomaticBackup() }
         }
     }
     func importPhotos(_ selections: [PhotosPickerItem]) {
-        guard unlocked, !busy else { return }
-        photoImportReview = nil
-        busy = true; progress = 0; let ticket = generation
-        Task {
+        guard unlocked, !busy, !selections.isEmpty else { return }
+        photoImportReview = nil; failedPhotos = []; failedFiles = []; failedImportCount = 0
+        busy = true; importing = true; progress = 0; let ticket = generation
+        importTask = Task {
             var completed = 0
             var originals: [ImportedOriginal] = []
-            var importError: String?
-            do {
-                // Permission is requested only after choosing Import Photos. Limited access is supported.
-                if PHPhotoLibrary.authorizationStatus(for: .readWrite) == .notDetermined {
-                    _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-                }
-                for selection in selections {
-                    guard ticket == generation else { break }
+            var failures: [PhotosPickerItem] = []
+            var errors: [String] = []
+            if PHPhotoLibrary.authorizationStatus(for: .readWrite) == .notDetermined {
+                _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            }
+            for (position, selection) in selections.enumerated() {
+                guard ticket == generation, !Task.isCancelled else { failures += selections.dropFirst(position); break }
+                status = "Importing photo or video \(position + 1) of \(selections.count)…"
+                do {
                     let media = try await MediaBridge.prepare(selection)
                     defer { media.clean() }
+                    try Task.checkCancellation()
                     guard ticket == generation else { break }
+                    let bytes = Int64(try media.url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+                        + Int64(try media.companion?.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+                    try StoragePreflight.require(bytes: bytes * 2)
                     let existing = Set(items.map(\.id))
                     let result = try await engine.add(file: media.url, name: media.name, contentType: media.type,
                         details: media.details, companion: media.companion,
@@ -158,16 +192,21 @@ final class VaultModel: ObservableObject {
                     if let source = media.original, let added = result.first(where: { $0.visible && !existing.contains($0.id) }) {
                         originals.append(ImportedOriginal(vaultID: added.id, source: source))
                     }
-                    items = result; progress = Double(completed) / Double(max(1, selections.count))
+                    items = result
+                } catch {
+                    failures.append(selection); errors.append("Item \(position + 1): " + error.localizedDescription)
+                    if importStopped(error) { failures += selections.dropFirst(position + 1); break }
                 }
-                if ticket == generation { status = "Imported \(completed). Originals remain in Photos." }
-            } catch { importError = error.localizedDescription }
-            busy = false
-            if completed > 0, ticket == generation { await autoBackup() }
+                progress = Double(position + 1) / Double(selections.count)
+            }
+            busy = false; importing = false; importTask = nil
             guard ticket == generation, unlocked else { return }
-            if completed > 0 {
-                photoImportReview = PhotoImportReview(imported: completed, requested: selections.count, originals: originals, importError: importError)
-            } else if let importError { message = "Nothing imported. Originals remain in Photos. " + importError }
+            failedPhotos = failures; failedImportCount = failures.count
+            status = "Imported \(completed) of \(selections.count). Originals remain in Photos."
+            photoImportReview = PhotoImportReview(imported: completed, requested: selections.count, originals: originals,
+                importError: errors.isEmpty ? nil : errors.prefix(3).joined(separator: "\n"))
+            // Show review immediately. Automatic backups wait until it is dismissed.
+            if completed > 0 { scheduleAutomaticBackup() }
         }
     }
     /// Recheck the committed vault copies and exact source assets only after the
@@ -203,12 +242,25 @@ final class VaultModel: ObservableObject {
                 if ticket == generation { items = result }
             } catch { if ticket == generation { message = error.localizedDescription } }
             busy = false
-            if ticket == generation { await autoBackup() }
+            if ticket == generation { scheduleAutomaticBackup() }
         }
     }
-    private func autoBackup() async {
-        if UserDefaults.standard.bool(forKey: "automaticFolderBackup"), BackupFolder.configured { await backup() }
-        if unlocked, UserDefaults.standard.bool(forKey: "cloudAfterChanges") { cloud.refresh(); cloud.backup(vault: self) }
+    func scheduleAutomaticBackup() {
+        automaticBackupTask?.cancel()
+        let ticket = generation
+        automaticBackupTask = Task {
+            do {
+                try await Task.sleep(nanoseconds: 3_000_000_000)
+                while busy || photoImportReview != nil { try await Task.sleep(nanoseconds: 500_000_000) }
+                try Task.checkCancellation()
+                guard unlocked, ticket == generation else { return }
+                if UserDefaults.standard.bool(forKey: "automaticFolderBackup"), BackupFolder.configured { await backup() }
+                try Task.checkCancellation()
+                if unlocked, ticket == generation, UserDefaults.standard.bool(forKey: "cloudAfterChanges") {
+                    cloud.refresh(); cloud.backup(vault: self)
+                }
+            } catch { /* A newer change or lock supersedes this request. */ }
+        }
     }
     func finishCloudRestore(_ archive: URL, recovery: String, code: String) async throws {
         guard !exists, VaultCode.valid(code) else { throw VaultError.exists }
@@ -235,7 +287,7 @@ final class VaultModel: ObservableObject {
             }
         } catch { if ticket == generation { message = error.localizedDescription } }
         busy = false
-        if ticket == generation { await autoBackup() }
+        if ticket == generation { scheduleAutomaticBackup() }
     }
     func backup() async {
         guard unlocked, !busy else { return }
@@ -245,6 +297,7 @@ final class VaultModel: ObservableObject {
             let source = try TemporaryFiles.fresh(extension: "c84backup")
             defer { try? FileManager.default.removeItem(at: source) }
             status = "Checking and preparing encrypted backup…"
+            try StoragePreflight.require(bytes: items.reduce(Int64(0)) { $0 + Int64($1.byteCount) } * 2)
             try await engine.export(to: source)
             guard ticket == generation else { return }
             status = "Saving encrypted copy…"
@@ -292,6 +345,7 @@ final class VaultModel: ObservableObject {
             _ = try TemporaryFiles.fresh(extension: "c84backup")
             let url = TemporaryFiles.directory.appendingPathComponent(BackupFolder.filename())
             source = url; status = "Preparing encrypted backup…"
+            try StoragePreflight.require(bytes: items.reduce(Int64(0)) { $0 + Int64($1.byteCount) } * 2)
             try await engine.export(to: url)
             try Task.checkCancellation()
             let digest = try await Task.detached(priority: .utility) { try BackupCopy.digest(url) }.value
@@ -340,6 +394,10 @@ final class VaultModel: ObservableObject {
             } }
         }
     }
+    func recordRecoveryTest(source: String, snapshot: String, library: String) {
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastRecoveryTest")
+        UserDefaults.standard.set(source + " · " + snapshot + " · Library " + library, forKey: "lastRecoveryTestIdentity")
+    }
     func verifyBackup(url: URL, recovery: String) async -> Bool {
         guard unlocked, !busy else { return false }
         busy = true; let ticket = generation
@@ -349,7 +407,9 @@ final class VaultModel: ObservableObject {
         do {
             let count = try await engine.verifyBackup(from: url, password: recovery)
             guard ticket == generation else { return false }
-            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastRecoveryTest")
+            let digest = try await Task.detached(priority: .utility) { try CloudBackup.hash(url) }.value
+            guard ticket == generation else { return false }
+            recordRecoveryTest(source: "Files", snapshot: url.lastPathComponent + " · SHA-256 " + digest, library: "Contained in the tested archive")
             status = "Recovery test passed: \(count) items authenticated in a separate temporary library."
             return true
         } catch { if ticket == generation { message = error.localizedDescription }; return false }

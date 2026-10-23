@@ -29,7 +29,7 @@ struct CalculatorView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     HStack(alignment: .firstTextBaseline) {
-                        Text("CALC 84").font(.headline).tracking(2)
+                        Text(AppBrand.calculatorTitle).font(.headline).tracking(2)
                         Spacer()
                         Button("Help", systemImage: "ellipsis.circle") { help = true }
                             .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
@@ -41,13 +41,13 @@ struct CalculatorView: View {
                     display
                     if scientific {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: textSize.isAccessibilitySize ? 2 : 4), spacing: 10) {
-                            ForEach(["sin", "cos", "tan", "sqrt", "ln", "log", "π", "^"], id: \.self) { key in
+                            ForEach(["sin", "cos", "tan", "sqrt", "ln", "log", "π", "^", "(", ")", "e", "⌫"], id: \.self) { key in
                                 keyButton(key == "sqrt" ? "√" : key, value: key, utility: true)
                             }
                         }
                     }
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
-                        ForEach(["2nd", "(", ")", "⌫", "AC", "+/−", "%", "÷", "7", "8", "9", "×", "4", "5", "6", "−", "1", "2", "3", "+", "0", ".", "e", "="], id: \.self) { key in
+                        ForEach(["AC", "+/−", "%", "÷", "7", "8", "9", "×", "4", "5", "6", "−", "1", "2", "3", "+", "2nd", "0", ".", "="], id: \.self) { key in
                             keyButton(key, value: key, utility: !key.allSatisfy(\.isNumber))
                         }
                     }
@@ -64,6 +64,10 @@ struct CalculatorView: View {
                 List {
                     Section("Calculator") {
                         Text("Use 2nd for scientific functions. DEG and RAD change angle units. Enter a calculation, then tap =.")
+                    }
+                    Section("Private library") {
+                        Text("Enter your code and hold = to open your library. On a new installation, use 160160. Normal taps on = only calculate.")
+                        Text("Incorrect codes are rate limited. After repeated attempts, wait up to five minutes before trying again.")
                     }
                     Section("Recovery") {
                         Button("Restore or Recover Library") { help = false; access = true }
@@ -109,7 +113,25 @@ struct CalculatorView: View {
         .accessibilityValue(expression + ", " + result)
     }
 
+    private func unlockLibrary() {
+        guard VaultCode.isDirectEntry(expression, evaluated: didEvaluate), !vault.busy else { return }
+        let code = expression
+        Task {
+            if await vault.enter(code: code) {
+                guard expression == code, scenePhase == .active else { vault.lock(); return }
+                expression = ""; result = "0"; didEvaluate = false; access = true
+            }
+        }
+    }
+    @ViewBuilder
     private func keyButton(_ title: String, value: String, utility: Bool) -> some View {
+        if value == "=" {
+            keyFace(title, value: value, utility: utility)
+                .highPriorityGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in unlockLibrary() })
+                .accessibilityAction(named: "Open private library") { unlockLibrary() }
+        } else { keyFace(title, value: value, utility: utility) }
+    }
+    private func keyFace(_ title: String, value: String, utility: Bool) -> some View {
         Button { press(value) } label: {
             Text(title).font(utility ? .headline.monospaced() : .title2.monospaced())
                 .frame(maxWidth: .infinity, minHeight: keyHeight)
@@ -126,15 +148,6 @@ struct CalculatorView: View {
         case "⌫": if !expression.isEmpty { expression.removeLast() }; didEvaluate = false
         case "2nd": scientific.toggle()
         case "=":
-            if VaultCode.isDirectEntry(expression, evaluated: didEvaluate), !vault.busy {
-                let code = expression
-                Task {
-                    if await vault.enter(code: code) {
-                        guard expression == code, scenePhase == .active else { vault.lock(); return }
-                        expression = ""; result = "0"; didEvaluate = false; access = true
-                    }
-                }
-            }
             do { result = Calculator.display(try Calculator.evaluate(expression, degrees: degrees)); didEvaluate = true }
             catch { result = error.localizedDescription; didEvaluate = false }
         case "+/−":

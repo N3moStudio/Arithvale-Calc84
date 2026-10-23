@@ -7,7 +7,7 @@ public enum VaultError: Error, LocalizedError {
         case .invalidPassword: return "Use at least 14 characters. A few unrelated words work well."
         case .wrongPasswordOrDamaged: return "The password is incorrect, or the encrypted data is damaged."
         case .invalidBackup: return "This backup is incomplete or unsupported. Your current files have not changed."
-        case .limit: return "This version supports files up to 4 GB and libraries up to 64 GB. Check available storage too."
+        case .limit: return "This version supports files up to 4 GB, libraries up to 64 GB, and 5,000 stored resources including thumbnails and Live Photo videos. Check available storage too."
         case .exists: return "A library already exists. Restore is available only in an empty installation."
         case .locked: return "Unlock your library again."
         case .missing: return "The encrypted file could not be found."

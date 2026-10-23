@@ -1,4 +1,4 @@
-"""Offline Calc 84 backup verification/recovery. Never sends files or keys over a network."""
+"""Offline Arithvale backup verification/recovery. Never sends files or keys over a network."""
 from __future__ import annotations
 import argparse
 import base64
@@ -97,7 +97,7 @@ def recover(backup: Path, secret: str, output: Path | None = None, include_delet
     try:
         with backup.open("rb") as stream:
             if exact(stream, 8) not in (b"C84B0001", b"C84B0002"):
-                raise ValueError("Not a supported Calc 84 backup.")
+                raise ValueError("Not a supported Arithvale or legacy backup.")
             header = decode(block(stream, 4096))
             key, context = recovery_key(header, secret)
             manifest = decode(open_sealed(block(stream, 4 * 1024**2), key, context + "/manifest"))

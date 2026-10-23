@@ -45,6 +45,9 @@ struct PhotoImportReviewView: View {
                     }
                     if vault.busy { HStack { ProgressView(); Text("Checking copies…").font(.subheadline) } }
                     if let error { Text(error).font(.footnote).foregroundStyle(.red).accessibilityLabel("Deletion not completed. " + error) }
+                    if vault.failedImportCount > 0 {
+                        Button("Retry Unimported Items") { vault.retryImports() }.frame(minHeight: 44)
+                    }
                     Button("Keep Originals") { dismiss() }
                         .buttonStyle(.borderedProminent).tint(.primary).frame(maxWidth: .infinity)
                     if review.originalCount > 0 {
