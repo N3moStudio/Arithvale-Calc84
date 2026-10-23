@@ -29,13 +29,12 @@ private struct AccessView: View {
     @State private var code = ""
     @State private var confirmation = ""
     @State private var restoring = false
-    @State private var backup: BackupSelection?
-    @State private var choosingBackup = false
+    @StateObject private var backupInput = BackupInputModel()
     private var creating: Bool { !vault.exists && !restoring }
     private var canContinue: Bool {
-        !vault.busy && !choosingBackup && VaultCode.valid(code) && code == confirmation
+        !vault.busy && !backupInput.working && VaultCode.valid(code) && code == confirmation
         && (creating ? setup.canCreate : !password.isEmpty)
-        && (!restoring || backup != nil)
+        && (!restoring || backupInput.backup != nil)
     }
     private func clearSecrets() {
         setup.clear(); password = ""; code = ""; confirmation = ""
@@ -62,7 +61,7 @@ private struct AccessView: View {
                 }
             }
             if restoring {
-                BackupInputSection(backup: $backup, enabled: !vault.busy, working: $choosingBackup)
+                BackupInputSection(input: backupInput, enabled: !vault.busy)
             }
             Section(creating ? "Save Your Recovery Key" : "Recovery Secret") {
                 if creating {
@@ -88,7 +87,7 @@ private struct AccessView: View {
             }
             Section {
                 Button {
-                    vault.open(password: creating ? setup.recovery : password, code: code, creating: creating, backup: restoring ? backup?.url : nil)
+                    vault.open(password: creating ? setup.recovery : password, code: code, creating: creating, backup: restoring ? backupInput.backup?.url : nil)
                 } label: {
                     HStack {
                         Text(creating ? "Create Library" : restoring ? "Restore Library" : "Recover Access")
@@ -98,6 +97,7 @@ private struct AccessView: View {
                 }.disabled(!canContinue)
             }
         }
+        .backupPicker(backupInput)
         .safeAreaInset(edge: .bottom) { Text(AppBrand.name + " " + AppBrand.version).font(.caption).foregroundStyle(.secondary).padding(6).frame(maxWidth: .infinity).background(.bar) }
         .navigationTitle(creating ? "Welcome" : "Recovery").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Calculator") { clearSecrets(); close() } } }

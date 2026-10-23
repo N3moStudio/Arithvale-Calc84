@@ -153,16 +153,22 @@ struct BackupDocumentPicker: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ controller: UIDocumentPickerViewController, context: Context) {}
     static func dismantleUIViewController(_ controller: UIDocumentPickerViewController, coordinator: Coordinator) {
-        DispatchQueue.main.async { coordinator.finish(nil) }
+        // SwiftUI can dismantle an obsolete controller while replacing its presentation.
+        // Teardown is cleanup, not a user cancellation; never mutate sheet state here.
+        controller.delegate = nil
+        coordinator.invalidate()
     }
     final class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let finished: (URL?) -> Void
+        private var finished: ((URL?) -> Void)?
         private var completed = false
         init(_ finished: @escaping (URL?) -> Void) { self.finished = finished }
         func finish(_ url: URL?) {
             guard !completed else { return }
-            completed = true; finished(url)
+            completed = true
+            let callback = finished; finished = nil
+            callback?(url)
         }
+        func invalidate() { completed = true; finished = nil }
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { finish(urls.first) }
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { finish(nil) }
     }

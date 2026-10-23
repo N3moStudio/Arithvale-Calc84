@@ -2,73 +2,54 @@
 import SwiftUI
 import CalcCore
 
-/// Embedded directly in each recovery form: no intermediate chooser sheet.
-struct BackupInputSection: View {
-    @Binding var backup: BackupSelection?
-    var enabled = true
-    @Binding var working: Bool
-    @State private var picker: Choice?
-    @State private var pending: (Choice, BackupSelection)?
-    @State private var folder: BackupSelection?
-    @State private var entries: [URL] = []
-    @State private var error: String?
-    @State private var preparation: Task<Void, Never>?
-    private enum Choice: String, Identifiable { case file, folder; var id: String { rawValue } }
-
-    var body: some View {
-        Section {
-            Button("Choose Backup File", systemImage: "doc") { picker = .file }
-                .accessibilityIdentifier("backup.chooseFile")
-            Button("Choose Backup Folder", systemImage: "folder") { picker = .folder }
-                .accessibilityIdentifier("backup.chooseFolder")
-            if let backup {
-                Label(backup.displayName, systemImage: "doc.badge.checkmark")
-                    .font(.subheadline).textSelection(.enabled)
-                Text("Backup selected. Enter its original recovery key below.")
-                    .font(.footnote).foregroundStyle(.secondary)
-            }
-            if let folder {
-                Text("Files in \(folder.displayName)").font(.headline)
-                Text("Tap the backup filename here to select it.").font(.footnote)
-                if entries.isEmpty && !working {
-                    Text("No files found. Choose the folder containing your backup, or download it in Files first.")
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(entries, id: \.self) { url in
-                    Button { prepare(url) } label: {
-                        Label(url.lastPathComponent, systemImage: "doc")
-                            .lineLimit(3).frame(minHeight: 44, alignment: .leading)
-                    }.buttonStyle(.borderless)
-                }
-            }
-            if working { ProgressView("Preparing backup…") }
-            if let error { Text(error).foregroundStyle(.secondary).accessibilityIdentifier("backup.error") }
-        } header: { Text("Encrypted Backup") } footer: {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("File: tap the backup itself. Folder: open the folder containing it, tap Open, then tap the filename in the list above. Opening a folder alone does not select a backup.")
-                Text("If LiveContainer’s picker does not respond, enable Fix File Picker in this app’s LiveContainer settings, then relaunch it.")
-            }
-        }
-        .disabled(working || !enabled)
-        .sheet(item: $picker, onDismiss: consumeSelection) { choice in
-            BackupDocumentPicker(purpose: choice == .file ? .openBackup : .folder) { url in
-                // Take the temporary permission before the document controller dismisses.
-                pending = url.map { (choice, BackupSelection($0)) }
-                picker = nil
-            }
-        }
-        .onDisappear { preparation?.cancel() }
+/// The form owns this state and its sheet. A recycled Section never owns a picker.
+@MainActor
+final class BackupInputModel: ObservableObject {
+    enum Kind { case file, folder }
+    struct Request: Identifiable {
+        let id = UUID()
+        let kind: Kind
     }
+    @Published var request: Request?
+    @Published private(set) var backup: BackupSelection?
+    @Published private(set) var folder: BackupSelection?
+    @Published private(set) var entries: [URL] = []
+    @Published private(set) var working = false
+    @Published private(set) var error: String?
+    @Published private(set) var notice: String?
+    private var pending: (Kind, BackupSelection)?
+    private var receivedDelegateResult = false
+    private var preparation: Task<Void, Never>?
 
-    private func consumeSelection() {
-        guard let request = pending else { return }
+    func choose(_ kind: Kind) {
+        guard request == nil, !working else { return }
+        pending = nil; receivedDelegateResult = false; error = nil; notice = nil
+        request = Request(kind: kind)
+    }
+    func picked(_ url: URL?, for presented: Request) {
+        // Ignore late callbacks from an older presentation after a retry.
+        guard request?.id == presented.id else { return }
+        receivedDelegateResult = true
+        pending = url.map { (presented.kind, BackupSelection($0)) }
+        if url == nil { notice = "Files closed without a selection. Your backup has not changed." }
+        request = nil
+    }
+    func dismissed() {
+        // Interactive dismissal is handled here, never by representable teardown.
+        guard let value = pending else {
+            if !receivedDelegateResult {
+                notice = "Files closed before returning a selection. In LiveContainer, check this app’s Fix File Picker setting and relaunch."
+            }
+            return
+        }
         pending = nil
-        if request.0 == .folder { browse(request.1) }
-        else { prepare(request.1.url, scope: request.1) }
+        if value.0 == .folder { browse(value.1) }
+        else { prepare(value.1.url, scope: value.1) }
     }
+    func cancelPreparation() { preparation?.cancel() }
 
     private func browse(_ scope: BackupSelection) {
-        folder = scope; entries = []; error = nil; working = true
+        folder = scope; entries = []; error = nil; notice = nil; working = true
         preparation = Task {
             defer { working = false }
             let worker = Task.detached(priority: .userInitiated) {
@@ -90,9 +71,9 @@ struct BackupInputSection: View {
             }
         }
     }
-
-    private func prepare(_ url: URL, scope: BackupSelection? = nil) {
-        working = true; error = nil
+    func prepare(_ url: URL, scope: BackupSelection? = nil) {
+        guard !working else { return }
+        working = true; error = nil; notice = nil
         let access = scope ?? BackupSelection(url); let parent = folder
         preparation = Task {
             defer { working = false }
@@ -110,6 +91,65 @@ struct BackupInputSection: View {
                 }
             }
         }
+    }
+}
+
+struct BackupInputSection: View {
+    @ObservedObject var input: BackupInputModel
+    var enabled = true
+    var body: some View {
+        Section {
+            Button("Choose Backup File", systemImage: "doc") { input.choose(.file) }
+                .accessibilityIdentifier("backup.chooseFile")
+            Button("Choose Backup Folder", systemImage: "folder") { input.choose(.folder) }
+                .accessibilityIdentifier("backup.chooseFolder")
+            if let backup = input.backup {
+                Label(backup.displayName, systemImage: "doc.badge.checkmark")
+                    .font(.subheadline).textSelection(.enabled)
+                Text("Backup selected. Enter its original recovery key below.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            if let folder = input.folder {
+                Text("Files in \(folder.displayName)").font(.headline)
+                Text("Tap the backup filename here to select it.").font(.footnote)
+                if input.entries.isEmpty && !input.working {
+                    Text("No files found. Choose the folder containing your backup, or download it in Files first.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(input.entries, id: \.self) { url in
+                    Button { input.prepare(url) } label: {
+                        Label(url.lastPathComponent, systemImage: "doc")
+                            .lineLimit(3).frame(minHeight: 44, alignment: .leading)
+                    }.buttonStyle(.borderless)
+                }
+            }
+            if input.working { ProgressView("Preparing backup…") }
+            if let error = input.error { Text(error).foregroundStyle(.secondary).accessibilityIdentifier("backup.error") }
+            if let notice = input.notice { Text(notice).font(.footnote).foregroundStyle(.secondary).accessibilityIdentifier("backup.pickerNotice") }
+        } header: { Text("Encrypted Backup") } footer: {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("File: tap the backup itself. Folder: open the folder containing it, tap Open, then tap the filename in the list above. Opening a folder alone does not select a backup.")
+                Text("If LiveContainer’s picker does not respond, enable Fix File Picker in this app’s LiveContainer settings, then relaunch it.")
+            }
+        }.disabled(input.working || !enabled)
+    }
+}
+
+/// Attach once to the Form, outside conditional sections and rows.
+private struct BackupPickerPresentation: ViewModifier {
+    @ObservedObject var input: BackupInputModel
+    func body(content: Content) -> some View {
+        content.sheet(item: $input.request, onDismiss: input.dismissed) { request in
+            BackupDocumentPicker(purpose: request.kind == .file ? .openBackup : .folder) { url in
+                input.picked(url, for: request)
+            }.id(request.id)
+        }
+        .onDisappear { input.cancelPreparation() }
+    }
+}
+extension View {
+    func backupPicker(_ input: BackupInputModel) -> some View {
+        modifier(BackupPickerPresentation(input: input))
     }
 }
 #endif
