@@ -87,6 +87,7 @@ public enum VaultCode {
 struct VaultManifest: Codable {
     var version = 2
     var items: [VaultItem] = []
+    var cloudPreferences: CloudPreferences? = nil
 }
 
 struct VaultHeader: Codable {

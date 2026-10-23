@@ -179,18 +179,53 @@ public final class VaultRepository {
         let target = next.items.first { $0.id == id }
         let ids = Set([id, target?.companionID, target?.thumbnailID].compactMap { $0 })
         next.items.removeAll { ids.contains($0.id) }
+        next.cloudPreferences?.remove(ids)
         try persist(next, key: key, header: header); manifest = next
         for id in ids { try? fm.removeItem(at: assetURL(id)) }
     }
 
-    public func cloudPlan() throws -> CloudPlan {
+    public func cloudPreferences() throws -> CloudPreferences {
+        guard let manifest else { throw VaultError.locked }
+        return manifest.cloudPreferences ?? .init()
+    }
+    public func setCloudPolicy(_ policy: CloudBackupPolicy, provider: CloudProvider) throws {
+        guard let key, let header, var next = manifest else { throw VaultError.locked }
+        var preferences = next.cloudPreferences ?? .init()
+        preferences[provider] = policy
+        try preferences.validate(items: next.items)
+        next.cloudPreferences = preferences
+        try persist(next, key: key, header: header); manifest = next
+    }
+
+    public func cloudPlan(provider: CloudProvider) throws -> CloudPlan {
         guard let header, let key, let manifest else { throw VaultError.locked }
         guard !manifest.items.contains(where: { $0.pendingImport == true }) else { throw VaultError.changed }
         let index = try Self.read(root.appendingPathComponent("index.enc"), limit: VaultLimits.manifestBytes)
         let committed = try Self.decodeManifest(index, header: header, key: key)
+        let policy = (committed.cloudPreferences ?? .init())[provider]
+        let selected = policy.itemIDs(in: committed.items)
+        let roots = committed.items.filter { selected.contains($0.id) }
+        let deniedResources = Set(committed.items.filter { $0.visible && !selected.contains($0.id) }
+            .flatMap { [$0.id, $0.companionID, $0.thumbnailID].compactMap { $0 } })
+        let resourceIDs = Set(roots.flatMap { [$0.id, $0.companionID, $0.thumbnailID].compactMap { $0 } })
+        // Fail closed on malformed/shared relationships that could leak an excluded resource.
+        guard resourceIDs.isDisjoint(with: deniedResources) else { throw VaultError.invalidBackup }
+        var subset = VaultManifest()
+        subset.version = committed.version
+        subset.items = committed.items.filter { resourceIDs.contains($0.id) }
+        guard subset.items.count == resourceIDs.count,
+              subset.items.allSatisfy({ item in
+                  item.pendingImport != true && (selected.contains(item.id) || !item.visible)
+                    && (item.companionID == nil || resourceIDs.contains(item.companionID!))
+                    && (item.thumbnailID == nil || resourceIDs.contains(item.thumbnailID!))
+              }) else { throw VaultError.invalidBackup }
+        // Never copy the full index: even names and other providers' choices stay local.
+        // Cloud recovery starts with manual/empty preferences; Files backups retain them.
+        let filteredIndex = try VaultCrypto.seal(JSONEncoder().encode(subset), key: key,
+            context: Self.context(header, "manifest"))
         var records: [CloudRecord] = []
         var sources: [UUID: URL] = [:]
-        for item in committed.items {
+        for item in subset.items {
             try Task.checkCancellation()
             if item.storageVersion == 2 {
                 try VaultStream.decrypt(assetURL(item.id), to: nil, size: item.byteCount, key: key, context: Self.context(header, item.id.uuidString))
@@ -201,7 +236,7 @@ public final class VaultRepository {
             sources[item.id] = url
         }
         return CloudPlan(snapshot: CloudSnapshot(id: UUID(), vaultID: header.id, created: Date(),
-            header: try JSONEncoder().encode(header), index: index, records: records), sources: sources)
+            header: try JSONEncoder().encode(header), index: filteredIndex, records: records), sources: sources, itemIDs: selected)
     }
 
     /// Authenticate the small catalog before trusting its download inventory.
@@ -305,6 +340,7 @@ public final class VaultRepository {
                   && (item.captured?.timeIntervalSince1970.isFinite ?? true)
                   && (item.duration.map { $0.isFinite && $0 >= 0 } ?? true)
               }) else { throw VaultError.invalidBackup }
+        try result.cloudPreferences?.validate(items: result.items)
         guard result.items.reduce(0, { $0 + $1.byteCount }) < VaultLimits.backupBytes else { throw VaultError.limit }
         return result
     }

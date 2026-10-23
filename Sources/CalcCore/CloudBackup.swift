@@ -42,6 +42,7 @@ public struct CloudSnapshot: Codable, Sendable {
 public struct CloudPlan: Sendable {
     public let snapshot: CloudSnapshot
     public let sources: [UUID: URL]
+    public let itemIDs: Set<UUID>
 }
 
 public enum CloudBackup {

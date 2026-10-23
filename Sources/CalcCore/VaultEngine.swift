@@ -57,7 +57,11 @@ public actor VaultEngine {
         return repository.items
     }
     public func export(to: URL) throws { try repository.exportBackup(to: to) }
-    public func cloudPlan() throws -> CloudPlan { try repository.cloudPlan() }
+    public func cloudPreferences() throws -> CloudPreferences { try repository.cloudPreferences() }
+    public func setCloudPolicy(_ policy: CloudBackupPolicy, provider: CloudProvider) throws {
+        try repository.setCloudPolicy(policy, provider: provider)
+    }
+    public func cloudPlan(provider: CloudProvider) throws -> CloudPlan { try repository.cloudPlan(provider: provider) }
     public func restore(from: URL, password: String) throws -> [VaultItem] {
         try repository.restore(from: from, password: password)
         return repository.items
