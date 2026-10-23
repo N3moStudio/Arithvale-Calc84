@@ -1,119 +1,88 @@
-# Arithvale · 0.4.0 alpha
+<p align="center">
+  <img src="AppIcon.png" alt="Arithvale app icon" width="112">
+</p>
 
-A scientific calculator with an encrypted photo, video, and file library. Native SwiftUI for iPhone. This is a test build, not a production security guarantee.
+<h1 align="center">Arithvale</h1>
+<p align="center"><strong>Familiar calculations. A private library.</strong></p>
+<p align="center">0.5.0 testing · iOS 17+ · SwiftUI · MIT licensed</p>
+<p align="center">
+  <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
+  <a href="Docs/UPDATE-0.5.0.md">What’s new</a> &nbsp;·&nbsp;
+  <a href="Docs/CLOUD-BACKUP.md">Cloud choices</a> &nbsp;·&nbsp;
+  <a href="Docs/BUILDING.md">Build from source</a>
+</p>
 
-Arithvale is the new visible name for Calc 84. This 0.4.0 test build keeps the same bundle identity, storage, recovery keys and backup formats. It fixes setup-key lifetime, resilient cloud recovery, import retries and backup status; adds cancellable photo reads, media navigation, Live Photo playback and optional private JPEG copies; and includes fresh source-bound build/test tooling. **Phone behavior and real cloud-account round trips still need device testing.**
+Arithvale is a working calculator with an encrypted library for photos, videos,
+Live Photos, and files. It keeps the everyday calculator familiar and gives you
+control over which memories leave your phone. Previously **Calc 84**, by **N3mo Studio**.
 
-## First use
+## Make it yours
 
-1. Install **Arithvale-0.4.0-test.ipa** through SideStore. The IPA is unsigned; your installer signs it. Test a direct installation first; test your existing LiveContainer setup separately if you intend to use it.
-2. Enter **160160**, then **hold =**. A normal tap only calculates and never counts as a code attempt.
-3. Save the randomly generated **recovery key somewhere separate** and confirm its last eight characters.
-4. Choose your own **6–12 digit calculator code**. The public starter cannot protect your library. From now on, type your chosen code and **hold =**. VoiceOver users can choose the Equals button’s Open private library action.
-5. Import disposable photos and a video. Choose **Keep Originals** or **Delete Imported Originals** after the encrypted copies are checked. Nothing is deleted automatically; Files imports keep their sources.
-6. Open **Settings → Backup & Recovery → Save Backup to Files**. Choose your own iCloud Drive folder or another Files provider outside the app/LiveContainer. This path needs no remembered folder permission.
-7. **Test a Backup** using that file and your recovery key. Also check that the provider actually uploads it. To reuse a destination, optionally **Connect Backup Folder**, then **Back Up to Connected Folder**. Choosing a folder does not itself save a backup.
+- **Calculate naturally.** A familiar keypad, rounded keys, blue accents, clear and backspace controls, and optional scientific functions.
+- **Keep your memories.** Browse a photo grid or timeline, search names and albums, mark favorites, and drag across multiple items to select them.
+- **Choose your cloud copies.** Select items separately for MEGA and Blomp, or enable automatic backup for a provider. A provider’s Never Upload list takes priority.
+- **Import, then decide.** Import Photos, files, or folders. Keep the originals, or explicitly approve moving verified originals to Photos Recently Deleted or the file provider’s Trash.
+- **Recover independently.** Save encrypted backups to Files, test recovery, and recover on a computer using the included offline tool.
 
-Keep originals until the tests in [DEVICE-CHECKS.md](DEVICE-CHECKS.md) pass.
+## The latest
 
-## Cloud Backup
+**0.5.0** adds per-provider selection and exclusions, folder imports, optional
+Trash for verified Files originals, and the updated calculator layout. It includes
+the drag selection, backup picker, and calculator privacy fixes from 0.4.1.
 
-Open **Settings → Backup & Recovery → MEGA & Blomp**. Connect your own Blomp or MEGA account, then tap **Back Up Now**. Both destinations receive the same library; their quotas are not pooled. Automatic backup after changes is optional and off initially. Wi-Fi is the default. Keep the app unlocked while transferring; locking pauses the job.
+Your existing library identity and recovery key stay compatible. The IPA contains
+the app, not anyone’s photos, recovery key, or cloud credentials.
 
-- Each original, thumbnail, and Live Photo companion stays encrypted. Original filenames, dates, and albums stay inside the encrypted catalog. Service operators can still observe object sizes, counts, access, and backup times.
-- New objects are uploaded separately and downloaded once to check their SHA-256. Previously verified objects are reused after a presence/size check. **Recheck All Remote Files** downloads them again. A local status cannot detect later remote deletion or corruption until another check.
-- The catalog is published last. An interrupted job can reuse completed files. Deleting from the phone does not erase cloud backups; old catalogs and their objects remain and consume space.
-- A photo's **Backup Status** is in its preview toolbar. It reports inclusion in the last completed backup, including the thumbnail and paired resources.
-- On an empty install, enter 160160 and hold =, then **Restore from Cloud**. Connect the account, find a saved backup, and enter its original Arithvale recovery key. Choose a new calculator code. Restoration does not merge with or overwrite an existing library.
-- **Test Cloud Recovery** downloads and authenticates a backup in a temporary library. Allow up to three times the backup size in spare phone storage during recovery. Save to Photos uses the original capture date; Recently Added can still show today.
+[Read the update notes →](Docs/UPDATE-0.5.0.md)
 
-**MEGA:** uses the official SDK 10.20.0. This personal test build asks for a developer application key from [MEGA's SDK page](https://mega.nz/sdk), plus your normal account sign-in and optional two-factor code. The app key is not either recovery key. No borrowed developer key is included. The session is stored in the phone's Keychain. MEGA transfer limits can delay a large backup or restore.
+## Get Arithvale
 
-**Blomp:** uses its documented OpenStack Swift authentication and your existing email-named container. Only HTTPS with normal certificate validation is accepted. On October 17, 2026, a credential-free check of the documented storage hostname failed certificate validation from this environment. The app refuses an insecure connection; this integration must not be described as operational until an account round-trip succeeds. Blomp's password is held in the phone's Keychain for token renewal.
+Use the IPA attached to the **0.5.0 test prerelease** in this repository’s
+[Releases](https://github.com/N3moStudio/Calc-84/releases). Sign and install it
+with your chosen installer, or import it into your existing LiveContainer setup.
+The supplied IPA is unsigned; compatibility depends on your iOS version and installer.
 
-No account was created or accessed during development. The cloud engine is tested using a disposable local service fixture; live-provider login, quotas, interrupted real transfers, and phone restore remain unverified. Keep an independent encrypted backup in Files too.
+For first use, enter **160160** and **hold =**. Save the generated recovery key
+separately, then choose your personal calculator code. Ordinary taps on = calculate.
 
-## Included
+Updating? Save and test an external backup first, then update the same app/data
+container. Uninstalling or replacing that container can remove its local library.
 
-- Arithmetic, parentheses, powers, percentages, trigonometry, logarithms, degree/radian modes. Not a TI-84 emulator.
-- Numeric calculator entry, change-code settings, and a separate random recovery key.
-- **Memories grid:** tall, four-column tiles, continuous native scrolling, pinned month headings, and a month/year handle that follows the actual visible photos. Drag the handle to scrub through the library. Two or three columns are also available.
-- **Photos Layout:** year/month/day grouping. Settings control layout, grid size, date source, and order.
-- Photos, videos, albums, favorites, name/album search, multi-select, and Recently Deleted. Nothing is automatically purged.
-- Original media bytes, stored capture dates, and supported Live Photo image/video pairs.
-- Optional deletion of just-imported Photos originals, with system confirmation. Failed, inaccessible, or edited/extra-resource imports are excluded. Copies are checked again before requesting deletion.
-- Image zoom, video playback, PDFs, Save to Photos, original-file export, and the Share/AirDrop sheet.
-- Encrypted snapshots, optional backup after changes while open, recovery testing, and a separate offline computer recovery tool.
-- A flat, readable gallery with search, selection, and a fixed action bar. Native cell reuse, bounded thumbnail caching, light/dark mode, large-text density adjustment, and an accessible date handle.
-- App-switcher cover while inactive; return to the calculator and lock when backgrounded.
+[Follow the short setup guide →](SETUP.md)
 
-## Reinstalling, moving phones, or changing installers
+## Know where your copies are
 
-The local library is inside the app. **Uninstalling can delete it.** A normal update with the same application identity is intended to retain it; back up before updating or changing signing accounts.
+| Destination | What it contains |
+| --- | --- |
+| This phone | The encrypted local library in private app storage |
+| Files backup | A full encrypted `.c84backup` snapshot, including Recently Deleted |
+| MEGA / Blomp | Only that provider’s eligible items and their related resources |
+| Photos / Share export | Ordinary, unencrypted copies you explicitly save or share |
 
-Recovery needs **an external .c84backup file or a complete cloud backup, plus its recovery key**, not the original phone or Keychain. For a Files backup on an empty installation: 160160 and hold = → Restore an Existing Backup → choose file → enter secret → choose a new calculator code. Re-select the external backup folder afterward; its access permission does not automatically move. For a cloud backup, use Restore from Cloud and reconnect the service instead.
+**Never Upload stops future uploads of the selected library items.** It does not
+erase old cloud backups or automatically recognize separate copies imported later.
+Cloud backups are snapshots, not two-way sync. Automatic jobs run while open and
+unlocked. Each cloud provider starts in manual mode with nothing selected.
 
-Forgot the code on the same phone? **Help → Restore or Recover Library** requires your recovery secret. Restore never replaces an existing library. Version 0.1 libraries/backups still use their original long password as that secret.
+[Cloud setup and limitations](Docs/CLOUD-BACKUP.md) · [Security and storage](SECURITY.md)
 
-If switching Apple Accounts, transfer the encrypted backup using a computer, external drive, Files, or AirDrop. Keep the secret separately. Backups are encrypted, but their existence and sizes are discoverable.
+## Tested—and what still needs a phone
 
-## Dates and sharing
+The release kit records automated Swift tests, independent Python recovery tests,
+an iPhone arm64 build, and IPA inspection. The exact results and checksum are in
+its build report. LiveContainer interactions, Photos permissions, provider Trash,
+Keychain behavior, and real MEGA/Blomp round trips require device testing.
 
-Photo-library imports use the asset's stored creation date where permission allows. Files imports read supported embedded dates. Missing dates fall back to import date; absent time zones can be ambiguous.
+This remains a test build. There is no developer-held recovery key or password
+reset. Keep an external backup and its original recovery key.
 
-**Save to Photos** sets the saved capture date. Photos may still show the copy in Recently Added. **Files/AirDrop** retain original bytes and embedded metadata, but receiving apps may sort by receipt time.
+[Phone testing checklist](DEVICE-CHECKS.md) · [Source map](Docs/PROJECT-MAP.md)
 
-Imports preserve original resources, not a rendered copy of every Photos crop/filter/edit. Photos-only adjusted dates, favorites, and albums are not necessarily embedded in the original file. Live Photos support native motion playback in the vault; Save to Photos recreates the pair. Files/Share export both resources, which the recipient may not pair automatically.
+## Open to everyone
 
-Original exports are unencrypted and may include GPS information. Share Photo Copies without Metadata creates new JPEG stills up to 4096 pixels without copying source metadata; it does not alter the originals or remove visible information from the image.
+Use it, change it, share it, or help make it better under the [MIT license](LICENSE).
+Keep the applicable copyright and dependency notices. The software is provided as is.
 
-**Deleting imported originals:** Photos deletion can sync to other devices through iCloud Photos. Originals may remain in Photos → Recently Deleted; Arithvale does not empty it. This choice is for the current import only and does not become an automatic setting. Keep a tested external backup before relying on the vault as your only copy.
-
-## Alpha limits
-
-- iOS 17+ build target. Computer tests and native compilation are checked; installation, Keychain, permissions, Photos, UI rendering, and lifecycle privacy still need phone testing.
-- 4 GiB per file; under 64 GiB per library/backup; 5,000 encrypted records, including thumbnails and Live Photo companions. Visible-item capacity is therefore lower.
-- New files use bounded 1 MiB encrypted chunks; legacy files remain limited to 128 MiB.
-- Files backups are **full snapshots**. Cloud backups reuse unchanged encrypted objects. Automatic backup is off by default, runs only while open, and can consume time, battery, and storage. Old snapshots remain until you delete them.
-- No automatic removal of originals, live multi-phone sync, biometric unlock, screenshot prevention, or undetectability guarantee.
-- The OS, installer, and any LiveContainer host remain trusted dependencies. Temporary plaintext is used for imports/previews/exports and cleaned on completion or next launch after a crash.
-- There is no developer-held recovery key or password reset. Keep two backup copies when files matter.
-
-## Recover without the app
-
-Install Python 3.10+ and the dependency once:
-
-```sh
-python -m pip install -r Scripts/recovery-requirements.txt
-python Scripts/recover.py "Library.c84backup" --verify-only
-python Scripts/recover.py "Library.c84backup" --output "Recovered originals"
-```
-
-On Windows, **Recover Vault.cmd** prompts for the file, a new output folder, and the secret after Python/dependency installation. Recovery runs offline and supports old/new backups. It writes originals plus metadata.json. Add --include-deleted for Recently Deleted. Recovered output is unencrypted.
-
-For cloud recovery without the app, download the entire `c84/v1/<library ID>` folder from the provider, keeping `objects/` and `snapshots/` together. Give `recover.py` a `.c84cloud` file inside `snapshots/` instead of a `.c84backup`. The same recovery key is required. The tool checks and assembles the encrypted records offline before extraction.
-
-## Build
-
-With Swift 6, xtool, and the iOS 27.1 Darwin SDK in WSL/Linux or macOS:
-
-```sh
-python Scripts/prepare_mega.py
-python3 -m venv .build/recovery-venv
-.build/recovery-venv/bin/python -m pip install -r Scripts/recovery-requirements.txt
-python3 Scripts/verify_release.py --ipa --python "$PWD/.build/recovery-venv/bin/python"
-```
-
-The verifier runs tests and build sequentially because they share .build. It writes full logs and input hashes, then produces an ignored `Releases/Arithvale-0.4.0-test-<hash>/` test kit. Any changed source invalidates the evidence. Output: xtool/Arithvale.ipa. Bundle identifier: studio.n3mo.calc84. Linux tests use pinned Swift Crypto 4.3.1; iPhone uses CryptoKit/CommonCrypto.
-
-`prepare_mega.py` downloads checksum-pinned MEGA source and iOS arm64 dependencies into ignored Vendor folders. They are not required for core-only tests. Native builds require them. No credentials are part of the build. The native MEGA dependency bundle is device-only; simulator builds need matching simulator libraries.
-
-The app's iOS linker settings explicitly record SDK 27.1 while keeping the minimum OS at 17.0. This corrects this cross-build toolchain's fallback SDK metadata so native appearance follows the modern SDK. If changing SDKs, update the linker declaration and package check to match the SDK actually used.
-
-For independent recovery tests: set C84_FIXTURE_DIR to a new persistent folder, run the Swift fixture test, then Scripts/test_recovery.py with the same environment setting.
-
-See [SECURITY.md](SECURITY.md), [DESIGN.md](DESIGN.md), and [DEVICE-CHECKS.md](DEVICE-CHECKS.md).
-
-## Testing branch and maintainability
-
-Development is on `codex/arithvale-0.4.0`. `main` remains unchanged until a reviewed merge. A branch is a development boundary; it does not itself certify an IPA for production. See [source map](Docs/PROJECT-MAP.md), [branding compatibility](Docs/BRANDING.md) and [public listing draft](Docs/STORE-LISTING.md). The build report explicitly separates automated checks from phone/provider tests.
+Built with SwiftUI, CryptoKit, and the official MEGA SDK. Independent of Apple,
+MEGA, and Blomp. This repository keeps its original URL and internal compatibility
+identifiers so existing libraries and backups continue to work.

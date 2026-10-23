@@ -1,6 +1,6 @@
-# Arithvale · 0.4.0 design notes
+# Arithvale · 0.5.0 design notes
 
-The vault now follows the supplied Memories / My Eyes Only screenshots: photographs occupy the screen, with a compact header and direct controls. This replaces the earlier iOS glass/gallery treatment. The calculator remains a separate surface; its requested Apple Calculator redesign has not been implemented in this revision.
+The vault now follows the supplied Memories / My Eyes Only screenshots: photographs occupy the screen, with a compact header and direct controls. This replaces the earlier iOS glass/gallery treatment. The calculator remains a separate surface with a familiar four-column keypad, rounded keys, right-side operators, current-entry clear, and separate scientific/backspace controls. The blue palette is retained.
 
 ## Gallery
 
@@ -23,7 +23,7 @@ The layout uses the user's screenshot direction. Accessibility principles from t
 
 ## Backup flow
 
-After importing from Photos, an Import Complete sheet offers Keep Originals (the primary action) and optional Delete Imported Originals. It names the eligible count, reports partial failures, and explains Recently Deleted and iCloud propagation. Dismissal keeps originals. Deletion is never remembered as an automatic preference; Files imports do not offer it. The vault rechecks copies before presenting the system's deletion confirmation. This source update still needs on-device permission, cancellation, Live Photo, and lifecycle checks.
+After importing from Photos, an Import Complete sheet offers Keep Originals (the primary action) and optional Delete Imported Originals. It names the eligible count, reports partial failures, and explains Recently Deleted and iCloud propagation. Dismissal keeps originals. Deletion is never remembered as an automatic preference; Files imports offer a separate counted Trash confirmation after coordinated snapshots and source-content checks; unsupported providers and changed originals are kept, and folders are never removed. The vault rechecks copies before presenting the system's deletion confirmation. This source update still needs on-device permission, cancellation, Live Photo, and lifecycle checks.
 
 Save Backup to Files is the primary action. It prepares an encrypted snapshot and opens the system save picker, without requiring a remembered directory bookmark. Cancellation does not set a success state. A saved copy is read back and compared with the prepared snapshot. If the provider does not allow verification, the UI asks for Test a Backup and leaves the current library marked as needing backup.
 
@@ -33,7 +33,7 @@ Only a completed, checked save updates the last-backup timestamp and filename. S
 
 ## Cloud backup
 
-Settings → Backup & Recovery has a MEGA & Blomp entry with overall status, separate service connections, a progress indicator, and Pause. Backup after changes and cellular transfers are optional and off initially. Provider screens offer Back Up, Recheck All Remote Files, and Test Cloud Recovery. Item previews show each provider's last completed backup inclusion without adding badges to every gallery tile.
+Settings → Backup & Recovery has a MEGA & Blomp entry with overall status, separate service connections, a progress indicator, and Pause. Each provider defaults to manual/empty selection. Automatic-all is optional per provider; Never Upload overrides both modes. Cellular transfers are optional and off initially. Provider screens offer Back Up, Recheck All Remote Files, and Test Cloud Recovery. Item previews show each provider's last completed backup inclusion without adding badges to every gallery tile.
 
 On an empty installation, Restore from Cloud reconnects a service, lists completed catalogs, and requests the original recovery key plus a new local calculator code. Recovery never replaces an existing library. The UI explains that transfers need an open, unlocked app and that backups are separate copies rather than live multi-phone synchronization.
 
@@ -45,4 +45,9 @@ Fresh automated results are recorded by Scripts/verify_release.py and shipped in
 
 ## 0.4.0 interaction changes
 
-The everyday calculator uses five rows, with extra functions behind 2nd. Hold Equals after a directly entered code to request access; taps calculate only. Setup owns its recovery key through child navigation. Import progress/retry/cancel precede automatic backups, which are coalesced after changes. The gallery opens a current-item full-screen browser with Previous, Next and Favorite; native Live Photo playback retains a still fallback. Video labels follow Dynamic Type and include media type/duration/favorite in VoiceOver. Settings includes About, storage capacity and recovery-test identity. Private JPEG export is an explicit derivative choice.
+The everyday calculator uses five rows, with extra functions behind the calculator mode button. Hold Equals after a directly entered code to request access; taps calculate only. Setup owns its recovery key through child navigation. Import progress/retry/cancel precede automatic backups, which are coalesced after changes. The gallery opens a current-item full-screen browser with Previous, Next and Favorite; native Live Photo playback retains a still fallback. Video labels follow Dynamic Type and include media type/duration/favorite in VoiceOver. Settings includes About, storage capacity and recovery-test identity. Private JPEG export is an explicit derivative choice.
+
+
+## 0.5.0 recovery chooser
+
+Test and Restore share a chooser that imports an encrypted copy into protected temporary storage. Browse a Folder Instead presents filenames inside Arithvale, bypassing the native file-type filter. Selection validates archive magic instead of trusting an extension; recovery still authenticates every encrypted record. Cancel preserves the previous selection. UI behavior in LiveContainer remains a device check.

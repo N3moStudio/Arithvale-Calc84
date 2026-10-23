@@ -164,3 +164,29 @@ Mark each group passed/failed after your own run. Computer tests are separate fr
 10. Low storage must fail before substantial staging when an estimate is available, preserve the library, and leave retry available. Test recovery records the selected snapshot/filename digest, not a blanket assurance about every backup.
 
 These checks require a signed installation. Linux core tests and an arm64 compile cannot execute UIKit, PhotoKit, Keychain, UI gestures or actual provider login.
+
+## 0.4.1 regression checks — pending in LiveContainer
+
+1. Tap Select. Drag sideways across photos/videos, continue down several rows and across date headers. Check immediate checkmarks/count and that fast drags do not miss items. Reverse direction; preselected items outside the shortened range must retain their previous state.
+2. Start a drag on a selected item to deselect a range. Hold at either grid edge to scroll into further items. Lift, cancel, rotate, change filters or lock; scrolling must stop. In Select mode, ordinary vertical swipes still scroll. Repeat both layouts, 2–6 columns, reverse sort and VoiceOver taps.
+3. Test a Backup → Choose Backup: select the saved .c84backup from iCloud Drive and On My iPhone. Unknown extensions should not be gray. Selecting its folder must explain that the file is needed. Cancel preserves the earlier choice. Test with the correct key, wrong key and a damaged disposable copy. Repeat in fresh-install Files restore.
+4. Calculator → three-dot Help shows only calculator guidance. Personal code + hold Equals unlocks. 160160 + hold Equals opens a locked recovery form; wrong/blank recovery keys cannot reveal an existing library. Verify a correct recovery key can reset a forgotten calculator code without losing media.
+
+
+## 0.5.0 selection, import, and calculator checks
+
+- [ ] Update the same LiveContainer guest; unlock the existing library and verify the existing recovery key still works.
+- [ ] Both providers start manual/empty for a legacy library. Choose different samples for each and inspect/test both recovered snapshots.
+- [ ] Block a Live Photo for MEGA, enable automatic-all there, import another sample, and confirm only eligible primary/thumbnail/paired records upload. Blomp’s choices must stay independent.
+- [ ] Block/unblock with gallery bulk actions and individual controls. Save and reopen the selection grids. Pause an active upload before changing policy.
+- [ ] Partial cloud recovery contains only selected items and starts manual/empty. Full Files recovery retains all items and provider choices.
+- [ ] Empty selection gives a clear message and does not publish an empty backup. Old snapshots remain recoverable after changing selections.
+- [ ] Import a nested folder with hidden/link/package files; confirm regular file count and retry/cancel behavior.
+- [ ] Keep Originals leaves everything intact. Cancel the Trash confirmation leaves everything intact. Approve on disposable Files items and inspect provider Trash/Recently Deleted.
+- [ ] Edit an original after import; Trash must refuse it. Test a provider without Trash support: no permanent deletion fallback.
+- [ ] Include a failed import; only successful sources can be removed, and the folder remains. Lock during checks/removal and ensure no subsequent source is processed.
+- [ ] Photos import offers the exact count, preserves edited/extra-resource assets, and requests iOS confirmation without a concurrency crash. Cancel and limited-access paths preserve originals.
+- [ ] Calculator C, AC, delete, decimal, sign, operators, scientific mode, DEG/RAD, and hold-equals entry work in portrait/landscape, light/dark, and largest text sizes.
+
+
+Backup picker follow-up: Test and Restore now share an import-as-copy chooser with protected, coordinated staging. If the file is gray, use **Browse a Folder Instead**, choose its folder, tap Open, then select the filename inside Arithvale. Selection checks archive contents rather than the extension. Cancel preserves the previous selection; full recovery still authenticates the key and every record. Actual LiveContainer behavior remains a device check.

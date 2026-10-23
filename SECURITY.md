@@ -1,4 +1,4 @@
-# Storage and recovery design · 0.4.0
+# Storage and recovery design · 0.5.0
 
 ## Scope and trust
 
@@ -10,7 +10,7 @@ No Arithvale account, application telemetry, developer server, or embedded cloud
 
 CloudBackup.swift publishes immutable, versioned catalogs after referenced ciphertext objects have been uploaded and read back. Original names, dates and albums remain in the encrypted index; the public envelope includes IDs, lengths, SHA-256 hashes and snapshot time. New data keys are not generated for backup. No raw recovery key or PIN is uploaded; the wrapped-key header is necessary for recovery.
 
-Cached verification receipts contain opaque IDs/hashes. Subsequent runs check presence and length before reusing a previously checked object. Recheck All Remote Files forces complete download/hash verification. Restore authenticates the catalog with the recovery key before downloading, then authenticates every resource before the repository commits a new library. Local status is historical evidence, not continuous proof of durability. No remote delete operation is exposed. This is backup/restore, not a multi-writer merge protocol.
+Cached verification receipts contain opaque IDs/hashes. Subsequent runs check presence and length before reusing a previously checked object. Recheck All Remote Files forces download/hash verification of the current eligible set. Restore authenticates the catalog with the recovery key before downloading, then authenticates every resource before the repository commits a new library. Local status is historical evidence, not continuous proof of durability. No remote delete operation is exposed. This is backup/restore, not a multi-writer merge protocol.
 
 Blomp uses HTTPS-only authentication and an allowlist of documented storage hostnames, upgrades their legacy HTTP advertisements to HTTPS, refuses redirects and enforces normal certificates. HTTP response sizes are bounded. A failed certificate check cannot fall back to HTTP. MEGA uses the official SDK with HTTPS-only transfers, public-key pinning enabled, logging disabled and no SDK node-cache path. MEGA's account encryption is not reimplemented. Blomp passwords and MEGA session strings use nonsynchronizing WhenUnlockedThisDeviceOnly Keychain items; disconnect deletes the local item, not remote data.
 
@@ -104,3 +104,34 @@ Automated checks cover encryption/reopen, independent KDF output, legacy interop
 Python recovery tests consume fixtures produced by Swift, verify original bytes/dates and safe paths, exercise both versions, and reject wrong secrets/damaged output without publishing partial results.
 
 Native compilation and package inspection do not verify phone installation, Keychain access, Photos resource APIs, visual layout, or lifecycle privacy. Follow DEVICE-CHECKS.md before storing sole copies. No independent penetration test is claimed.
+
+
+## 0.5.0 selection and original-removal boundaries
+
+Provider policies live inside the encrypted local manifest. Absent policies are
+manual/empty. Each provider plan reads the committed policy and creates a fresh
+encrypted subset index; it never uploads the full index alongside a partial set
+of objects. Blocks override manual selections and automatic mode. Excluded
+primary items, their metadata, thumbnails, and Live Photo resources are omitted.
+Malformed shared references fail closed. Files snapshots still contain the full
+manifest and policies; cloud restore starts with manual/empty policies.
+
+Blocks govern future uploads of those item identities. They do not purge old
+snapshots or completed objects from interrupted transfers, and do not identify
+duplicates imported later. All backups retain the original library key. This
+version does not rotate keys or reencrypt an imported library with a new key.
+
+Files imports use coordinated, protected snapshots. The in-memory import review
+retains source scopes and content digests only until dismissal/lock. Optional
+Trash authenticates committed vault resources, coordinates each original, checks
+that its current digest matches the imported bytes, then requests recoverable
+FileManager Trash. It never substitutes permanent removal for unsupported Trash.
+Only successfully imported regular files are eligible; parent folders stay intact.
+Provider Trash and Photos Recently Deleted can synchronize across devices.
+
+Backup selection imports a verified encrypted copy under app-owned temporary
+storage. A content probe recognizes both supported backup magics regardless of
+extension; it is not a substitute for recovery-key authentication. Folder listing
+offers a way around a host application's missing file-type registration. Native
+provider coordination, security scopes, permission prompts and LiveContainer
+runtime behavior still require phone tests.

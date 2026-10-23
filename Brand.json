@@ -1,7 +1,7 @@
 {
   "displayName": "Arithvale",
   "productName": "Arithvale",
-  "version": "0.4.0",
-  "build": "4",
+  "version": "0.5.0",
+  "build": "6",
   "bundleIdentifier": "studio.n3mo.calc84"
 }
