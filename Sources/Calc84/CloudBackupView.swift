@@ -6,7 +6,6 @@ struct CloudBackupView: View {
     var restoring = false
     @EnvironmentObject private var vault: VaultModel
     @EnvironmentObject private var cloud: CloudBackupModel
-    @AppStorage("cloudAfterChanges") private var automatic = false
     @AppStorage("cloudUseCellular") private var cellular = false
     var body: some View {
         List {
@@ -25,7 +24,7 @@ struct CloudBackupView: View {
                 }
             } footer: {
                 Text(restoring ? "Use the recovery key belonging to the saved library. Cloud sign-in alone cannot decrypt it."
-                     : "Originals, thumbnails, and dates are encrypted before upload. Backups stay in your own accounts.")
+                     : "Only eligible items and their thumbnails, Live Photo videos, and dates are included. Each provider starts with no items selected.")
             }
             Section("Your services") {
                 ForEach(CloudProvider.allCases) { provider in
@@ -44,13 +43,12 @@ struct CloudBackupView: View {
             }
             if !restoring {
                 Section("When to back up") {
-                    Toggle("Back up after changes", isOn: $automatic)
                     Toggle("Allow cellular data", isOn: $cellular)
                         .onChange(of: cellular) { _, _ in cloud.connectionChanged() }
                 }.disabled(vault.busy)
                 Section {
                     Text("Keep the app open and unlocked while transferring. Locking pauses the job. Tap Back Up Now to resume; completed files are reused.")
-                    Text("Both connections back up the same library. Their storage allowances are not combined. This version does not merge changes from two phones.")
+                    Text("Choose items separately for each provider. Automatic mode backs up all eligible items after changes while the app is open. Never Upload overrides both modes. This version does not merge changes from two phones.")
                     Text("Deleting from this phone never deletes cloud backups. Old recovery catalogs are kept; retained files can use extra cloud space.")
                     Text("The first upload includes a download check. Full recovery tests also download everything and need free space on your phone.")
                 } header: { Text("How it works") }
@@ -107,6 +105,9 @@ struct CloudProviderView: View {
                     }.disabled(vault.busy)
                     Button("Disconnect", role: .destructive) { disconnecting = true }.disabled(vault.busy)
                 }
+            }
+            if !restoring {
+                CloudPolicySection(provider: provider)
             }
             if cloud.running || cloud.error != nil {
                 Section {
@@ -196,18 +197,36 @@ struct CloudItemStatusView: View {
     let item: VaultItem
     @EnvironmentObject private var cloud: CloudBackupModel
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var vault: VaultModel
     var body: some View {
         List {
             Section { Text(item.name).font(.headline) }
             ForEach(CloudProvider.allCases) { provider in
                 Section(provider.title) {
                     Text(cloud.itemStatus(item, provider: provider))
+                    Toggle("Never upload to " + provider.title, isOn: Binding(
+                        get: { vault.cloudPreferences[provider].blocked.contains(item.id) },
+                        set: { value in
+                            var policy = vault.cloudPreferences[provider]
+                            if value { policy.blocked.insert(item.id); policy.selected.remove(item.id) }
+                            else { policy.blocked.remove(item.id) }
+                            Task { _ = await vault.saveCloudPolicy(policy, provider: provider) }
+                        })).disabled(vault.busy || item.deletedAt != nil)
+                    if vault.cloudPreferences[provider].mode == .manual {
+                        Toggle("Include in manual backup", isOn: Binding(
+                            get: { vault.cloudPreferences[provider].selected.contains(item.id) },
+                            set: { value in
+                                var policy = vault.cloudPreferences[provider]
+                                if value { policy.selected.insert(item.id) } else { policy.selected.remove(item.id) }
+                                Task { _ = await vault.saveCloudPolicy(policy, provider: provider) }
+                            })).disabled(vault.busy || item.deletedAt != nil || vault.cloudPreferences[provider].blocked.contains(item.id))
+                    }
                     if cloud.receipts[provider]?.itemIDs.contains(item.id) == true, let date = cloud.receipts[provider]?.saved {
                         LabeledContent("Backup saved") { Text(date, format: .dateTime.month().day().hour().minute()) }
                     }
                 }
             }
-            Section { Text("A completed backup includes the original, its encrypted thumbnail, any Live Photo companion, and stored dates. This status records the last completed backup; it cannot detect files someone later removes from your cloud account.") }
+            Section { Text("A completed backup includes the original, its encrypted thumbnail, any Live Photo companion, and stored dates. Never Upload stops future uploads of this library item; it does not erase older cloud copies. Removing a block in automatic mode makes it eligible again. This status records the last completed backup; it cannot detect files someone later removes from your cloud account.") }
         }.navigationTitle("Backup Status").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .onAppear { cloud.refresh() }

@@ -89,7 +89,7 @@ final class CloudBackupModel: ObservableObject {
             // Reconnecting may select another account. Never reuse the old receipts.
             self.receipts[provider] = .init(); self.persist(provider)
             self.stores[provider] = store; self.connected.insert(provider)
-            self.phase = "\(provider.title) connected. Choose Back Up Now to save your library."
+            self.phase = "\(provider.title) connected. Choose items or enable automatic backup."
         }
     }
     private func store(_ provider: CloudProvider) async throws -> any CloudStore {
@@ -142,21 +142,30 @@ final class CloudBackupModel: ObservableObject {
         }
         return error.localizedDescription
     }
-    func backup(vault: VaultModel, only: CloudProvider? = nil, verifyAll: Bool = false) {
+    func backup(vault: VaultModel, only: CloudProvider? = nil, verifyAll: Bool = false, automaticOnly: Bool = false) {
         guard vault.unlocked else { return }
-        let providers = CloudProvider.allCases.filter { connected.contains($0) && (only == nil || only == $0) }
-        guard !providers.isEmpty else { error = "Connect a service first."; return }
+        let providers = CloudProvider.allCases.filter {
+            connected.contains($0) && (only == nil || only == $0)
+                && (!automaticOnly || vault.cloudPreferences[$0].mode == .automatic)
+        }
+        guard !providers.isEmpty else { if !automaticOnly { error = "Connect a service first." }; return }
         start(vault) {
             self.phase = "Checking your encrypted library…"
-            let plan = try await vault.engine.cloudPlan()
-            try Task.checkCancellation()
-            try StoragePreflight.require(bytes: Int64(plan.snapshot.records.map(\.bytes).max() ?? 0) + 8 * 1024 * 1024)
             let scratch = try Self.scratch()
             defer { try? FileManager.default.removeItem(at: scratch) }
             var failures: [String] = []
+            var completed = 0
+            var empty: [String] = []
             for provider in providers {
                 try Task.checkCancellation(); self.activeProvider = provider
                 do {
+                    // Re-read the committed policy for each provider; never reuse another plan.
+                    let preferences = try await vault.engine.cloudPreferences()
+                    if automaticOnly && preferences[provider].mode != .automatic { continue }
+                    let plan = try await vault.engine.cloudPlan(provider: provider)
+                    try Task.checkCancellation()
+                    guard !plan.itemIDs.isEmpty else { empty.append(provider.title); continue }
+                    try StoragePreflight.require(bytes: Int64(plan.snapshot.records.map(\.bytes).max() ?? 0) + 8 * 1024 * 1024)
                     let store = try await self.store(provider)
                     let previous = self.receipts[provider] ?? .init()
                     try await CloudTransfer.upload(plan, store: store, scratch: scratch,
@@ -166,16 +175,17 @@ final class CloudBackupModel: ObservableObject {
                     try Task.checkCancellation()
                     var receipt = self.receipts[provider] ?? .init()
                     receipt.objects = Set(plan.snapshot.records.map(\.filename))
-                    receipt.itemIDs = Set(vault.items.filter(\.visible).map(\.id))
+                    receipt.itemIDs = plan.itemIDs
                     receipt.vaultID = plan.snapshot.vaultID; receipt.saved = Date(); receipt.needsBackup = false
-                    self.receipts[provider] = receipt; self.persist(provider)
+                    self.receipts[provider] = receipt; self.persist(provider); completed += 1
                 } catch {
                     if Task.isCancelled { throw CancellationError() }
                     failures.append(provider.title + ": " + Self.message(error)); self.stores[provider] = nil
                 }
             }
             self.error = failures.isEmpty ? nil : failures.joined(separator: "\n\n")
-            self.phase = failures.isEmpty ? "Backup complete" : "Some backups need attention"
+            self.phase = failures.isEmpty ? (completed > 0 ? "Selected items backed up" : "No items eligible for backup") : "Some backups need attention"
+            if !empty.isEmpty { self.phase += ". Choose items for " + empty.joined(separator: ", ") + "." }
         }
     }
     private func recordObject(_ name: String, provider: CloudProvider) {

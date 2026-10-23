@@ -21,6 +21,8 @@ struct LibraryView: View {
     let close: () -> Void
     @State private var photos: [PhotosPickerItem] = []
     @State private var files = false
+    @State private var folders = false
+    @State private var cloudChoices = false
     @State private var selected: VaultItem?
     @State private var settings = false
     @State private var filter = "All"
@@ -75,6 +77,11 @@ struct LibraryView: View {
                         .font(.caption.weight(.semibold)).multilineTextAlignment(.trailing).frame(minHeight: 44)
                 }.disabled(vault.busy)
             }.font(.subheadline).padding(.horizontal, 16)
+            if selecting {
+                Text("Drag across items to select. Swipe vertically to scroll.")
+                    .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16).padding(.bottom, 6)
+            }
             if !timeline {
                 Picker("Browse by", selection: $period) {
                     ForEach(["Years", "Months", "Days"], id: \.self) { Text($0).tag($0) }
@@ -102,6 +109,7 @@ struct LibraryView: View {
             } else {
                 MemoryGrid(sections: sections, engine: vault.engine, columns: textSize.isAccessibilitySize ? 2 : columns,
                     portrait: timeline, grouping: timeline ? "Months" : period, selection: selection, selecting: selecting,
+                    busy: vault.busy, setSelection: { selection = $0 },
                     identity: filter + "|" + search + "|" + dateSource + "|" + String(newestFirst), open: open, action: itemAction)
             }
             Divider()
@@ -113,8 +121,13 @@ struct LibraryView: View {
         .fullScreenCover(item: $selected) { MediaBrowser(items: sections.flatMap(\.items), initial: $0.id).environmentObject(vault) }
         .sheet(isPresented: $showingExports) { ExportMediaView(items: exportItems).environmentObject(vault) }
         .sheet(isPresented: $albumSheet) { albumEditor }
+        .sheet(isPresented: $cloudChoices) { CloudBatchSelectionView(ids: selection).environmentObject(vault) }
+        .sheet(item: $vault.fileImportReview) { FileImportReviewView(review: $0).environmentObject(vault) }
         .sheet(item: $vault.photoImportReview) { PhotoImportReviewView(review: $0).environmentObject(vault) }
         .fileImporter(isPresented: $files, allowedContentTypes: [.item], allowsMultipleSelection: true) {
+            do { vault.importFiles(try $0.get()) } catch { vault.message = error.localizedDescription }
+        }
+        .fileImporter(isPresented: $folders, allowedContentTypes: [.folder], allowsMultipleSelection: false) {
             do { vault.importFiles(try $0.get()) } catch { vault.message = error.localizedDescription }
         }
         .onChange(of: photos) { _, value in if !value.isEmpty { vault.importPhotos(value); photos = [] } }
@@ -128,7 +141,7 @@ struct LibraryView: View {
             }
         } message: { Text(filter == "Recently Deleted" ? "This removes these local copies. Older backups and exported originals keep theirs." : "Restore them from Albums → Recently Deleted. Nothing is automatically erased.") }
         .onChange(of: vault.unlocked) { _, unlocked in if !unlocked { selected = nil; photos = []; selection = []; search = "" } }
-        .alert("Couldn’t Complete", isPresented: Binding(get: { !settings && vault.photoImportReview == nil && vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
+        .alert("Couldn’t Complete", isPresented: Binding(get: { !settings && vault.photoImportReview == nil && vault.fileImportReview == nil && vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
             Button("Close", role: .cancel) { vault.message = nil }
         } message: { Text(vault.message ?? "") }
     }
@@ -179,6 +192,7 @@ struct LibraryView: View {
                 } else {
                     Button("Save / Share", systemImage: "square.and.arrow.up") { exportItems = selectedItems; showingExports = true }.disabled(selection.isEmpty)
                     Spacer(minLength: 0)
+                    Button("Cloud Choices", systemImage: "icloud") { cloudChoices = true }.labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(selection.isEmpty)
                     Button("Album", systemImage: "rectangle.stack.badge.plus") { albumSheet = true }.labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(selection.isEmpty)
                 }
                 Spacer(minLength: 0)
@@ -188,7 +202,10 @@ struct LibraryView: View {
                     Label("Import", systemImage: "plus").fontWeight(.semibold).frame(minHeight: 44)
                 }
                 Spacer()
-                Button("Files", systemImage: "folder") { files = true }.frame(minHeight: 44)
+                Menu {
+                    Button("Import Files") { files = true }
+                    Button("Import Folder") { folders = true }
+                } label: { Label("Files", systemImage: "folder").frame(minHeight: 44) }
                 Spacer()
                 Button("Settings", systemImage: "gearshape") { settings = true }.frame(minHeight: 44)
             }

@@ -22,7 +22,7 @@ struct CalculatorView: View {
     @State private var didEvaluate = false
     @State private var access = false
     @State private var help = false
-    @ScaledMetric(relativeTo: .title2) private var keyHeight = 58.0
+    @ScaledMetric(relativeTo: .title2) private var keyHeight = 68.0
 
     var body: some View {
         GeometryReader { geometry in
@@ -32,6 +32,8 @@ struct CalculatorView: View {
                         Text(AppBrand.calculatorTitle).font(.headline).tracking(2)
                         Spacer()
                         Button("Help", systemImage: "ellipsis.circle") { help = true }
+                            .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
+                        Button(scientific ? "Basic" : "Scientific", systemImage: "calculator") { scientific.toggle() }
                             .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
                         Button(degrees ? "DEG" : "RAD") { degrees.toggle() }
                             .font(.subheadline.monospaced().weight(.semibold))
@@ -47,7 +49,7 @@ struct CalculatorView: View {
                         }
                     }
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
-                        ForEach(["AC", "+/−", "%", "÷", "7", "8", "9", "×", "4", "5", "6", "−", "1", "2", "3", "+", "2nd", "0", ".", "="], id: \.self) { key in
+                        ForEach(["AC", "+/−", "%", "÷", "7", "8", "9", "×", "4", "5", "6", "−", "1", "2", "3", "+", "C", "0", ".", "="], id: \.self) { key in
                             keyButton(key, value: key, utility: !key.allSatisfy(\.isNumber))
                         }
                     }
@@ -63,16 +65,7 @@ struct CalculatorView: View {
             NavigationStack {
                 List {
                     Section("Calculator") {
-                        Text("Use 2nd for scientific functions. DEG and RAD change angle units. Enter a calculation, then tap =.")
-                    }
-                    Section("Private library") {
-                        Text("Enter your code and hold = to open your library. On a new installation, use 160160. Normal taps on = only calculate.")
-                        Text("Incorrect codes are rate limited. After repeated attempts, wait up to five minutes before trying again.")
-                    }
-                    Section("Recovery") {
-                        Button("Restore or Recover Library") { help = false; access = true }
-                        Text("A recovery key or your original 0.1 password is required. Recovery never replaces an existing library.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                        Text("Use the calculator button for scientific functions. DEG and RAD change angle units. C clears the current entry; AC clears everything. Enter a calculation, then tap =.")
                     }
                 }.navigationTitle("Help")
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { help = false } } }
@@ -95,11 +88,16 @@ struct CalculatorView: View {
 
     private var display: some View {
         VStack(alignment: .trailing, spacing: 18) {
+            HStack {
+                Spacer()
+                Button("Delete last character", systemImage: "delete.left") { press("⌫") }
+                    .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
+            }
             Text(expression.isEmpty ? " " : expression)
-                .font(.title3.monospaced()).foregroundStyle(.secondary)
+                .font(.title3).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(result).font(.system(.largeTitle, design: .monospaced).weight(.medium))
+            Text(result).font(.system(size: textSize.isAccessibilitySize ? 48 : 56, weight: .regular, design: .rounded))
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -128,15 +126,15 @@ struct CalculatorView: View {
         if value == "=" {
             keyFace(title, value: value, utility: utility)
                 .highPriorityGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in unlockLibrary() })
-                .accessibilityAction(named: "Open private library") { unlockLibrary() }
+                .accessibilityAction(named: "Hold Equals") { unlockLibrary() }
         } else { keyFace(title, value: value, utility: utility) }
     }
     private func keyFace(_ title: String, value: String, utility: Bool) -> some View {
         Button { press(value) } label: {
-            Text(title).font(utility ? .headline.monospaced() : .title2.monospaced())
+            Text(title).font(utility ? .title2.weight(.medium) : .largeTitle.weight(.regular))
                 .frame(maxWidth: .infinity, minHeight: keyHeight)
                 .foregroundStyle(value == "=" ? Color(uiColor: .systemBackground) : utility ? CalcTheme.accent : .primary)
-                .background(value == "=" ? CalcTheme.accent : Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+                .background(value == "=" ? CalcTheme.accent : Color(uiColor: .secondarySystemGroupedBackground), in: Capsule())
         }
         .buttonStyle(CalcKeyStyle())
         .accessibilityLabel(label(for: value))
@@ -145,6 +143,7 @@ struct CalculatorView: View {
     private func press(_ value: String) {
         switch value {
         case "AC": expression = ""; result = "0"; didEvaluate = false
+        case "C": expression = Calculator.clearEntry(expression); result = "0"; didEvaluate = false
         case "⌫": if !expression.isEmpty { expression.removeLast() }; didEvaluate = false
         case "2nd": scientific.toggle()
         case "=":
@@ -164,7 +163,7 @@ struct CalculatorView: View {
     }
 
     private func label(for key: String) -> String {
-        ["2nd": "Scientific functions", "⌫": "Delete last character", "AC": "Clear all", "+/−": "Change sign",
+        ["2nd": "Scientific functions", "⌫": "Delete last character", "AC": "Clear all", "C": "Clear current entry", "+/−": "Change sign",
          "÷": "Divide", "×": "Multiply", "−": "Subtract", "+": "Add", "=": "Equals",
          "^": "Power", "sqrt": "Square root", "π": "Pi", "%": "Percent" ][key] ?? key
     }

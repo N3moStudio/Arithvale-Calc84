@@ -29,7 +29,7 @@ private struct AccessView: View {
     @State private var code = ""
     @State private var confirmation = ""
     @State private var restoring = false
-    @State private var backup: URL?
+    @State private var backup: BackupSelection?
     @State private var picker = false
     private var creating: Bool { !vault.exists && !restoring }
     private var canContinue: Bool {
@@ -64,7 +64,7 @@ private struct AccessView: View {
             if restoring {
                 Section("Encrypted Backup") {
                     Button(backup == nil ? "Choose Backup" : "Choose a Different Backup", systemImage: "folder") { picker = true }
-                    if let backup { Text(backup.lastPathComponent).font(.footnote).foregroundStyle(.secondary) }
+                    if let backup { Text(backup.displayName).font(.footnote).foregroundStyle(.secondary) }
                 }
             }
             Section(creating ? "Save Your Recovery Key" : "Recovery Secret") {
@@ -91,7 +91,7 @@ private struct AccessView: View {
             }
             Section {
                 Button {
-                    vault.open(password: creating ? setup.recovery : password, code: code, creating: creating, backup: restoring ? backup : nil)
+                    vault.open(password: creating ? setup.recovery : password, code: code, creating: creating, backup: restoring ? backup?.url : nil)
                 } label: {
                     HStack {
                         Text(creating ? "Create Library" : restoring ? "Restore Library" : "Recover Access")
@@ -103,12 +103,12 @@ private struct AccessView: View {
         }
         .navigationTitle(creating ? "Welcome" : "Recovery").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Calculator") { clearSecrets(); close() } } }
-        .fileImporter(isPresented: $picker, allowedContentTypes: [.data]) {
-            do { backup = try $0.get() } catch { vault.message = error.localizedDescription }
+        .sheet(isPresented: $picker) {
+            BackupChooserView { backup = $0; picker = false }
         }
         .onChange(of: vault.unlocked) { _, unlocked in if unlocked { clearSecrets() } }
         .onChange(of: vault.generation) { _, _ in clearSecrets() }
-        .alert("Couldn’t Complete", isPresented: Binding(get: { vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
+        .alert("Couldn’t Complete", isPresented: Binding(get: { !picker && vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
             Button("Close", role: .cancel) { vault.message = nil }
         } message: { Text(vault.message ?? "") }
     }

@@ -3,12 +3,6 @@ import Foundation
 import Security
 import CalcCore
 
-enum CloudProvider: String, Codable, CaseIterable, Identifiable, Sendable {
-    case blomp, mega
-    var id: String { rawValue }
-    var title: String { self == .blomp ? "Blomp" : "MEGA" }
-}
-
 struct CloudLogin: Codable, Sendable {
     let email: String
     // Blomp needs the password to refresh its token. MEGA stores only its session.

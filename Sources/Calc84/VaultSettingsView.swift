@@ -161,13 +161,13 @@ struct BackupSettingsView: View {
             case .folder:
                 BackupDocumentPicker(purpose: .folder) { url in
                     guard sheet != nil else { return }
-                    picked = url.map(BackupSelection.init)
+                    picked = url.map { BackupSelection($0) }
                     sheet = nil
                 }
             case .save(let backup):
                 BackupDocumentPicker(purpose: .save(backup.url)) { url in
                     guard sheet != nil else { return }
-                    picked = url.map(BackupSelection.init)
+                    picked = url.map { BackupSelection($0) }
                     sheet = nil
                 }
             }

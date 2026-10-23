@@ -153,7 +153,7 @@ enum MediaBridge {
         }
         let isVideo = UTType(item.contentType)?.conforms(to: .movie) == true
         guard isVideo || UTType(item.contentType)?.conforms(to: .image) == true else { throw failure("This file can be exported to Files.") }
-        try await PHPhotoLibrary.shared().performChanges {
+        try await PHPhotoLibrary.shared().performChanges { @Sendable in
             let request = PHAssetCreationRequest.forAsset()
             let options = PHAssetResourceCreationOptions()
             options.originalFilename = item.name; options.uniformTypeIdentifier = item.contentType

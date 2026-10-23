@@ -51,7 +51,7 @@ struct PhotoImportReviewView: View {
                     Button("Keep Originals") { dismiss() }
                         .buttonStyle(.borderedProminent).tint(.primary).frame(maxWidth: .infinity)
                     if review.originalCount > 0 {
-                        Button("Delete \(review.originalCount) Imported Originals", role: .destructive) {
+                        Button("Allow Deleting \(review.originalCount) Originals from Photos", role: .destructive) {
                             Task { error = await vault.deleteImportedOriginals(review) }
                         }.frame(maxWidth: .infinity, minHeight: 44)
                     }

@@ -14,6 +14,8 @@ struct MemoryGrid: UIViewControllerRepresentable {
     let grouping: String
     let selection: Set<UUID>
     let selecting: Bool
+    let busy: Bool
+    let setSelection: (Set<UUID>) -> Void
     let identity: String
     let open: (VaultItem) -> Void
     let action: (String, VaultItem) -> Void
@@ -33,6 +35,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
     private var lastWidth: CGFloat = 0
     private var currentSection = 0
     private var restoredVisibility = true
+    private var dragSelection: GridDragSelection?
     init(_ model: MemoryGrid) { self.model = model; super.init(nibName: nil, bundle: nil) }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override func viewDidLoad() {
@@ -48,6 +51,12 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         grid.register(MemoryCell.self, forCellWithReuseIdentifier: "photo")
         grid.register(MonthHeader.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "month")
         view.addSubview(grid); view.addSubview(scrubber); view.addSubview(month)
+        dragSelection = GridDragSelection(grid: grid) { [weak self] selection in
+            guard let self else { return }
+            self.refreshSelection(selection)
+            self.model.setSelection(selection)
+        }
+        configureDragSelection()
         month.textColor = .white; month.backgroundColor = UIColor(red: 0.84, green: 0, blue: 0.23, alpha: 1)
         month.font = .preferredFont(forTextStyle: .headline)
         month.adjustsFontForContentSizeCategory = true
@@ -67,6 +76,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         grid.frame = view.bounds
         scrubber.frame = CGRect(x: max(0, view.bounds.width - 44), y: 0, width: 44, height: view.bounds.height)
         if lastWidth != grid.bounds.width {
+            dragSelection?.cancel()
             lastWidth = grid.bounds.width
             layout.invalidateLayout()
         }
@@ -82,6 +92,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         clearImages(); restoredVisibility = false
     }
     func clearImages() {
+        dragSelection?.cancel()
         hideMonth?.cancel(); month.alpha = 0
         images.removeAllObjects()
         for cell in grid.visibleCells.compactMap({ $0 as? MemoryCell }) { cell.clear() }
@@ -91,8 +102,10 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         let newLayout = model.columns != next.columns || model.portrait != next.portrait || model.grouping != next.grouping
         let reset = model.identity != next.identity
         let anchor = grid.indexPathsForVisibleItems.sorted().first.flatMap { item(at: $0)?.id }
+        if newContent || newLayout || reset { dragSelection?.cancel() }
         model = next
         guard isViewLoaded else { return }
+        configureDragSelection()
         if newContent || newLayout || reset {
             grid.reloadData(); layout.invalidateLayout(); grid.layoutIfNeeded()
             if reset { grid.setContentOffset(.zero, animated: false) }
@@ -104,11 +117,18 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
                 }
             }
         } else {
-            for cell in grid.visibleCells.compactMap({ $0 as? MemoryCell }) {
-                if let id = cell.itemID { cell.setSelection(model.selection.contains(id), selecting: model.selecting) }
-            }
+            refreshSelection(model.selection)
         }
         updateDate(show: false)
+    }
+    private func configureDragSelection() {
+        dragSelection?.configure(sections: model.sections.map { $0.items.map(\.id) },
+                                 selection: model.selection, enabled: model.selecting && !model.busy)
+    }
+    private func refreshSelection(_ selection: Set<UUID>) {
+        for cell in grid.visibleCells.compactMap({ $0 as? MemoryCell }) {
+            if let id = cell.itemID { cell.setSelection(selection.contains(id), selecting: model.selecting) }
+        }
     }
     func numberOfSections(in collectionView: UICollectionView) -> Int { model.sections.count }
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int { model.sections[section].items.count }
@@ -120,7 +140,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "photo", for: path) as! MemoryCell
         if let item = item(at: path) {
             cell.configure(item, engine: model.engine, cache: images)
-            cell.setSelection(model.selection.contains(item.id), selecting: model.selecting)
+            cell.setSelection((dragSelection?.selection ?? model.selection).contains(item.id), selecting: model.selecting)
         }
         return cell
     }
@@ -167,7 +187,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         guard isViewLoaded else { return }
         let fraction = LibraryScrollPosition.fraction(offset: Double(grid.contentOffset.y), content: Double(grid.contentSize.height), viewport: Double(grid.bounds.height))
         scrubber.fraction = fraction
-        scrubber.isHidden = model.sections.isEmpty || grid.contentSize.height <= grid.bounds.height
+        scrubber.isHidden = model.selecting || model.sections.isEmpty || grid.contentSize.height <= grid.bounds.height
         // Derive the badge from real visible cells, including long months and short sections.
         let visible = grid.indexPathsForVisibleItems.sorted().filter { path in
             guard let rect = layout.layoutAttributesForItem(at: path)?.frame else { return false }
@@ -325,6 +345,7 @@ private final class MemoryCell: UICollectionViewCell {
         check.tintColor = selected ? .systemBlue : .white
         photo.alpha = selected ? 0.7 : 1
         accessibilityTraits = selected ? [.button, .selected] : [.button]
+        accessibilityHint = selecting ? (selected ? "Double-tap to deselect." : "Double-tap to select.") : "Double-tap to open."
     }
     func clear() { task?.cancel(); task = nil; photo.image = nil; itemID = nil }
     override func prepareForReuse() { super.prepareForReuse(); clear() }
