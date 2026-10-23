@@ -57,4 +57,8 @@ starts with manual/empty cloud choices. Sign-ins and folder permissions must be
 connected again. See [offline computer recovery](Docs/BUILDING.md#recover-without-the-app).
 
 
-Backup picker follow-up: Test and Restore now share an import-as-copy chooser with protected, coordinated staging. If the file is gray, use **Browse a Folder Instead**, choose its folder, tap Open, then select the filename inside Arithvale. Selection checks archive contents rather than the extension. Cancel preserves the previous selection; full recovery still authenticates the key and every record. Actual LiveContainer behavior remains a device check.
+Backup picker (0.5.1): choose **Choose Backup File** and tap the file, or
+**Choose Backup Folder**, open its folder, tap Open, then tap the filename in
+Arithvale's list. The selected name must appear before restoration. If LiveContainer
+does not respond to Open, enable its per-app **Fix File Picker** setting and relaunch.
+Find the running build in calculator Help → About or at the bottom of Recovery.

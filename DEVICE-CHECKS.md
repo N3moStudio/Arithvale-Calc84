@@ -190,3 +190,27 @@ These checks require a signed installation. Linux core tests and an arm64 compil
 
 
 Backup picker follow-up: Test and Restore now share an import-as-copy chooser with protected, coordinated staging. If the file is gray, use **Browse a Folder Instead**, choose its folder, tap Open, then select the filename inside Arithvale. Selection checks archive contents rather than the extension. Cancel preserves the previous selection; full recovery still authenticates the key and every record. Actual LiveContainer behavior remains a device check.
+
+
+## 0.5.1 recovery and viewer follow-up
+
+- Confirm Help → About and Recovery both show **0.5.1 (7)**.
+- Fresh-install restore: both file/folder buttons must be on the recovery form.
+- File mode: select a local and an iCloud backup; cancel once, retry, and confirm
+  the selected filename appears. Check LiveContainer's Fix File Picker setting.
+- Folder mode: Open chooses the folder; then select the actual filename inside
+  Arithvale. Test a renamed backup, empty folder, ordinary non-backup file, missing
+  permission, and cloud placeholder. No restore should start from a folder alone.
+- Restore an exported sample using its original key. Confirm item counts, original
+  photo bytes, a full video, dates, and Live Photo pairing. Wrong-key failure must
+  leave the destination empty and the external backup intact.
+- Swipe quickly through 30 mixed items and back. Confirm counter/content alignment,
+  correct first/last boundaries, canceled drags, rapid arrow taps, and no stale photo.
+- Metadata is hidden initially. Swipe up at 1× zoom and test Info with VoiceOver.
+- Pinch/double-tap zoom, pan the zoomed image, return to 1×, then swipe to the next.
+- Play a video and swipe away: audio must stop. Test Live Photo motion after leaving
+  and returning during loading. Large videos may still need preparation time.
+- Open/dismiss details and export without losing the page. Lock/background mid-load;
+  return must show the calculator and cached plaintext must be removed.
+- Measure frame timing and memory with Instruments on a Mac/device when available;
+  this build's automated tests do not substitute for performance measurements.

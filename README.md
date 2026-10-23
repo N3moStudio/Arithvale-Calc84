@@ -4,10 +4,10 @@
 
 <h1 align="center">Arithvale</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.5.0 testing · iOS 17+ · SwiftUI · MIT licensed</p>
+<p align="center">0.5.1 testing · iOS 17+ · SwiftUI · MIT licensed</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
-  <a href="Docs/UPDATE-0.5.0.md">What’s new</a> &nbsp;·&nbsp;
+  <a href="Docs/UPDATE-0.5.1.md">What’s new</a> &nbsp;·&nbsp;
   <a href="Docs/CLOUD-BACKUP.md">Cloud choices</a> &nbsp;·&nbsp;
   <a href="Docs/BUILDING.md">Build from source</a>
 </p>
@@ -26,18 +26,19 @@ control over which memories leave your phone. Previously **Calc 84**, by **N3mo 
 
 ## The latest
 
-**0.5.0** adds per-provider selection and exclusions, folder imports, optional
-Trash for verified Files originals, and the updated calculator layout. It includes
-the drag selection, backup picker, and calculator privacy fixes from 0.4.1.
+**0.5.1** puts separate backup-file and backup-folder controls directly on the
+restore screen, adds visible version/build labels, and introduces horizontal media
+paging with details hidden until you swipe up or tap Info. It retains 0.5.0's cloud
+selection, exclusions, folder imports, and optional Trash controls.
 
 Your existing library identity and recovery key stay compatible. The IPA contains
 the app, not anyone’s photos, recovery key, or cloud credentials.
 
-[Read the update notes →](Docs/UPDATE-0.5.0.md)
+[Read the update notes →](Docs/UPDATE-0.5.1.md)
 
 ## Get Arithvale
 
-Use the IPA attached to the **0.5.0 test prerelease** in this repository’s
+Use the IPA attached to the **0.5.1 test prerelease** in this repository’s
 [Releases](https://github.com/N3moStudio/Calc-84/releases). Sign and install it
 with your chosen installer, or import it into your existing LiveContainer setup.
 The supplied IPA is unsigned; compatibility depends on your iOS version and installer.
