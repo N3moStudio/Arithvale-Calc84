@@ -63,3 +63,24 @@ and never authenticates/decrypts without an explicit restore/test and secret.
 The calculator receives no private filename/status UI. Setup and RecoveryViews
 offer receipt instructions and Use Received Backup. BackupInboxTests covers
 core persistence, input rejection, interruption, source safety and authentication.
+
+
+## 0.6.0 visual and backup map
+
+| Change | Primary files |
+| --- | --- |
+| Six layout names, initial choice, dimensions | `Sources/CalcCore/LibraryPresentation.swift` (`GalleryStyle`) |
+| Header, filters, bottom navigation, received card, add routes | `Sources/Calc84/LibraryView.swift` |
+| Native reusable grid and timeline mosaics | `Sources/Calc84/MemoryGrid.swift` |
+| Album collages | `Sources/Calc84/AlbumLibraryView.swift` |
+| Layout, appearance and calculator color preferences; glass fallback | `Sources/Calc84/Appearance.swift` |
+| Calculator geometry and session history | `Sources/Calc84/CalculatorView.swift` |
+| Four settings destinations | `Sources/Calc84/VaultSettingsView.swift` |
+| Authenticated preview and item selection | `Sources/Calc84/BackupImportView.swift` |
+| Atomic archive addition and duplicate/cloud policies | `Sources/CalcCore/VaultRepository.swift` |
+| Chunked re-encryption without plaintext files | `Sources/CalcCore/VaultStream.swift` |
+| Merge regression tests | `Tests/CalcCoreTests/BackupImportTests.swift` |
+
+`galleryStyle` defaults to Clear Glass and remembers later choices. Old
+`libraryLayout` is retained but no longer drives the new gallery. Changing a
+visual style does not touch media, encryption identifiers, or cloud preferences.
