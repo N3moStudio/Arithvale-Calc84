@@ -1,3 +1,66 @@
+# Arithvale · 0.6.0 design
+
+Implementation reference: the six interactive library previews and the calculator
+preview approved October 23, 2026. The user explicitly selected **Clear Glass** as
+the initial layout. Sample photographs, dates, counts, and the fake device shell
+in those previews are not app content.
+
+| Layout | Geometry | Navigation |
+| --- | --- | --- |
+| Clear Glass | 3 portrait columns, 0.85 aspect, 2 pt gaps | Floating glass pill |
+| Photo Library | 3 square columns, 2 pt gaps | Opaque bottom bar |
+| Nightroom | 2 portrait columns, 7 pt gaps, 12 pt inset/corners | Dark, quiet bar |
+| Albums First | 2 columns of four-photo collage covers | Album overview first |
+| Timeline | Month sections, large left photo and two stacked on the right | Standard bar |
+| Contact Sheet | 4 square columns, 1 pt gaps, compact header | Bar with Add |
+
+All six are persisted options in Appearance. The new galleryStyle preference
+leaves the legacy libraryLayout preference untouched. New/unset galleryStyle
+uses Clear Glass. Dynamic Type uses two columns for ordinary photo grids at
+accessibility sizes; album covers stack into one column. Safe areas and adaptive
+text replace the mockup’s fixed 360×720 device dimensions.
+
+Native reusable collection cells, date scrolling, drag selection, contextual
+menus and the existing adjacent-media pager remain. Only the control layer uses
+glass, with native regular Liquid Glass on iOS 26+ and regular material on older
+iOS. Reduce Transparency and increased contrast use an opaque outlined pill.
+Photos and metadata never form translucent backgrounds for one another.
+
+The root header is Library / Select / + / Settings. Filters are All, Photos,
+Videos and Favorites; Files and Recently Deleted live in Albums. Settings starts
+with Backups, Cloud Copies, Privacy & Access, and Appearance. Lock and About
+are secondary actions there. Private filenames stay behind the calculator code.
+
+The calculator matches the supplied arrangement: shared delete/AC capsule, % and
+÷; 7–9/×; 4–6/−; 1–3/+; sign/0/decimal/=. History is session-only, and mode and
+angle controls use the top-right menu. Hold Equals retains its original entry
+behavior. The default calculator is dark with blue operators; library appearance
+is independent. Mint, Lilac and Amber are also available.
+
+## Backup addition
+
+Received encrypted copies are visible after unlock, with a stable + → From a
+Backup route. Full archive authentication happens in an isolated encrypted
+preview directory before item selection. The commit re-encrypts selected resources
+with the current library key, using fresh nonces and new identifiers. Existing
+assets are unchanged and one atomic index write publishes the new items. Failure
+or cancellation before that commit removes staged files. A process crash can
+leave unreferenced encrypted resources; it cannot publish a partial index.
+
+Duplicates compare original content and media type/size, including Live Photo
+motion; derived thumbnails and filename differences do not produce extra copies.
+Dates, favorites, albums and paired-resource relationships are preserved. Source
+cloud blocks follow the item; source selections never grant upload permission.
+Current provider modes still apply. Sources in Files are never deleted by import.
+
+## Verification limits
+
+Automated tests and native compilation do not establish final iPhone rendering,
+glass behavior, frame timing, VoiceOver, or LiveContainer handoff. Compare the
+installed build against the approved previews using DEVICE-CHECKS.md.
+
+## Earlier implementation notes (historical)
+
 # Arithvale · 0.5.0 design notes
 
 The vault now follows the supplied Memories / My Eyes Only screenshots: photographs occupy the screen, with a compact header and direct controls. This replaces the earlier iOS glass/gallery treatment. The calculator remains a separate surface with a familiar four-column keypad, rounded keys, right-side operators, current-entry clear, and separate scientific/backspace controls. The blue palette is retained.

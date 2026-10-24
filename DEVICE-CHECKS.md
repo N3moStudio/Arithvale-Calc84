@@ -1,13 +1,49 @@
 # Arithvale · phone test guide
-Version 0.5.3 test · Build 9
+Version 0.6.0 test · Build 10
+
+## First: compare all six approved designs
+
+- On first upgrade/new setup, Clear Glass is selected. Switch through all six in
+  Settings → Appearance. Relaunch: the chosen layout must persist.
+- Compare each layout against its preview: columns, aspect ratios, gaps, corners,
+  chronology, album covers, title, filters and the bottom navigation. Use real
+  portrait, landscape, video, Live Photo and file samples, plus empty albums.
+- Check light/dark, Nightroom, Reduce Transparency, Increase Contrast, Reduce
+  Motion, largest text size, landscape, and VoiceOver. All actions remain reachable.
+- Select then drag across cells in each photo layout, including Timeline and an
+  album. Scroll and open a media item; swipe both directions and up for Details.
+- Calculator: compare the supplied screenshot’s key arrangement. Check delete,
+  AC, sign, decimal, percent, equals, scientific mode, DEG/RAD, history, and all
+  four accent colors. No vault information or received filename may appear there.
+
+## Add a backup to an existing library
+
+1. Keep original files and keys. Use disposable libraries A and B with different
+   recovery keys, an exact duplicate, distinct Live Photo motion, favorites,
+   albums, and items blocked from each cloud provider.
+2. With B already set up, share A’s backup from Files to LiveContainer/Arithvale.
+   Unlock B. The received card and + → From a Backup must both reach the flow.
+3. Wrong key and truncated archives must fail before showing contents. With the
+   correct A key, preview items and choose a subset. No item is added yet.
+4. Add the subset. B’s old items remain; duplicates are skipped; dates, favorites,
+   albums, Live Photos and videos survive. Save B’s new backup and verify with
+   B’s key. A’s key must not decrypt B’s newly saved backup.
+5. Cancel during review and addition, background the app, and test low storage.
+   Existing items must remain. No partial addition may appear before the atomic
+   commit; if the commit completed just before backgrounding, all added items
+   should appear together after unlock.
+6. Verify manual cloud providers gain no selected items. Automatic mode must
+   respect source and existing Never Upload blocks. No remote deletes occur.
+7. After success, share a second backup. For an unprocessed receipt, remove its
+   received copy first. Both originals in Files must remain intact.
 
 ## First: picker-independent receipt (0.5.3)
 
 These are pending phone checks, not claimed pass results. Keep your original backup and recovery key.
 
-1. Verify Help → About shows 0.5.3 (9). Update the intended LiveContainer entry; do not delete an existing library.
+1. Verify Settings shows 0.6.0 (10). Update the intended LiveContainer entry; do not delete an existing library.
 2. With Arithvale stopped, download a disposable backup in Files. Touch and hold it → Share → LiveContainer → Arithvale → intended container. The calculator must stay private. Enter your code (160160 only for empty setup) and hold =.
-3. On setup or Settings → Backup & Recovery → Test a Backup, confirm the original filename and **Use Received Backup** appear. No received copy must be called authenticated yet.
+3. On setup or Settings → Backups → Test a Backup, confirm the original filename and **Use Received Backup** appear. No received copy must be called authenticated yet.
 4. Tap Use Received Backup. A wrong recovery key must fail without replacing anything. The original key must restore into an empty test container or pass Test Recovery without changing the current library.
 5. Repeat with Arithvale already running, then after force quit/relaunch. The received encrypted copy should remain available. Compare restored bytes, counts, dates, albums and favorites using disposable media.
 6. Share again while a copy is waiting. The first must remain. **Remove Received Copy** must leave both the source in Files and the live library untouched; then sharing another backup should work.
@@ -20,7 +56,7 @@ These are pending phone checks, not claimed pass results. Keep your original bac
 Use disposable samples first. Do not delete your only library to test recovery.
 
 1. Update over the old app using the same installer/signing identity. Check that the existing calculator code, photos, videos, and recovery key still work.
-2. Open Settings → Backup & Recovery → MEGA & Blomp. Sign in to your own service. MEGA also asks for a developer app key from https://mega.nz/sdk; this is not a recovery key. Blomp must pass HTTPS checks; stop and use another destination if it reports a certificate error.
+2. Open Settings → Cloud Copies. Sign in to your own service. MEGA also asks for a developer app key from https://mega.nz/sdk; this is not a recovery key. Blomp must pass HTTPS checks; stop and use another destination if it reports a certificate error.
 3. Import one old-dated photo, one video, and a Live Photo if available. Back Up Now. Wait for the completed catalog, not just an individual upload. Open a photo → Backup Status; check the provider and saved time.
 4. Check the cloud account in its own website/app. Files under c84/v1 should be opaque encrypted objects, with no ordinary media thumbnails or original filenames. Save the Arithvale recovery key separately.
 5. Add another sample. Back up again: it should upload only new resource objects plus a catalog. Recheck All Remote Files also downloads unchanged files and consumes bandwidth.
@@ -40,7 +76,7 @@ This build includes the Memories gallery and backup updates. Phone checks remain
 
 - Gallery: check the four-column tall grid, clear headers at each month, and continuous scroll. Drag the right-edge handle through long and short months: the badge must match the visible photos. Test one month, an empty library, and many months.
 - Try Photos/Videos/Favorites/Albums, search, selecting several items, select all, Save / Share, album moves, deletion, and restoration. Check 2/3/4 columns, rotation, dark mode, larger text, and VoiceOver's adjustable date control.
-- Settings → Backup & Recovery → **Save Backup to Files**: choose iCloud Drive or another location outside the app/container. Complete the save, check the exact filename, then **Test a Backup** with the old key. A provider save without successful read-back must say it needs checking.
+- Settings → Backups → **Save Backup to Files**: choose iCloud Drive or another location outside the app/container. Complete the save, check the exact filename, then **Test a Backup** with the old key. A provider save without successful read-back must say it needs checking.
 - Cancel the save picker. Last checked backup and its filename must not advance. Close Settings during preparation and verify another attempt works. Lock the phone during preparation and during the picker; returning must require unlocking the vault again.
 - **Connect Backup Folder**: open a folder and tap Open. The picker should close, show Checking folder access, then either confirm connection or show an error. No backup should be marked saved at this stage. Back Up to Connected Folder must create and verify a separate snapshot.
 - Test a read-only/unavailable provider and a disconnected/reselected folder. The direct Save Backup to Files route must remain available without a folder connection. The app must preserve previous snapshots and the local library on failure.
@@ -52,7 +88,7 @@ The checks below cover both new and existing features.
 
 ## 1. Install and enter
 
-- Install Arithvale-0.5.3-test.ipa directly with SideStore. No extension is included. Keep your normal signing/refresh process.
+- Install Arithvale-0.6.0-test.ipa directly with SideStore. No extension is included. Keep your normal signing/refresh process.
 - Launch: calculator first, no photo permission request.
 - Type 160160 and hold =. Save the recovery key outside the app, confirm its final eight characters, and choose a unique 6–12 digit code.
 - Lock; your new code and hold = should reopen it. The public starter must no longer open the configured library.

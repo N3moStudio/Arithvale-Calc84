@@ -4,10 +4,10 @@
 
 <h1 align="center">Arithvale</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.5.3 testing · iOS 17+ · SwiftUI · MIT licensed</p>
+<p align="center">0.6.0 testing · iOS 17+ · SwiftUI · MIT licensed</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
-  <a href="Docs/UPDATE-0.5.3.md">What’s new</a> &nbsp;·&nbsp;
+  <a href="Docs/UPDATE-0.6.0.md">What’s new</a> &nbsp;·&nbsp;
   <a href="Docs/CLOUD-BACKUP.md">Cloud choices</a> &nbsp;·&nbsp;
   <a href="Docs/BUILDING.md">Build from source</a>
 </p>
@@ -19,28 +19,41 @@ control over which memories leave your phone. Previously **Calc 84**, by **N3mo 
 ## Make it yours
 
 - **Calculate naturally.** A familiar keypad, rounded keys, blue accents, clear and backspace controls, and optional scientific functions.
-- **Keep your memories.** Browse a photo grid or timeline, search names and albums, mark favorites, and drag across multiple items to select them.
+- **Keep your memories.** Choose Clear Glass, Photo Library, Nightroom, Albums First, Timeline, or Contact Sheet. Search, favorite, and drag across items to select them.
 - **Choose your cloud copies.** Select items separately for MEGA and Blomp, or enable automatic backup for a provider. A provider’s Never Upload list takes priority.
 - **Import, then decide.** Import Photos, files, or folders. Keep the originals, or explicitly approve moving verified originals to Photos Recently Deleted or the file provider’s Trash.
 - **Recover independently.** Save encrypted backups to Files, test recovery, and recover on a computer using the included offline tool.
 
 ## The latest
 
-**0.5.3** adds a backup receive route that bypasses the in-app Files picker.
-In Files, touch and hold the backup → Share → LiveContainer → Arithvale.
-Unlock Arithvale, then use **Use Received Backup** on setup or Test a Backup.
-A protected encrypted copy survives relaunch; the original stays in Files.
-The previous picker correction did not resolve the reported LiveContainer issue.
-This new share handoff still needs a phone test.
+**0.6.0** brings all six approved gallery designs to the app. **Clear Glass opens
+first**; choose another under **Settings → Appearance** and it stays selected.
+The calculator uses circular keys, a shared backspace/AC capsule, the familiar
+number arrangement, and Blue, Mint, Lilac, or Amber accents.
+
+Settings now starts with four choices: **Backups**, **Cloud Copies**,
+**Privacy & Access**, and **Appearance**. Version and build are visible there.
+
+Shared backups appear on the unlocked library as **Backup received**. Tap it,
+or **+ → From a Backup**, enter the original recovery key, preview the contents,
+and choose items to add. Exact original-content duplicates are skipped; Live
+Photo motion counts too. Added items are encrypted using the current library’s
+key. Its existing items and identity stay in place. Source cloud exclusions are
+carried over; source upload selections never opt items into a new provider.
+
+Use **Files → Share → LiveContainer → Arithvale** to receive a backup. The Files
+picker remains an optional route; its reported host-specific issue is not claimed
+fixed by this update. After a successful addition the received copy is cleared,
+leaving the original backup in Files available to share again.
 
 Your existing library identity and recovery key stay compatible. The IPA contains
 the app, not anyone’s photos, recovery key, or cloud credentials.
 
-[Read the update notes →](Docs/UPDATE-0.5.3.md)
+[Read the update notes →](Docs/UPDATE-0.6.0.md)
 
 ## Get Arithvale
 
-Use the IPA attached to the **0.5.3 test prerelease** in this repository’s
+Use the IPA attached to the **0.6.0 test prerelease** in this repository’s
 [Releases](https://github.com/N3moStudio/Calc-84/releases). Sign and install it
 with your chosen installer, or import it into your existing LiveContainer setup.
 The supplied IPA is unsigned; compatibility depends on your iOS version and installer.

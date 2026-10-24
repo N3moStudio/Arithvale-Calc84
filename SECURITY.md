@@ -135,3 +135,30 @@ extension; it is not a substitute for recovery-key authentication. Folder listin
 offers a way around a host application's missing file-type registration. Native
 provider coordination, security scopes, permission prompts and LiveContainer
 runtime behavior still require phone tests.
+
+
+## Adding an archive to an existing library (0.6.0)
+
+The archive is first fully authenticated in a separate encrypted preview. The
+user selects visible, non-deleted items. Selected originals, thumbnails and Live
+Photo companions are re-encrypted with fresh nonces and new UUIDs under the
+current library key. This does not rotate the current key or alter the source.
+Chunked resources are re-encrypted without writing a plaintext intermediate file.
+Legacy resources retain their existing bounded-memory compatibility path.
+
+One atomic manifest write publishes the addition after all new ciphertext is
+verified and moved into place. Cancellation/failure before that commit leaves the
+old manifest intact; staged resources are removed. A process crash can leave
+unreferenced ciphertext, not a partially published library. Such orphans can use
+storage until removed in a future maintenance pass.
+
+Duplicate detection hashes authenticated original content plus media type/size;
+Live Photo motion is included, derived thumbnails and names are not. No public
+content hashes are uploaded by this operation. Dates, favorites, albums, and
+resource associations are retained. Source Never Upload restrictions are applied
+to the corresponding destination items, including exact duplicates. Source
+upload selections never opt items in; existing destination provider modes apply.
+
+The isolated encrypted preview is deleted when leaving the flow, and temporary
+review caches are cleaned on next launch after interruption. Initial empty-app
+restore remains a separate operation and retains the source library’s key.
