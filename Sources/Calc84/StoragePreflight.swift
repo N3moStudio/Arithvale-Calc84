@@ -3,7 +3,9 @@ import Foundation
 
 enum StoragePreflight {
     static func require(bytes: Int64) throws {
-        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        // Application Support may not exist on an empty installation. The app's
+        // home already exists on the same volume, including in LiveContainer.
+        let root = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
         let values = try root.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
         guard let available = values.volumeAvailableCapacityForImportantUsage else { return }
         let needed = max(0, bytes) + 64 * 1024 * 1024
