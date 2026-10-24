@@ -33,9 +33,10 @@ def main():
         assert not info.get('NSAppTransportSecurity')
         assert info['UIFileSharingEnabled'] is False and info['LSSupportsOpeningDocumentsInPlace'] is False
         assert info['UTExportedTypeDeclarations'][0]['UTTypeIdentifier']=='studio.n3mo.calc84.backup'
+        assert info['CFBundleDocumentTypes'][0]['LSItemContentTypes']==['studio.n3mo.calc84.backup']
         assert any(n.endswith('PrivacyInfo.xcprivacy') for n in archive.namelist()), 'Privacy manifest absent'
         binary=archive.read(app+info['CFBundleExecutable'])
-        for prompt in ('Choose Backup File', 'Choose Backup Folder', 'Tap the backup filename here to select it.', 'Original capture date unavailable.'):
+        for prompt in ('Choose Backup File', 'Choose Backup Folder', 'Tap the backup filename here to select it.', 'Original capture date unavailable.', 'Receive Backup from Files', 'Use Received Backup'):
             assert prompt.encode() in binary, 'Missing expected recovery/viewer UI: '+prompt
         assert binary[:4]==bytes.fromhex('cffaedfe') and int.from_bytes(binary[4:8],'little')==0x0100000C
         commands=struct.unpack_from('<I',binary,16)[0]; position=32; min_version=None; sdk=None
