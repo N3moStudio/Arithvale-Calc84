@@ -52,3 +52,14 @@ folder listing and preparation. `AccessView` and `RecoveryTestView` each retain
 one model and attach `backupPicker` to their Form. `BackupInputSection` renders
 controls only. `BackupDocumentPicker` cleanup invalidates callbacks without
 changing presentation state; only delegate events complete a selection.
+
+## 0.5.3 shared-file receipt
+
+`Calc84App.onOpenURL` forwards local file handoffs to the app-owned
+`SharedBackupModel` in `SharedBackupView.swift`. Its serial storage actor holds
+security scope and coordinates reads into `CalcCore/BackupInbox.swift`.
+The inbox publishes one protected encrypted copy atomically, survives relaunch,
+and never authenticates/decrypts without an explicit restore/test and secret.
+The calculator receives no private filename/status UI. Setup and RecoveryViews
+offer receipt instructions and Use Received Backup. BackupInboxTests covers
+core persistence, input rejection, interruption, source safety and authentication.
