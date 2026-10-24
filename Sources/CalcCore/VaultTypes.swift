@@ -56,6 +56,12 @@ public struct VaultCredential: Codable, Sendable {
     public let key: Data
 }
 
+public struct BackupImportResult: Sendable {
+    public let items: [VaultItem]
+    public let added: Int
+    public let skipped: Int
+}
+
 public enum VaultCode {
     public static let starter = "160160"
     public static func valid(_ code: String) -> Bool {

@@ -1,5 +1,39 @@
 import Foundation
 
+/// Stable preference identifiers; the previous two-layout setting is left intact.
+public enum GalleryStyle: String, CaseIterable, Sendable {
+    case clearGlass, photoLibrary, nightroom, albumsFirst, timeline, contactSheet
+    public static let initial: GalleryStyle = .clearGlass
+    public var title: String {
+        switch self {
+        case .clearGlass: "Clear Glass"
+        case .photoLibrary: "Photo Library"
+        case .nightroom: "Nightroom"
+        case .albumsFirst: "Albums First"
+        case .timeline: "Timeline"
+        case .contactSheet: "Contact Sheet"
+        }
+    }
+    public var subtitle: String {
+        switch self {
+        case .clearGlass: "Portrait photos with floating glass controls"
+        case .photoLibrary: "A familiar, simple square grid"
+        case .nightroom: "Larger photos on a quiet dark background"
+        case .albumsFirst: "Your collections at the front"
+        case .timeline: "A visual story, month by month"
+        case .contactSheet: "More photos at a glance"
+        }
+    }
+    public var columns: Int {
+        switch self { case .nightroom, .albumsFirst: 2; case .contactSheet: 4; default: 3 }
+    }
+    public var gap: Double {
+        switch self { case .nightroom: 7; case .contactSheet: 1; case .timeline: 4; default: 2 }
+    }
+    public var inset: Double { self == .nightroom ? 12 : self == .timeline ? 15 : 0 }
+    public var aspectRatio: Double { self == .clearGlass || self == .nightroom ? 0.85 : 1 }
+}
+
 public enum LibraryLayout: String, CaseIterable, Sendable {
     case timeline, photos
     public var title: String { self == .timeline ? "Vault Timeline" : "Photos Layout" }

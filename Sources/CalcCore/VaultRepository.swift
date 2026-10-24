@@ -319,6 +319,113 @@ public final class VaultRepository {
         try fm.moveItem(at: stage, to: root)
         key = candidateKey; header = candidate; manifest = index
     }
+    /// Resources commit before one atomic index write. On failure the old index and
+    /// old files remain untouched. A crash can leave only unreferenced ciphertext.
+    public func importBackup(_ source: VaultRepository, selected: Set<UUID>) throws -> BackupImportResult {
+        guard let key, let header, var next = manifest,
+              let sourceKey = source.key, let sourceHeader = source.header else { throw VaultError.locked }
+        guard !selected.isEmpty, root.standardizedFileURL != source.root.standardizedFileURL else { throw VaultError.invalidBackup }
+        let roots = source.items.filter { selected.contains($0.id) && $0.visible && $0.deletedAt == nil }
+        guard roots.count == selected.count else { throw VaultError.invalidBackup }
+        let stage = try stagingDirectory()
+        defer { try? fm.removeItem(at: stage) }
+        var moved: [URL] = []
+        var committed = false
+        defer { if !committed { for url in moved { try? fm.removeItem(at: url) } } }
+        let candidates = next.items.filter(\.visible)
+        var known: [String: UUID] = [:]
+        var scanned = Set<String>()
+        var added = 0, skipped = 0
+        var mapping: [UUID: UUID] = [:]
+        var claimed = Set<UUID>()
+        for item in roots {
+            try Task.checkCancellation()
+            let resources = try source.importResources(for: item)
+            guard claimed.isDisjoint(with: Set(resources.map(\.id))) else { throw VaultError.invalidBackup }
+            claimed.formUnion(resources.map(\.id))
+            let signature = try source.importSignature(item)
+            let group = "\(item.contentType)|\(item.byteCount)|\(item.companionID != nil)"
+            if scanned.insert(group).inserted {
+                for candidate in candidates where candidate.byteCount == item.byteCount && candidate.contentType == item.contentType && (candidate.companionID == nil) == (item.companionID == nil) {
+                    let candidateSignature = try importSignature(candidate)
+                    known[candidateSignature] = candidate.id
+                }
+            }
+            if let existing = known[signature] { mapping[item.id] = existing; skipped += 1; continue }
+            guard next.items.count + resources.count <= VaultLimits.itemCount,
+                  next.items.reduce(0, { $0 + $1.byteCount }) + resources.reduce(0, { $0 + $1.byteCount }) < VaultLimits.backupBytes - 32 * 1024 * 1024 else { throw VaultError.limit }
+            let ids = Dictionary(uniqueKeysWithValues: resources.map { ($0.id, UUID()) })
+            for resource in resources {
+                try Task.checkCancellation()
+                let id = ids[resource.id]!
+                let url = stage.appendingPathComponent(id.uuidString + ".enc")
+                let context = Self.context(header, id.uuidString)
+                if resource.storageVersion == 2 {
+                    try VaultStream.reencrypt(source.assetURL(resource.id), to: url, size: resource.byteCount,
+                        sourceKey: sourceKey, sourceContext: Self.context(sourceHeader, resource.id.uuidString), key: key, context: context)
+                } else { try VaultStream.encrypt(source.contents(of: resource.id), to: url, key: key, context: context) }
+                try VaultStream.decrypt(url, to: nil, size: resource.byteCount, key: key, context: context)
+                var copy = VaultItem(id: id, name: resource.name, contentType: resource.contentType, byteCount: resource.byteCount, added: resource.added)
+                copy.captured = resource.captured; copy.duration = resource.duration
+                copy.latitude = resource.latitude; copy.longitude = resource.longitude
+                copy.favorite = resource.favorite; copy.album = resource.album; copy.storageVersion = 2
+                copy.companionID = resource.companionID.flatMap { ids[$0] }; copy.companionType = resource.companionType
+                copy.thumbnailID = resource.thumbnailID.flatMap { ids[$0] }
+                copy.isCompanion = resource.isCompanion; copy.isThumbnail = resource.isThumbnail
+                next.items.append(copy)
+            }
+            mapping[item.id] = ids[item.id]!
+            known[signature] = ids[item.id]!
+            added += 1
+        }
+        // Source permissions never opt items in. Source exclusions remain exclusions,
+        // including when an exact duplicate is already in the destination library.
+        var policies = next.cloudPreferences ?? .init()
+        let originalPolicies = try source.cloudPreferences()
+        for provider in CloudProvider.allCases {
+            for (old, new) in mapping where originalPolicies[provider].blocked.contains(old) {
+                policies[provider].blocked.insert(new); policies[provider].selected.remove(new)
+            }
+        }
+        next.cloudPreferences = policies
+        try policies.validate(items: next.items)
+        for url in try fm.contentsOfDirectory(at: stage, includingPropertiesForKeys: nil) {
+            try Task.checkCancellation()
+            let destination = root.appendingPathComponent(url.lastPathComponent)
+            try fm.moveItem(at: url, to: destination); moved.append(destination)
+        }
+        try Task.checkCancellation()
+        try persist(next, key: key, header: header)
+        manifest = next; committed = true
+        return BackupImportResult(items: next.items, added: added, skipped: skipped)
+    }
+    private func importResources(for item: VaultItem) throws -> [VaultItem] {
+        var result = [item]
+        for (id, companion) in [(item.companionID, true), (item.thumbnailID, false)] {
+            if let id {
+                guard let resource = items.first(where: { $0.id == id }), !resource.visible, resource.pendingImport != true,
+                      resource.companionID == nil, resource.thumbnailID == nil,
+                      companion ? resource.isCompanion == true : resource.isThumbnail == true,
+                      !result.contains(where: { $0.id == id }) else { throw VaultError.invalidBackup }
+                result.append(resource)
+            }
+        }
+        return result
+    }
+    private func importSignature(_ item: VaultItem) throws -> String {
+        guard let key, let header else { throw VaultError.locked }
+        var hash = SHA256()
+        // Thumbnails are derived previews, not original content. Live Photo motion
+        // participates so two stills with different motion are never collapsed.
+        for resource in try importResources(for: item).filter({ $0.isThumbnail != true }) {
+            hash.update(data: Data("\(resource.contentType.utf8.count):\(resource.contentType):\(resource.byteCount):".utf8))
+            let digest = resource.storageVersion == 2
+                ? try VaultStream.digest(assetURL(resource.id), size: resource.byteCount, key: key, context: Self.context(header, resource.id.uuidString))
+                : Data(SHA256.hash(data: try contents(of: resource.id)))
+            hash.update(data: digest)
+        }
+        return Data(hash.finalize()).base64EncodedString()
+    }
     private func assetURL(_ id: UUID) -> URL { root.appendingPathComponent(id.uuidString + ".enc") }
     private static func context(_ header: VaultHeader, _ item: String) -> String { "Calc84/v\(header.version)/\(header.id.uuidString)/\(item)" }
     private func persist(_ next: VaultManifest, key: SymmetricKey, header: VaultHeader) throws {

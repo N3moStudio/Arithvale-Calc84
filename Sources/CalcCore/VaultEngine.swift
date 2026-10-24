@@ -66,6 +66,12 @@ public actor VaultEngine {
         try repository.restore(from: from, password: password)
         return repository.items
     }
+    public func importBackup(from root: URL, credential: VaultCredential, selected: Set<UUID>) throws -> BackupImportResult {
+        let source = VaultRepository(root: root)
+        defer { source.lock() }
+        try source.unlock(credential: credential)
+        return try repository.importBackup(source, selected: selected)
+    }
     public func verifyBackup(from: URL, password: String) throws -> Int {
         let temporary = repository.root.deletingLastPathComponent().appendingPathComponent("verify-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: temporary) }
