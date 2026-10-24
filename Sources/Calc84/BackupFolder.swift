@@ -19,7 +19,7 @@ final class BackupSelection: @unchecked Sendable {
         if access { url.stopAccessingSecurityScopedResource() }
         if owned { try? FileManager.default.removeItem(at: url) }
     }
-    static func backupFile(_ source: URL) throws -> BackupSelection {
+    static func backupFile(_ source: URL, displayName: String? = nil) throws -> BackupSelection {
         let scope = BackupSelection(source)
         defer { withExtendedLifetime(scope) {} }
         let copy = try TemporaryFiles.fresh(extension: "c84backup")
@@ -41,7 +41,7 @@ final class BackupSelection: @unchecked Sendable {
         if let coordinationError { throw coordinationError }
         guard let result else { throw VaultError.invalidBackup }
         try result.get(); succeeded = true
-        return BackupSelection(copy, owned: true, displayName: source.lastPathComponent)
+        return BackupSelection(copy, owned: true, displayName: displayName ?? source.lastPathComponent)
     }
 }
 

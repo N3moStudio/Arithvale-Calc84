@@ -31,6 +31,7 @@ struct RecoveryTestView: View {
     @State private var passed = false
     var body: some View {
         Form {
+            SharedBackupSection(input: backupInput)
             BackupInputSection(input: backupInput, enabled: !vault.busy)
             Section {
                 Text("This decrypts and checks the complete backup in a separate temporary library. Your current library is left in place. You need free space for another encrypted copy.")

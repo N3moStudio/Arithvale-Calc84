@@ -5,9 +5,9 @@
 	<key>CFBundleDisplayName</key>
 	<string>Arithvale</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.5.2</string>
+	<string>0.5.3</string>
 	<key>CFBundleVersion</key>
-	<string>8</string>
+	<string>9</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Arithvale imports your selected photos and videos with their original dates and Live Photo resources. After verified import, you can choose to delete those originals from Photos with your confirmation.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
@@ -46,6 +46,21 @@
 					<string>c84backup</string>
 				</array>
 			</dict>
+		</dict>
+	</array>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Arithvale Backup</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>studio.n3mo.calc84.backup</string>
+			</array>
 		</dict>
 	</array>
 </dict>

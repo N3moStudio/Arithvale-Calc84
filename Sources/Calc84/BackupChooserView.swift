@@ -38,7 +38,7 @@ final class BackupInputModel: ObservableObject {
         // Interactive dismissal is handled here, never by representable teardown.
         guard let value = pending else {
             if !receivedDelegateResult {
-                notice = "Files closed before returning a selection. In LiveContainer, check this app’s Fix File Picker setting and relaunch."
+                notice = "Files closed before returning a selection. Use Receive Backup from Files above to share the file into this app instead."
             }
             return
         }
@@ -71,7 +71,7 @@ final class BackupInputModel: ObservableObject {
             }
         }
     }
-    func prepare(_ url: URL, scope: BackupSelection? = nil) {
+    func prepare(_ url: URL, scope: BackupSelection? = nil, displayName: String? = nil) {
         guard !working else { return }
         working = true; error = nil; notice = nil
         let access = scope ?? BackupSelection(url); let parent = folder
@@ -79,7 +79,7 @@ final class BackupInputModel: ObservableObject {
             defer { working = false }
             let worker = Task.detached(priority: .userInitiated) {
                 defer { withExtendedLifetime(access) {}; withExtendedLifetime(parent) {} }
-                return try BackupSelection.backupFile(url)
+                return try BackupSelection.backupFile(url, displayName: displayName)
             }
             do {
                 let value = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
@@ -87,7 +87,7 @@ final class BackupInputModel: ObservableObject {
                 backup = value; entries = []; folder = nil
             } catch {
                 if !Task.isCancelled {
-                    self.error = "Couldn’t select this backup. Use Choose Backup Folder if the file picker cannot open it. " + error.localizedDescription
+                    self.error = "Couldn’t prepare this backup. Your original file is unchanged. " + error.localizedDescription
                 }
             }
         }
@@ -129,7 +129,7 @@ struct BackupInputSection: View {
         } header: { Text("Encrypted Backup") } footer: {
             VStack(alignment: .leading, spacing: 8) {
                 Text("File: tap the backup itself. Folder: open the folder containing it, tap Open, then tap the filename in the list above. Opening a folder alone does not select a backup.")
-                Text("If LiveContainer’s picker does not respond, enable Fix File Picker in this app’s LiveContainer settings, then relaunch it.")
+                Text("If the picker closes or will not select the file, use Receive Backup from Files above. That route bypasses this picker.")
             }
         }.disabled(input.working || !enabled)
     }

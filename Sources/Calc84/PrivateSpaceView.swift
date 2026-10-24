@@ -60,6 +60,9 @@ private struct AccessView: View {
                     } label: { Label("Restore from Cloud", systemImage: "icloud.and.arrow.down") }.disabled(vault.busy)
                 }
             }
+            if !vault.exists {
+                SharedBackupSection(input: backupInput) { restoring = true }
+            }
             if restoring {
                 BackupInputSection(input: backupInput, enabled: !vault.busy)
             }
