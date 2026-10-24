@@ -1,5 +1,19 @@
 # Arithvale · phone test guide
-Version 0.4.0 alpha · Build 4
+Version 0.5.3 test · Build 9
+
+## First: picker-independent receipt (0.5.3)
+
+These are pending phone checks, not claimed pass results. Keep your original backup and recovery key.
+
+1. Verify Help → About shows 0.5.3 (9). Update the intended LiveContainer entry; do not delete an existing library.
+2. With Arithvale stopped, download a disposable backup in Files. Touch and hold it → Share → LiveContainer → Arithvale → intended container. The calculator must stay private. Enter your code (160160 only for empty setup) and hold =.
+3. On setup or Settings → Backup & Recovery → Test a Backup, confirm the original filename and **Use Received Backup** appear. No received copy must be called authenticated yet.
+4. Tap Use Received Backup. A wrong recovery key must fail without replacing anything. The original key must restore into an empty test container or pass Test Recovery without changing the current library.
+5. Repeat with Arithvale already running, then after force quit/relaunch. The received encrypted copy should remain available. Compare restored bytes, counts, dates, albums and favorites using disposable media.
+6. Share again while a copy is waiting. The first must remain. **Remove Received Copy** must leave both the source in Files and the live library untouched; then sharing another backup should work.
+7. Try a renamed backup, a fake .c84backup, a truncated archive, a large backup and a cloud-only placeholder. An incomplete/failed copy must not become selected. Leave the app during copying and relaunch: only complete copies may appear.
+8. If the filename never appears, record whether LiveContainer was available in Share and whether the correct app/container opened. **No shared backup received yet** means no completed receipt, not a bad recovery key.
+9. Check direct installation's Files → Share → Arithvale separately. Check that calculator Help and app-switcher snapshots reveal no backup filename or private content.
 
 ## Cloud backup checks
 
@@ -38,21 +52,21 @@ The checks below cover both new and existing features.
 
 ## 1. Install and enter
 
-- Install Arithvale-0.4.0-test.ipa directly with SideStore. No extension is included. Keep your normal signing/refresh process.
+- Install Arithvale-0.5.3-test.ipa directly with SideStore. No extension is included. Keep your normal signing/refresh process.
 - Launch: calculator first, no photo permission request.
 - Type 160160 and hold =. Save the recovery key outside the app, confirm its final eight characters, and choose a unique 6–12 digit code.
 - Lock; your new code and hold = should reopen it. The public starter must no longer open the configured library.
 - Check 2+3×4 = 14, (2+3)×4 = 20, sin(30) = 0.5 in DEG, plus AC, backspace, sign change, scientific controls, and RAD.
 - A calculation whose answer equals your code must not unlock the library. Long-pressing the answer must do nothing special.
 
-Already used 0.1? Export a backup using the old app first. Update with the same signing identity, use Help → Restore or Recover Library, enter the old long password, and enroll a new code. Do not uninstall to upgrade.
+Already used 0.1? Export a backup using the old app first. Update with the same signing identity, enter 160160 and hold = to reach recovery, enter the old long password, and enroll a new code. Do not uninstall to upgrade.
 
 ## 2. Access and privacy
 
 - Wrong code: calculator remains visible, library remains closed.
 - After five failures, wait at least 30 seconds before the correct code; further failures increase the delay up to five minutes. No wipe occurs.
 - Settings → Change Calculator Code: old code fails, new code works. Recovery key/backups still work.
-- Help → Restore or Recover Library must require the recovery secret before enrolling a new code.
+- Entering 160160 and holding = on an existing library must require the recovery secret before enrolling a new code.
 - With a photo, video, Settings, or export sheet open: open the app switcher, lock the phone, and return. The switcher should show a neutral calculator cover. Returning from background must require your code.
 - Repeat while importing, unlocking, backing up, or exporting. A stale operation must not reopen the vault after locking.
 - Force quit/relaunch: calculator first.

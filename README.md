@@ -4,10 +4,10 @@
 
 <h1 align="center">Arithvale</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.5.2 testing · iOS 17+ · SwiftUI · MIT licensed</p>
+<p align="center">0.5.3 testing · iOS 17+ · SwiftUI · MIT licensed</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
-  <a href="Docs/UPDATE-0.5.2.md">What’s new</a> &nbsp;·&nbsp;
+  <a href="Docs/UPDATE-0.5.3.md">What’s new</a> &nbsp;·&nbsp;
   <a href="Docs/CLOUD-BACKUP.md">Cloud choices</a> &nbsp;·&nbsp;
   <a href="Docs/BUILDING.md">Build from source</a>
 </p>
@@ -26,20 +26,21 @@ control over which memories leave your phone. Previously **Calc 84**, by **N3mo 
 
 ## The latest
 
-**0.5.2** corrects picker dismissal handling and moves presentation to the recovery
-form to address a reported immediate Files closure. It retains 0.5.1's direct
-file/folder controls, visible build number, horizontal media paging and swipe-up
-details, plus 0.5.0's cloud selection, exclusions and optional Trash controls.
-The reported LiveContainer behavior still needs confirmation on a phone.
+**0.5.3** adds a backup receive route that bypasses the in-app Files picker.
+In Files, touch and hold the backup → Share → LiveContainer → Arithvale.
+Unlock Arithvale, then use **Use Received Backup** on setup or Test a Backup.
+A protected encrypted copy survives relaunch; the original stays in Files.
+The previous picker correction did not resolve the reported LiveContainer issue.
+This new share handoff still needs a phone test.
 
 Your existing library identity and recovery key stay compatible. The IPA contains
 the app, not anyone’s photos, recovery key, or cloud credentials.
 
-[Read the update notes →](Docs/UPDATE-0.5.2.md)
+[Read the update notes →](Docs/UPDATE-0.5.3.md)
 
 ## Get Arithvale
 
-Use the IPA attached to the **0.5.1 test prerelease** in this repository’s
+Use the IPA attached to the **0.5.3 test prerelease** in this repository’s
 [Releases](https://github.com/N3moStudio/Calc-84/releases). Sign and install it
 with your chosen installer, or import it into your existing LiveContainer setup.
 The supplied IPA is unsigned; compatibility depends on your iOS version and installer.

@@ -16,7 +16,7 @@ key is still required; the starter code does not decrypt an existing library.
 
 1. Open **Settings → Backup & Recovery → Save Backup to Files**.
 2. Save to your own iCloud Drive folder or another Files location outside the app/LiveContainer.
-3. Open **Test a Backup**, select the actual `.c84backup` file, and enter its recovery key. Do not select the containing folder.
+3. Open **Test a Backup**, select the actual `.c84backup` file, and enter its recovery key. If the picker closes, use the sharing route below.
 4. Check the Files provider’s upload status separately. A successful local save is not proof of cloud upload.
 
 The local encrypted library is private app data. It is not a normal Photos album
@@ -57,8 +57,20 @@ starts with manual/empty cloud choices. Sign-ins and folder permissions must be
 connected again. See [offline computer recovery](Docs/BUILDING.md#recover-without-the-app).
 
 
-Backup picker (0.5.1): choose **Choose Backup File** and tap the file, or
-**Choose Backup Folder**, open its folder, tap Open, then tap the filename in
-Arithvale's list. The selected name must appear before restoration. If LiveContainer
-does not respond to Open, enable its per-app **Fix File Picker** setting and relaunch.
-Find the running build in calculator Help → About or at the bottom of Recovery.
+## Receive a backup without opening the picker (0.5.3)
+
+1. Open Apple’s **Files** app yourself. Find the `.c84backup` and download it if it has a cloud icon.
+2. Touch and hold the file → **Share → LiveContainer → Arithvale**. Choose the intended data container. Share one downloaded file, not a folder or collaboration link. A directly installed Arithvale can be selected instead of LiveContainer.
+3. Arithvale still opens as a calculator. Enter your code and hold **=**; an empty installation uses **160160** and hold **=**.
+4. On setup, tap **Use Received Backup**, enter its original recovery key and choose a new calculator code. Tap **Restore Library**. For an existing library, go to **Settings → Backup & Recovery → Test a Backup → Use Received Backup** instead.
+5. Receipt means the encrypted copy arrived; only a successful recovery test or restore authenticates it. **Remove Received Copy** removes this extra copy, not the original in Files or your library. One received backup is retained at a time.
+
+This path never opens Arithvale’s document picker. LiveContainer documents its
+share handoff, but that host-to-app transfer still needs testing on your phone.
+If **No shared backup received yet** remains, the host has not delivered a file.
+If LiveContainer is absent from Share → More, check that its share extension is
+installed/enabled. Keep the original and key; do not delete them to troubleshoot.
+
+The original **Choose Backup File** and **Choose Backup Folder** paths remain
+available. Find the build in calculator Help → About or the Recovery footer:
+**0.5.3 (9)** for this update.
