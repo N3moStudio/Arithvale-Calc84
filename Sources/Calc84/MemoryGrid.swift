@@ -10,7 +10,7 @@ struct MemoryGrid: UIViewControllerRepresentable {
     let sections: [LibrarySection]
     let engine: VaultEngine
     let columns: Int
-    let portrait: Bool
+    let style: GalleryStyle
     let grouping: String
     let selection: Set<UUID>
     let selecting: Bool
@@ -24,9 +24,11 @@ struct MemoryGrid: UIViewControllerRepresentable {
     static func dismantleUIViewController(_ controller: MemoryGridController, coordinator: ()) { controller.clearImages() }
 }
 
-final class MemoryGridController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
+final class MemoryGridController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegate {
     private var model: MemoryGrid
-    private let layout = UICollectionViewFlowLayout()
+    private lazy var layout = UICollectionViewCompositionalLayout { [weak self] _, environment in
+        self?.makeSection(environment)
+    }
     private lazy var grid = UICollectionView(frame: .zero, collectionViewLayout: layout)
     private let images = NSCache<NSUUID, UIImage>()
     private let scrubber = MonthScrubber()
@@ -46,8 +48,6 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         grid.dataSource = self; grid.delegate = self
         grid.alwaysBounceVertical = true; grid.showsVerticalScrollIndicator = false
         grid.contentInsetAdjustmentBehavior = .never
-        layout.minimumLineSpacing = 1; layout.minimumInteritemSpacing = 1
-        layout.sectionHeadersPinToVisibleBounds = true
         grid.register(MemoryCell.self, forCellWithReuseIdentifier: "photo")
         grid.register(MonthHeader.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "month")
         view.addSubview(grid); view.addSubview(scrubber); view.addSubview(month)
@@ -57,7 +57,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
             self.model.setSelection(selection)
         }
         configureDragSelection()
-        month.textColor = .white; month.backgroundColor = UIColor(red: 0.84, green: 0, blue: 0.23, alpha: 1)
+        month.textColor = .white; month.backgroundColor = .darkGray
         month.font = .preferredFont(forTextStyle: .headline)
         month.adjustsFontForContentSizeCategory = true
         month.textAlignment = .center; month.layer.cornerRadius = 9; month.clipsToBounds = true
@@ -99,12 +99,13 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
     }
     func update(_ next: MemoryGrid) {
         let newContent = model.sections != next.sections
-        let newLayout = model.columns != next.columns || model.portrait != next.portrait || model.grouping != next.grouping
+        let newLayout = model.columns != next.columns || model.style != next.style || model.grouping != next.grouping
         let reset = model.identity != next.identity
         let anchor = grid.indexPathsForVisibleItems.sorted().first.flatMap { item(at: $0)?.id }
         if newContent || newLayout || reset { dragSelection?.cancel() }
         model = next
         guard isViewLoaded else { return }
+        grid.contentInset.bottom = model.style == .clearGlass && !model.selecting ? 88 : 8
         configureDragSelection()
         if newContent || newLayout || reset {
             grid.reloadData(); layout.invalidateLayout(); grid.layoutIfNeeded()
@@ -140,6 +141,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "photo", for: path) as! MemoryCell
         if let item = item(at: path) {
             cell.configure(item, engine: model.engine, cache: images)
+            cell.contentView.layer.cornerRadius = model.style == .nightroom ? 12 : model.style == .timeline ? 12 : 0
             cell.setSelection((dragSelection?.selection ?? model.selection).contains(item.id), selecting: model.selecting)
         }
         return cell
@@ -147,19 +149,43 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt path: IndexPath) {
         if let item = item(at: path) { model.open(item) }
     }
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt path: IndexPath) -> CGSize {
-        let count = CGFloat(max(2, min(6, model.columns)))
-        let width = floor((collectionView.bounds.width - count + 1) / count)
-        return CGSize(width: max(1, width), height: max(1, floor(width * (model.portrait ? 1.65 : 1))))
-    }
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize {
-        CGSize(width: collectionView.bounds.width, height: UIFont.preferredFont(forTextStyle: .headline).lineHeight + 26)
+    private func makeSection(_ environment: NSCollectionLayoutEnvironment) -> NSCollectionLayoutSection {
+        let style = model.style
+        let inset = CGFloat(style.inset), gap = CGFloat(style.gap)
+        let available = max(1, environment.container.effectiveContentSize.width - inset * 2)
+        let group: NSCollectionLayoutGroup
+        if style == .timeline {
+            let height = available * 0.61
+            let hero = NSCollectionLayoutItem(layoutSize: .init(widthDimension: .fractionalWidth(0.61), heightDimension: .fractionalHeight(1)))
+            let small = NSCollectionLayoutItem(layoutSize: .init(widthDimension: .fractionalWidth(1), heightDimension: .fractionalHeight(0.5)))
+            let side = NSCollectionLayoutGroup.vertical(layoutSize: .init(widthDimension: .fractionalWidth(0.39), heightDimension: .fractionalHeight(1)), repeatingSubitem: small, count: 2)
+            side.interItemSpacing = .fixed(gap)
+            group = .horizontal(layoutSize: .init(widthDimension: .fractionalWidth(1), heightDimension: .absolute(height)), subitems: [hero, side])
+            group.interItemSpacing = .fixed(gap)
+            // Fractional widths include the gap. Flexible side width avoids overflow.
+            hero.contentInsets.trailing = gap
+            group.interItemSpacing = .fixed(0)
+        } else {
+            let count = max(2, model.columns)
+            let height = (available - CGFloat(count - 1) * gap) / CGFloat(count) / style.aspectRatio
+            let item = NSCollectionLayoutItem(layoutSize: .init(widthDimension: .fractionalWidth(1 / CGFloat(count)), heightDimension: .fractionalHeight(1)))
+            group = .horizontal(layoutSize: .init(widthDimension: .fractionalWidth(1), heightDimension: .absolute(height)), repeatingSubitem: item, count: count)
+            group.interItemSpacing = .fixed(gap)
+        }
+        let section = NSCollectionLayoutSection(group: group)
+        section.interGroupSpacing = gap
+        section.contentInsets = .init(top: 0, leading: inset, bottom: style == .timeline ? 18 : 12, trailing: inset)
+        let height = UIFont.preferredFont(forTextStyle: style == .contactSheet ? .subheadline : .headline).lineHeight + 24
+        let header = NSCollectionLayoutBoundarySupplementaryItem(layoutSize: .init(widthDimension: .fractionalWidth(1), heightDimension: .absolute(height)), elementKind: UICollectionView.elementKindSectionHeader, alignment: .top)
+        header.pinToVisibleBounds = style == .contactSheet || style == .photoLibrary
+        section.boundarySupplementaryItems = [header]
+        return section
     }
     func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at path: IndexPath) -> UICollectionReusableView {
         let header = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "month", for: path) as! MonthHeader
         let section = model.sections[path.section]
         let format: Date.FormatStyle = model.grouping == "Years" ? .dateTime.year() : model.grouping == "Days" ? .dateTime.month(.wide).day().year() : .dateTime.month(.wide).year()
-        header.configure(section.date.formatted(format), count: section.items.count)
+        header.configure(section.date.formatted(format), count: section.items.count, style: model.style)
         return header
     }
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
@@ -270,6 +296,7 @@ private final class MonthScrubber: UIView {
 
 private final class MonthHeader: UICollectionReusableView {
     private let title = UILabel(), count = UILabel()
+    private var inset: CGFloat = 16
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .systemBackground
@@ -279,12 +306,18 @@ private final class MonthHeader: UICollectionReusableView {
         isAccessibilityElement = true; accessibilityTraits = [.header]
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    func configure(_ value: String, count: Int) { title.text = value; self.count.text = "\(count)"; accessibilityLabel = "\(value), \(count) items" }
+    func configure(_ value: String, count: Int, style: GalleryStyle) {
+        title.text = value; self.count.text = "\(count) items"; accessibilityLabel = "\(value), \(count) items"
+        inset = style.inset > 0 ? 0 : 16
+        let size: CGFloat = style == .timeline ? 21 : style == .contactSheet ? 14 : 16
+        title.font = UIFontMetrics(forTextStyle: .headline).scaledFont(for: .systemFont(ofSize: size, weight: .semibold))
+        self.count.font = UIFont.preferredFont(forTextStyle: .caption1)
+    }
     override func layoutSubviews() {
         super.layoutSubviews()
         count.sizeToFit()
-        count.frame = CGRect(x: bounds.width - count.bounds.width - 18, y: 0, width: count.bounds.width, height: bounds.height)
-        title.frame = CGRect(x: 16, y: 0, width: max(0, count.frame.minX - 28), height: bounds.height)
+        count.frame = CGRect(x: bounds.width - count.bounds.width - inset, y: 0, width: count.bounds.width, height: bounds.height)
+        title.frame = CGRect(x: inset, y: 0, width: max(0, count.frame.minX - inset - 12), height: bounds.height)
     }
 }
 

@@ -5,63 +5,61 @@ import CalcCore
 struct VaultSettingsView: View {
     @EnvironmentObject private var vault: VaultModel
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("libraryLayout") private var layout = LibraryLayout.timeline.rawValue
-    @AppStorage("libraryDateSource") private var dateSource = LibraryDateSource.captured.rawValue
-    @AppStorage("libraryNewestFirst") private var newestFirst = true
-    @AppStorage("memoryGridColumns") private var columns = 4
-    @AppStorage("lastEncryptedExport") private var lastExport = 0.0
-    @AppStorage("libraryNeedsBackup") private var needsBackup = true
     var body: some View {
         List {
             Section {
-                NavigationLink { BackupSettingsView() } label: {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Label("Backup & Recovery", systemImage: "externaldrive")
-                        BackupSummaryView().environmentObject(vault.cloud).font(.footnote).foregroundStyle(.secondary)
-                    }.padding(.vertical, 6)
-                }
-            }
-            Section { NavigationLink("About " + AppBrand.name) { AboutView() } }
-            Section("Your gallery") {
-                Picker("View", selection: $layout) {
-                    Text("Memories grid").tag(LibraryLayout.timeline.rawValue)
-                    Text("Photos grid").tag(LibraryLayout.photos.rawValue)
-                }
-                Text(layout == LibraryLayout.timeline.rawValue ? "Tall tiles, month headings, and a date handle for quick scrolling." : "Square tiles with year, month, or day grouping.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                Picker("Columns", selection: $columns) { Text("2 · Large").tag(2); Text("3").tag(3); Text("4 · Compact").tag(4) }
-                Picker("Dates", selection: $dateSource) {
-                    ForEach(LibraryDateSource.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
-                }
-                Toggle("Newest first", isOn: $newestFirst)
-            }
-            Section("Access") {
-                NavigationLink("Change calculator code") { ChangeCodeView() }
-                Text("Changing this code does not change your recovery key.").font(.footnote).foregroundStyle(.secondary)
+                NavigationLink { BackupSettingsView() } label: { settingsRow("Backups", detail: "Save, add or check a copy", symbol: "externaldrive") }
+                NavigationLink { CloudBackupView() } label: { settingsRow("Cloud Copies", detail: "Choose what leaves this device", symbol: "icloud") }
+                NavigationLink { PrivacyAccessView() } label: { settingsRow("Privacy & Access", detail: "Calculator code and recovery key", symbol: "lock") }
+                NavigationLink { AppearanceSettingsView() } label: { settingsRow("Appearance", detail: "Layout, colors and display", symbol: "paintpalette") }
             }
             Section {
-                NavigationLink("Privacy & storage") {
-                    List {
-                        Section("Private library") {
-                            Text("Your library is encrypted in private app storage. No \(AppBrand.name) account or analytics. Optional cloud backups use your own Blomp or MEGA account.")
-                            Text("Deleting the app or its data container can delete that copy. Keep an external backup and its recovery key.")
-                        }
-                        Section("Copies you save") {
-                            Text("Encrypted backups can be found, copied, or deleted in Files. Their contents are not ordinary playable photos or videos.")
-                            Text("Shared or exported originals are unencrypted and can include location metadata. Recipients can keep them.")
-                        }
-                        Section("Before relying on it") {
-                            Text("Test a backup and restore it using disposable samples first. Keep originals until phone tests pass. There is no screenshot-blocking or undetectability guarantee.")
-                        }
-                    }.navigationTitle("Privacy & Storage").navigationBarTitleDisplayMode(.inline)
-                }
+                NavigationLink { AboutView() } label: { LabeledContent(AppBrand.name, value: AppBrand.version).font(.footnote).foregroundStyle(.secondary) }
+                Button("Lock & Return to Calculator", systemImage: "lock.fill") { vault.lock(); dismiss() }
             }
-        }
-        .navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        .alert("Couldn’t Complete", isPresented: Binding(get: { vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
-            Button("Close", role: .cancel) { vault.message = nil }
-        } message: { Text(vault.message ?? "") }
+        }.navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .alert("Couldn’t Complete", isPresented: Binding(get: { vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
+                Button("Close", role: .cancel) { vault.message = nil }
+            } message: { Text(vault.message ?? "") }
+    }
+    private func settingsRow(_ title: String, detail: String, symbol: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: symbol).font(.title2).frame(width: 28).foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.body.weight(.medium))
+                Text(detail).font(.footnote).foregroundStyle(.secondary)
+            }
+        }.padding(.vertical, 9)
+    }
+}
+
+struct PrivacyAccessView: View {
+    var body: some View {
+        List {
+            Section {
+                NavigationLink("Change Calculator Code") { ChangeCodeView() }
+                NavigationLink("Recovery Key") { RecoveryKeyHelpView() }
+            }
+            Section("Private storage") {
+                Text("Your library stays encrypted in private app storage. Save an external backup before removing the app or its data container.")
+                Text("Exported originals are ordinary photos and videos. They may contain location information.")
+            }
+            Section { NavigationLink("About & Privacy") { AboutView() } }
+        }.navigationTitle("Privacy & Access").navigationBarTitleDisplayMode(.inline)
+    }
+}
+struct RecoveryKeyHelpView: View {
+    var body: some View {
+        List {
+            Section("Keep your key") {
+                Text("Use the recovery key you saved when creating or restoring this library. The app does not keep a viewable copy of that key.")
+                Text("Your calculator code opens this installation. It cannot decrypt a backup by itself.")
+            }
+            Section {
+                NavigationLink("Test a Backup & Key") { RecoveryTestView() }
+            } footer: { Text("Adding items from a different backup keeps this library’s key. The source key only opens the backup you are adding.") }
+        }.navigationTitle("Recovery Key").navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -87,16 +85,14 @@ struct BackupSettingsView: View {
     var body: some View {
         List {
             Section {
-                NavigationLink { CloudBackupView() } label: { Label("MEGA & Blomp", systemImage: "icloud") }
-                Text("Files backup").font(.title3.bold())
-                Text("Save an encrypted backup to Files. Keep its recovery key separately—you need both after reinstalling.").foregroundStyle(.secondary)
+                NavigationLink { BackupImportView() } label: { Label("Add from Backup", systemImage: "externaldrive.badge.plus").frame(minHeight: 44) }
                 Button {
                     preparation = Task {
                         if let request = await vault.prepareBackupForFiles() {
                             activeExport = request; sheet = .save(request)
                         }
                     }
-                } label: { Label("Save Backup to Files", systemImage: "square.and.arrow.down").fontWeight(.semibold).frame(minHeight: 44) }
+                } label: { Label("Save a Backup", systemImage: "square.and.arrow.down").fontWeight(.semibold).frame(minHeight: 44) }
                 .disabled(vault.busy)
             } footer: { Text("Choose a location outside \(AppBrand.name) / LiveContainer. No folder connection is required for this save.") }
             if vault.busy || !vault.status.isEmpty {
@@ -110,7 +106,8 @@ struct BackupSettingsView: View {
                     }
                 }
             }
-            Section("Last checked copy") {
+            Section {
+                NavigationLink("Last Saved Copy") { List {
                 if lastExport > 0 {
                     LabeledContent("Saved") { Text(Date(timeIntervalSince1970: lastExport), format: .dateTime.month().day().hour().minute()) }
                     if !savedFolder.isEmpty { LabeledContent("Folder", value: savedFolder) }
@@ -118,6 +115,7 @@ struct BackupSettingsView: View {
                     if needsBackup { Label("New changes need another backup", systemImage: "exclamationmark.circle") }
                     Text("Find this filename in Files. A successful save does not confirm cloud upload.").font(.footnote).foregroundStyle(.secondary)
                 } else { Text("No backup has been saved and checked yet.").foregroundStyle(.secondary) }
+                }.navigationTitle("Last Saved Copy") }
             }
             Section {
                 NavigationLink { RecoveryTestView() } label: { Label("Test a Backup", systemImage: "checkmark.shield") }
@@ -126,6 +124,7 @@ struct BackupSettingsView: View {
                     Text(lastTestIdentity.isEmpty ? "Older test · snapshot identity was not recorded" : lastTestIdentity).font(.caption).textSelection(.enabled)
                     LabeledContent("Last test") { Text(Date(timeIntervalSince1970: lastTest), format: .dateTime.month().day().hour().minute()) }
                 }
+                NavigationLink("Recovery Key") { RecoveryKeyHelpView() }
                 NavigationLink("Restore after reinstalling") {
                     List {
                         Text("1. Before deleting anything, save a backup outside the app and test that exact file. Wait for your Files provider to finish uploading.")
@@ -138,6 +137,7 @@ struct BackupSettingsView: View {
                 }
             } header: { Text("Check & restore") } footer: { Text("A recovery test checks the file you select, not all your backups. A screenshot of the key does not contain your photos.") }
             Section {
+                NavigationLink("Connected Folder") { List {
                 LabeledContent("Connected folder", value: folderName)
                 Button(BackupFolder.configured ? "Reconnect or Change Folder" : "Connect Backup Folder", systemImage: "folder.badge.plus") { sheet = .folder }
                     .disabled(vault.busy)
@@ -146,11 +146,12 @@ struct BackupSettingsView: View {
                     Toggle("Back up after changes", isOn: $automatic).disabled(vault.busy)
                     Button("Disconnect Folder") { BackupFolder.forget() }.disabled(vault.busy)
                 }
-            } header: { Text("Optional · reuse a folder") } footer: {
+                }.navigationTitle("Connected Folder") }
+            } footer: {
                 Text("Choose a writable folder, then tap Open. We check access before connecting it. If your provider or installer cannot keep folder access, use Save Backup to Files above. Automatic backups run only while the app is open; older snapshots stay until you delete them.")
             }
         }
-        .navigationTitle("Backup & Recovery").navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Backups").navigationBarTitleDisplayMode(.inline)
         .onDisappear { if activeExport == nil { preparation?.cancel() } }
         .sheet(item: $sheet, onDismiss: {
             if let activeExport { vault.finishBackupExport(activeExport, destination: picked?.url) }

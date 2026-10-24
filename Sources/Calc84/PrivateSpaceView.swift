@@ -18,6 +18,7 @@ struct PrivateSpaceView: View {
                 else { AccessView(close: close) }
             }
         }.tint(CalcTheme.accent)
+            .onChange(of: vault.unlocked) { old, new in if old && !new { close() } }
     }
 }
 

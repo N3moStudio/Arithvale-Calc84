@@ -101,7 +101,7 @@ struct SharedBackupSection: View {
     }
 }
 
-private struct SharedBackupGuide: View {
+struct SharedBackupGuide: View {
     var body: some View {
         List {
             Section("In Files") {
@@ -112,7 +112,7 @@ private struct SharedBackupGuide: View {
             Section("Back in Arithvale") {
                 Text("4. The calculator stays on screen for privacy. Enter your code and hold =. On an empty installation, use 160160 and hold =.")
                 Text("5. On the setup screen, tap Use Received Backup. Enter the backup’s original recovery key and choose a new calculator code, then tap Restore Library.")
-                Text("Already have a library? Unlock it and go to Settings → Backup & Recovery → Test a Backup, then Use Received Backup. This checks the archive without replacing your library.")
+                Text("Already have a library? Unlock it and tap Backup received, or + → From a Backup. Enter the backup’s original recovery key, preview it, and choose items to add. Settings → Backups also has Add from Backup and Test a Backup.")
             }
             Section("If Nothing Arrives") {
                 Text("Receiving does not use Arithvale’s file picker. If LiveContainer is missing from Share, its share extension may not be installed or enabled. For a directly installed app, choose Arithvale instead.")

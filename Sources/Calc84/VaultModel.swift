@@ -126,6 +126,27 @@ final class VaultModel: ObservableObject {
     }
     private func changed() { UserDefaults.standard.set(true, forKey: "libraryNeedsBackup"); cloud.changed() }
     func cancelImport() { importTask?.cancel(); status = "Cancelling import…" }
+    func addFromBackup(root: URL, credential: VaultCredential, selected: Set<UUID>, completion: @escaping (Result<BackupImportResult, Error>) -> Void) {
+        guard unlocked, !busy, !selected.isEmpty else { return }
+        busy = true; importing = true; progress = 0; status = "Adding encrypted items…"
+        let ticket = generation
+        importTask = Task {
+            defer { busy = false; importing = false; importTask = nil }
+            do {
+                let result = try await engine.importBackup(from: root, credential: credential, selected: selected)
+                guard ticket == generation else { return }
+                items = result.items; cloudPreferences = try await engine.cloudPreferences()
+                guard ticket == generation else { return }
+                changed(); status = "Added \(result.added) items. Skipped \(result.skipped) exact duplicates."
+                completion(.success(result)); scheduleAutomaticBackup()
+            } catch {
+                if ticket == generation {
+                    status = ""
+                    if !Task.isCancelled { completion(.failure(error)) }
+                }
+            }
+        }
+    }
     func retryImports() {
         guard unlocked, !busy else { return }
         if !failedPhotos.isEmpty { let values = failedPhotos; importPhotos(values) }

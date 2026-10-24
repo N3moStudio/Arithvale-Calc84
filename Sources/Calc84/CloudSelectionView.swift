@@ -59,7 +59,7 @@ struct CloudSelectionView: View {
                     description: Text("Import items first. Items blocked for this provider are hidden from manual selection."))
             } else {
                 MemoryGrid(sections: LibraryPresentation.sections(choices, source: .captured, newestFirst: true, component: .month),
-                    engine: vault.engine, columns: textSize.isAccessibilitySize ? 2 : 4, portrait: false, grouping: "Months",
+                    engine: vault.engine, columns: textSize.isAccessibilitySize ? 2 : 4, style: .contactSheet, grouping: "Months",
                     selection: selection, selecting: true, busy: vault.busy, setSelection: { selection = $0 },
                     identity: provider.rawValue + String(blocking), open: { item in
                         if !selection.insert(item.id).inserted { selection.remove(item.id) }
