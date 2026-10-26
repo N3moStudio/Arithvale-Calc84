@@ -319,13 +319,53 @@ public final class VaultRepository {
         try fm.moveItem(at: stage, to: root)
         key = candidateKey; header = candidate; manifest = index
     }
+    /// New-install setup always creates independent keys. Source restore remains
+    /// unchanged for archive verification, preview and legacy interoperability.
+    /// Nothing is published at root until every source has authenticated and copied.
+    public func initializeFromBackups(_ sources: [SetupBackupSource], recovery: String,
+                                      progress: @Sendable (Int, Int) -> Void = { _, _ in }) throws {
+        guard !exists else { throw VaultError.exists }
+        guard !sources.isEmpty, sources.count <= 32 else { throw VaultError.invalidBackup }
+        guard VaultCode.validRecovery(recovery), sources.allSatisfy({
+            VaultCode.normalizeRecovery($0.recovery) != VaultCode.normalizeRecovery(recovery)
+        }) else { throw VaultError.invalidRecovery }
+        try Task.checkCancellation()
+        let transaction = try stagingDirectory()
+        defer { try? fm.removeItem(at: transaction) }
+        let destination = VaultRepository(root: transaction.appendingPathComponent("destination"))
+        defer { destination.lock() }
+        try destination.create(password: recovery)
+        for (index, input) in sources.enumerated() {
+            try Task.checkCancellation()
+            let source = VaultRepository(root: transaction.appendingPathComponent("source-\(index)"))
+            defer { source.lock(); try? fm.removeItem(at: source.root) }
+            try source.restore(from: input.url, password: input.recovery)
+            let eligible = source.items.filter { $0.pendingImport != true }
+            let roots = eligible.filter(\.visible)
+            let covered = try Set(roots.flatMap { try source.importResources(for: $0).map(\.id) })
+            guard covered == Set(eligible.map(\.id)) else { throw VaultError.invalidBackup }
+            if !roots.isEmpty {
+                _ = try destination.importBackup(source, selected: Set(roots.map(\.id)), includingDeleted: true)
+            }
+            progress(index + 1, sources.count)
+        }
+        try Task.checkCancellation()
+        // Rename on the same volume publishes the complete new library at once.
+        // A competing/existing destination makes this fail without overwriting it.
+        try fm.moveItem(at: destination.root, to: root)
+        header = destination.header; key = destination.key; manifest = destination.manifest
+    }
+
     /// Resources commit before one atomic index write. On failure the old index and
     /// old files remain untouched. A crash can leave only unreferenced ciphertext.
     public func importBackup(_ source: VaultRepository, selected: Set<UUID>) throws -> BackupImportResult {
+        try importBackup(source, selected: selected, includingDeleted: false)
+    }
+    private func importBackup(_ source: VaultRepository, selected: Set<UUID>, includingDeleted: Bool) throws -> BackupImportResult {
         guard let key, let header, var next = manifest,
               let sourceKey = source.key, let sourceHeader = source.header else { throw VaultError.locked }
         guard !selected.isEmpty, root.standardizedFileURL != source.root.standardizedFileURL else { throw VaultError.invalidBackup }
-        let roots = source.items.filter { selected.contains($0.id) && $0.visible && $0.deletedAt == nil }
+        let roots = source.items.filter { selected.contains($0.id) && $0.visible && (includingDeleted || $0.deletedAt == nil) }
         guard roots.count == selected.count else { throw VaultError.invalidBackup }
         let stage = try stagingDirectory()
         defer { try? fm.removeItem(at: stage) }
@@ -343,11 +383,11 @@ public final class VaultRepository {
             let resources = try source.importResources(for: item)
             guard claimed.isDisjoint(with: Set(resources.map(\.id))) else { throw VaultError.invalidBackup }
             claimed.formUnion(resources.map(\.id))
-            let signature = try source.importSignature(item)
+            let signature = try source.importSignature(item) + (includingDeleted && item.deletedAt != nil ? "|deleted" : "")
             let group = "\(item.contentType)|\(item.byteCount)|\(item.companionID != nil)"
             if scanned.insert(group).inserted {
                 for candidate in candidates where candidate.byteCount == item.byteCount && candidate.contentType == item.contentType && (candidate.companionID == nil) == (item.companionID == nil) {
-                    let candidateSignature = try importSignature(candidate)
+                    let candidateSignature = try importSignature(candidate) + (includingDeleted && candidate.deletedAt != nil ? "|deleted" : "")
                     known[candidateSignature] = candidate.id
                 }
             }
@@ -369,6 +409,7 @@ public final class VaultRepository {
                 copy.captured = resource.captured; copy.duration = resource.duration
                 copy.latitude = resource.latitude; copy.longitude = resource.longitude
                 copy.favorite = resource.favorite; copy.album = resource.album; copy.storageVersion = 2
+                copy.deletedAt = includingDeleted ? resource.deletedAt : nil
                 copy.companionID = resource.companionID.flatMap { ids[$0] }; copy.companionType = resource.companionType
                 copy.thumbnailID = resource.thumbnailID.flatMap { ids[$0] }
                 copy.isCompanion = resource.isCompanion; copy.isThumbnail = resource.isThumbnail

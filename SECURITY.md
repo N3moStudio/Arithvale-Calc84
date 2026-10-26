@@ -1,4 +1,4 @@
-# Storage and recovery design · 0.5.0
+# Storage and recovery design · 0.7.0
 
 ## Scope and trust
 
@@ -35,7 +35,7 @@ Five failed code attempts introduce a delay starting at 30 seconds, capped at fi
 
 No key is written to UserDefaults. Key references are released on lock, but Swift runtime copies are not guaranteed to be zeroized. Recovery is impossible without an appropriate secret; there is no developer reset. A recovery key saved alongside the backup removes that separation.
 
-Version 0.1 libraries retain their original v1 password-derived data key. Enrolling a local numeric code does not upgrade their password strength or reencrypt every existing resource.
+Existing version 0.1 libraries retain their original v1 password-derived data key. Enrolling a local numeric code does not upgrade their password strength or reencrypt every existing resource. Starting a new library from their backup in 0.7.0 instead authenticates with the old password and re-encrypts into a fresh v2 destination.
 
 ## Private storage and transactions
 
@@ -118,8 +118,9 @@ manifest and policies; cloud restore starts with manual/empty policies.
 
 Blocks govern future uploads of those item identities. They do not purge old
 snapshots or completed objects from interrupted transfers, and do not identify
-duplicates imported later. All backups retain the original library key. This
-version does not rotate keys or reencrypt an imported library with a new key.
+duplicates imported later. Backups retain the key of their exporting library.
+Existing libraries are not automatically rotated. The new-onboarding behavior
+in 0.7.0 below supersedes source-key preservation for new destinations only.
 
 Files imports use coordinated, protected snapshots. The in-memory import review
 retains source scopes and content digests only until dismissal/lock. Optional
@@ -160,5 +161,30 @@ to the corresponding destination items, including exact duplicates. Source
 upload selections never opt items in; existing destination provider modes apply.
 
 The isolated encrypted preview is deleted when leaving the flow, and temporary
-review caches are cleaned on next launch after interruption. Initial empty-app
-restore remains a separate operation and retains the source library’s key.
+review caches are cleaned on next launch after interruption. In 0.6.0 and earlier,
+initial empty-app restore retained the source key. Those existing libraries are
+unchanged by an update.
+
+## Fresh-key onboarding (0.7.0)
+
+New setup creates a random recovery secret and requires saved acknowledgment plus
+confirmation of its last eight characters. Files and cloud setup share the same
+setup-owned secret across navigation. It is not persisted as a viewable secret.
+The source key is used only to authenticate/read that source. New library IDs,
+data keys, salts, resource IDs and GCM nonces are generated; all copied media and
+metadata are sealed under the destination key. Source keys cannot open new
+exports. Current archive formats and the offline recovery reader are unchanged.
+
+For one or multiple archives, each source is fully restored into isolated
+encrypted staging, then merged into a new staged destination. A single rename
+publishes the destination only after all sources succeed. Errors/cancellation
+before commit remove staging and leave the destination absent. Source archives
+are never modified. A crash can leave encrypted staging data until cleanup; it
+cannot publish a partly built destination. There are no plaintext intermediate
+files for chunked re-encryption; legacy inputs keep the bounded-memory path.
+
+Setup preserves Recently Deleted status and separates active/deleted duplicates.
+Source cloud blocks carry over, but cloud modes/selections default to manual and
+empty. An empty source still gets fresh destination keys. Adding later backups,
+raw media imports, changing the calculator code, recovering access to an existing
+library and installing updates do not rotate the destination key.

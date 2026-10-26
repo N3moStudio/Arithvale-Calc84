@@ -19,9 +19,11 @@ struct MemoryGrid: UIViewControllerRepresentable {
     let identity: String
     let open: (VaultItem) -> Void
     let action: (String, VaultItem) -> Void
+    var viewerVault: VaultModel? = nil
+    var contentRevision: UUID? = nil
     func makeUIViewController(context: Context) -> MemoryGridController { MemoryGridController(self) }
     func updateUIViewController(_ controller: MemoryGridController, context: Context) { controller.update(self) }
-    static func dismantleUIViewController(_ controller: MemoryGridController, coordinator: ()) { controller.clearImages() }
+    static func dismantleUIViewController(_ controller: MemoryGridController, coordinator: ()) { controller.tearDown() }
 }
 
 final class MemoryGridController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegate {
@@ -38,10 +40,15 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
     private var currentSection = 0
     private var restoredVisibility = true
     private var dragSelection: GridDragSelection?
+    private var mediaHost: MediaViewerController?
     init(_ model: MemoryGrid) { self.model = model; super.init(nibName: nil, bundle: nil) }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    deinit { NotificationCenter.default.removeObserver(self) }
     override func viewDidLoad() {
         super.viewDidLoad()
+        NotificationCenter.default.addObserver(self, selector: #selector(coverPrivateContent), name: UIApplication.willResignActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(resumeVisibleContent), name: UIApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(releaseCache), name: UIApplication.didReceiveMemoryWarningNotification, object: nil)
         view.backgroundColor = .systemBackground
         images.totalCostLimit = 32 * 1024 * 1024
         grid.backgroundColor = .systemBackground
@@ -89,38 +96,105 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
     }
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        dragSelection?.cancel()
+        // The native zoom needs its source thumbnail while the viewer is open.
+        // Privacy/lock and teardown still purge synchronously.
+        if mediaHost == nil { clearImages(); restoredVisibility = false }
+    }
+    @objc private func coverPrivateContent() {
         clearImages(); restoredVisibility = false
+    }
+    @objc private func resumeVisibleContent() {
+        guard viewIfLoaded?.window != nil, model.viewerVault?.unlocked != false else { return }
+        if !restoredVisibility { restoredVisibility = true; grid.reloadData() }
+    }
+    @objc private func releaseCache() { images.removeAllObjects() }
+    func tearDown() {
+        mediaHost?.closeForPrivacy(); mediaHost = nil
+        clearImages()
+        NotificationCenter.default.removeObserver(self)
     }
     func clearImages() {
         dragSelection?.cancel()
         hideMonth?.cancel(); month.alpha = 0
+        grid.layer.removeAllAnimations(); grid.alpha = 1
         images.removeAllObjects()
         for cell in grid.visibleCells.compactMap({ $0 as? MemoryCell }) { cell.clear() }
     }
     func update(_ next: MemoryGrid) {
-        let newContent = model.sections != next.sections
+        let newContent: Bool
+        if let previous = model.contentRevision, let revision = next.contentRevision { newContent = previous != revision }
+        else { newContent = model.sections != next.sections }
         let newLayout = model.columns != next.columns || model.style != next.style || model.grouping != next.grouping
         let reset = model.identity != next.identity
-        let anchor = grid.indexPathsForVisibleItems.sorted().first.flatMap { item(at: $0)?.id }
+        let selectionChanged = model.selection != next.selection || model.selecting != next.selecting
+        let anchorPath = (newContent || newLayout) ? grid.indexPathsForVisibleItems.sorted().first : nil
+        let anchor = anchorPath.flatMap { item(at: $0)?.id }
+        let relativeTop = anchorPath.flatMap { layout.layoutAttributesForItem(at: $0)?.frame.minY }.map { $0 - grid.contentOffset.y }
         if newContent || newLayout || reset { dragSelection?.cancel() }
         model = next
         guard isViewLoaded else { return }
-        grid.contentInset.bottom = model.style == .clearGlass && !model.selecting ? 88 : 8
-        configureDragSelection()
+        let bottom: CGFloat = model.style == .clearGlass && !model.selecting ? 88 : 8
+        if grid.contentInset.bottom != bottom { grid.contentInset.bottom = bottom }
+        if newContent { configureDragSelection() }
+        else { dragSelection?.update(selection: model.selection, enabled: model.selecting && !model.busy) }
         if newContent || newLayout || reset {
-            grid.reloadData(); layout.invalidateLayout(); grid.layoutIfNeeded()
-            if reset { grid.setContentOffset(.zero, animated: false) }
-            else if newLayout, let anchor {
-                for (section, group) in model.sections.enumerated() {
-                    if let row = group.items.firstIndex(where: { $0.id == anchor }) {
-                        grid.scrollToItem(at: IndexPath(item: row, section: section), at: .top, animated: false); break
-                    }
+            let change = {
+                self.grid.reloadData(); self.layout.invalidateLayout(); self.grid.layoutIfNeeded()
+                if reset { self.grid.setContentOffset(.zero, animated: false) }
+                else if let anchor, let relativeTop, let path = self.path(for: anchor),
+                        let frame = self.layout.layoutAttributesForItem(at: path)?.frame {
+                    let offset = LibraryViewportAnchor.offset(itemTop: Double(frame.minY), relativeTop: Double(relativeTop),
+                        minimum: Double(-self.grid.adjustedContentInset.top),
+                        maximum: Double(self.grid.contentSize.height - self.grid.bounds.height + self.grid.adjustedContentInset.bottom))
+                    self.grid.setContentOffset(CGPoint(x: 0, y: offset), animated: false)
                 }
             }
-        } else {
+            if newLayout && !reset && view.window != nil && mediaHost == nil && !UIAccessibility.isReduceMotionEnabled {
+                UIView.transition(with: grid, duration: 0.15, options: [.transitionCrossDissolve, .allowUserInteraction, .beginFromCurrentState], animations: change)
+            } else { UIView.performWithoutAnimation(change) }
+        } else if selectionChanged {
             refreshSelection(model.selection)
         }
-        updateDate(show: false)
+        if newContent || newLayout || reset { updateDate(show: false) }
+    }
+    private func path(for id: UUID) -> IndexPath? {
+        for (section, group) in model.sections.enumerated() {
+            if let row = group.items.firstIndex(where: { $0.id == id }) { return IndexPath(item: row, section: section) }
+        }
+        return nil
+    }
+    private func open(_ item: VaultItem) {
+        guard !model.selecting, let vault = model.viewerVault else { model.open(item); return }
+        guard vault.unlocked, mediaHost == nil, presentedViewController == nil, view.window != nil else { return }
+        dragSelection?.cancel()
+        let host = MediaViewerController(items: model.sections.flatMap(\.items), initial: item.id, vault: vault,
+            sourceView: { [weak self] id, preview in self?.transitionSource(id: id, preview: preview) },
+            closed: { [weak self, weak vault] id in
+                guard let self else { return }
+                self.mediaHost = nil
+                if vault?.unlocked == true {
+                    // The iOS 17/Reduce Motion fallback also returns to the current
+                    // item, although it doesn't ask for a native zoom source.
+                    _ = self.transitionSource(id: id, preview: nil)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self, vault?.unlocked == true, self.view.window != nil else { return }
+                        let cell = self.path(for: id).flatMap { self.grid.cellForItem(at: $0) }
+                        UIAccessibility.post(notification: .screenChanged, argument: cell)
+                    }
+                } else { self.clearImages() }
+            })
+        mediaHost = host
+        present(host, animated: !UIAccessibility.isReduceMotionEnabled)
+    }
+    private func transitionSource(id: UUID, preview: UIImage?) -> UIView? {
+        guard model.viewerVault?.unlocked == true, let path = path(for: id) else { return nil }
+        if !restoredVisibility { restoredVisibility = true; grid.reloadData() }
+        if grid.cellForItem(at: path) == nil { grid.scrollToItem(at: path, at: .centeredVertically, animated: false) }
+        grid.layoutIfNeeded()
+        guard let cell = grid.cellForItem(at: path) as? MemoryCell, cell.itemID == id else { return nil }
+        cell.prepareTransition(preview)
+        return cell.transitionView
     }
     private func configureDragSelection() {
         dragSelection?.configure(sections: model.sections.map { $0.items.map(\.id) },
@@ -147,7 +221,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         return cell
     }
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt path: IndexPath) {
-        if let item = item(at: path) { model.open(item) }
+        if let item = item(at: path) { open(item) }
     }
     private func makeSection(_ environment: NSCollectionLayoutEnvironment) -> NSCollectionLayoutSection {
         let style = model.style
@@ -201,7 +275,9 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
                    ("Move to Recently Deleted", "trash", "delete")]
                 : [("Restore", "arrow.uturn.backward", "restore")]
             return UIMenu(children: actions.map { title, symbol, key in
-                UIAction(title: title, image: UIImage(systemName: symbol), attributes: key == "delete" ? .destructive : []) { _ in self?.model.action(key, item) }
+                UIAction(title: title, image: UIImage(systemName: symbol), attributes: key == "delete" ? .destructive : []) { _ in
+                    if key == "open" { self?.open(item) } else { self?.model.action(key, item) }
+                }
             })
         }
     }
@@ -324,7 +400,13 @@ private final class MonthHeader: UICollectionReusableView {
 private final class MemoryCell: UICollectionViewCell {
     private let photo = UIImageView(), duration = UILabel(), favorite = UIImageView(), check = UIImageView()
     private var task: Task<Void, Never>?
+    private var hasThumbnail = false
+    private var selectionState: (selected: Bool, selecting: Bool)?
     private(set) var itemID: UUID?
+    var transitionView: UIView { photo }
+    func prepareTransition(_ image: UIImage?) {
+        if !hasThumbnail, let image { photo.image = image }
+    }
     override init(frame: CGRect) {
         super.init(frame: frame)
         contentView.backgroundColor = .secondarySystemBackground; contentView.clipsToBounds = true
@@ -356,7 +438,7 @@ private final class MemoryCell: UICollectionViewCell {
         accessibilityLabel = [kind, item.name, item.chronologicalDate.formatted(date: .abbreviated, time: .omitted),
                               duration.text, item.favorite == true ? "Favorite" : nil].compactMap { $0 }.joined(separator: ", ")
         setNeedsLayout()
-        if let image = cache.object(forKey: item.id as NSUUID) { photo.image = image; return }
+        if let image = cache.object(forKey: item.id as NSUUID) { photo.image = image; hasThumbnail = true; return }
         photo.image = UIImage(systemName: item.duration != nil ? "film" : "doc"); photo.tintColor = .tertiaryLabel
         task = Task { [weak self] in
             guard item.thumbnailID != nil || (item.byteCount <= 8 * 1024 * 1024 && UTType(item.contentType)?.conforms(to: .image) == true),
@@ -369,10 +451,12 @@ private final class MemoryCell: UICollectionViewCell {
             }.value
             guard !Task.isCancelled, let self, self.itemID == item.id, let image else { return }
             cache.setObject(image, forKey: item.id as NSUUID, cost: (image.cgImage?.bytesPerRow ?? 0) * (image.cgImage?.height ?? 0))
-            self.photo.image = image
+            self.photo.image = image; self.hasThumbnail = true
         }
     }
     func setSelection(_ selected: Bool, selecting: Bool) {
+        if let previous = selectionState, previous.selected == selected, previous.selecting == selecting { return }
+        selectionState = (selected, selecting)
         check.isHidden = !selecting
         check.image = UIImage(systemName: selected ? "checkmark.circle.fill" : "circle")
         check.tintColor = selected ? .systemBlue : .white
@@ -380,7 +464,7 @@ private final class MemoryCell: UICollectionViewCell {
         accessibilityTraits = selected ? [.button, .selected] : [.button]
         accessibilityHint = selecting ? (selected ? "Double-tap to deselect." : "Double-tap to select.") : "Double-tap to open."
     }
-    func clear() { task?.cancel(); task = nil; photo.image = nil; itemID = nil }
+    func clear() { task?.cancel(); task = nil; photo.image = nil; itemID = nil; hasThumbnail = false; selectionState = nil }
     override func prepareForReuse() { super.prepareForReuse(); clear() }
 }
 #endif

@@ -4,6 +4,7 @@ import CalcCore
 
 struct CloudBackupView: View {
     var restoring = false
+    var setup: Binding<SetupSession>? = nil
     @EnvironmentObject private var vault: VaultModel
     @EnvironmentObject private var cloud: CloudBackupModel
     @AppStorage("cloudUseCellular") private var cellular = false
@@ -29,7 +30,7 @@ struct CloudBackupView: View {
             Section("Your services") {
                 ForEach(CloudProvider.allCases) { provider in
                     NavigationLink {
-                        CloudProviderView(provider: provider, restoring: restoring)
+                        CloudProviderView(provider: provider, restoring: restoring, setup: setup)
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(provider.title).font(.headline)
@@ -67,6 +68,7 @@ struct CloudBackupView: View {
 struct CloudProviderView: View {
     let provider: CloudProvider
     var restoring = false
+    var setup: Binding<SetupSession>? = nil
     @EnvironmentObject private var vault: VaultModel
     @EnvironmentObject private var cloud: CloudBackupModel
     @State private var email = ""
@@ -101,7 +103,7 @@ struct CloudProviderView: View {
                         Button("Recheck All Remote Files") { cloud.backup(vault: vault, only: provider, verifyAll: true) }.disabled(vault.busy)
                     }
                     NavigationLink(restoring ? "Find & Restore a Backup" : "Test Cloud Recovery") {
-                        CloudRestoreView(provider: provider, testOnly: !restoring)
+                        CloudRestoreView(provider: provider, testOnly: !restoring, setup: setup)
                     }.disabled(vault.busy)
                     Button("Disconnect", role: .destructive) { disconnecting = true }.disabled(vault.busy)
                 }
@@ -137,6 +139,7 @@ struct CloudProviderView: View {
 struct CloudRestoreView: View {
     let provider: CloudProvider
     let testOnly: Bool
+    var setup: Binding<SetupSession>? = nil
     @EnvironmentObject private var vault: VaultModel
     @EnvironmentObject private var cloud: CloudBackupModel
     @State private var selected: UUID?
@@ -146,7 +149,7 @@ struct CloudRestoreView: View {
     var body: some View {
         List {
             Section {
-                Text(testOnly ? "Download and authenticate a backup without replacing your library." : "Restore into this empty installation. Your saved capture dates and recovery key stay the same.")
+                Text(testOnly ? "Download and authenticate a backup without replacing your library." : "Start a new library from a cloud backup. Your photos and dates are copied under a fresh key. The original cloud backup keeps its old key.")
                 Button("Find Backups") { selected = nil; cloud.findBackups(provider, vault: vault) }.disabled(vault.busy)
             }
             Section("Saved backups") {
@@ -167,19 +170,24 @@ struct CloudRestoreView: View {
                 Button("Next Page of Backups") { selected = nil; cloud.findBackups(provider, vault: vault, next: true) }.disabled(vault.busy)
             }
             if selected != nil {
+                if !testOnly, let setup { NewRecoveryKeySection(setup: setup).disabled(vault.busy) }
                 Section {
-                    SecureField("\(AppBrand.name) recovery key", text: $recovery).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    SecureField("Source backup’s recovery key", text: $recovery).textInputAutocapitalization(.never).autocorrectionDisabled()
                     if !testOnly {
                         SecureField("New calculator code", text: $code).keyboardType(.numberPad)
                         SecureField("Repeat code", text: $repeatCode).keyboardType(.numberPad)
                     }
-                    Button(testOnly ? "Test Recovery" : "Restore Library") {
+                    Button(testOnly ? "Test Recovery" : "Create Library from Backup") {
                         if let snapshot = cloud.snapshots.first(where: { $0.id == selected }) {
-                            cloud.restore(snapshot, provider: provider, recovery: recovery, code: code, vault: vault, testOnly: testOnly)
+                            cloud.restore(snapshot, provider: provider, recovery: recovery, code: code, vault: vault, testOnly: testOnly,
+                                          newRecovery: testOnly ? nil : setup?.wrappedValue.recovery)
                             recovery = ""; code = ""; repeatCode = ""
                         }
-                    }.disabled(vault.busy || recovery.isEmpty || (!testOnly && (!VaultCode.valid(code) || code != repeatCode)))
-                } header: { Text("Unlock the saved library") } footer: { Text("This downloads the backup. Allow up to three times its size in free phone storage while recovery is checked.") }
+                    }.disabled(vault.busy || recovery.isEmpty || (!testOnly && (setup?.wrappedValue.canCreate != true || !VaultCode.valid(code) || code != repeatCode)))
+                } header: { Text("Unlock the source backup") } footer: {
+                    Text(testOnly ? "This only checks the backup with its existing key. It does not create a library or change any key. Allow up to three times the backup size in free storage."
+                         : "Keep both keys: the old key for the source, and the new key for future backups. Allow up to three times the backup size in free storage while it is checked and copied.")
+                }
             }
             Section {
                 Text(cloud.phase)

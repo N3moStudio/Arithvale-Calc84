@@ -1,5 +1,78 @@
 # Arithvale · phone test guide
-Version 0.6.0 test · Build 10
+Version 0.8.0 test · Build 12
+
+## First: 0.8.0 motion checks (physical device - NOT RUN here)
+
+Record device, OS, installer/container and PASS/FAIL/NOT RUN for each item.
+Use disposable photos, a large video, a Live Photo, a PDF and a long library.
+
+1. Confirm Settings shows 0.8.0 (12). A new appearance preference starts at
+   Clear Glass; an existing chosen layout stays chosen. All six remain selectable.
+2. On iOS 18+, open a thumbnail, swipe to another photo, then close. The return
+   transition targets the currently viewed item. Repeat with an offscreen source,
+   a changed Favorites filter, and a cancelled downward dismissal. No blank tile,
+   stuck dimming, duplicate viewer or lost touch response is acceptable.
+3. Interrupt opening with a downward gesture; reverse or re-grab; cancel, reopen
+   and try again. Test videos and Live Photos as well as still photos.
+4. Swipe halfway sideways and cancel. The counter, favorite/Info target and active
+   video must still belong to the visible page. Quickly tap Next three times and
+   Previous once during animation. The final visible page and counter must agree.
+5. Zoom a photo and pan it. Horizontal paging and downward viewer dismissal must
+   not steal that pan. Zoom back out and verify both become usable again.
+6. Open Details by its button and by swiping its handle. Resize the sheet between
+   medium and large, scroll metadata, and dismiss. Scrubbing video, panning a
+   zoomed photo, scrolling a PDF or holding Live Photo motion must not open Details.
+7. Select and drag across hundreds of items, reverse the sweep and auto-scroll at
+   an edge. Vertical initial intent still scrolls. Changing content or layout
+   cancels the sweep cleanly, and selection never deletes or uploads anything.
+8. Scroll halfway down a month and change layouts while keeping the same content
+   filter. The first visible photo should keep its approximate pixel position,
+   clamped at the ends of shorter layouts. Albums First may show its album home.
+9. Toggle Reduce Motion while the viewer is visible and during interaction. New
+   opens/closes must avoid zoom; native transitions must settle coherently. Grid
+   and navigation-highlight effects must not animate. Test iOS 17 fallback too.
+10. Test VoiceOver: open, Previous/Next, Favorite, Details, Done; return focus to
+    the current thumbnail after dismissal. Repeat with maximum Dynamic Type,
+    RTL, Reduce Transparency and increased contrast. Controls must stay reachable.
+11. Background/lock during opening, paging, Details, export and closing. The
+    calculator privacy shield must appear immediately; relaunch remains locked.
+    No private thumbnail, transition snapshot or playing video may remain exposed.
+12. Compare identical before/after release-build recordings on 60 Hz and ProMotion
+    hardware where available. Use Instruments Animation Hitches/Time Profiler on
+    a suitable Mac; record traces, thermal/Low Power Mode conditions and memory.
+    Compilation and automated tests are not proof of frame pacing or gesture feel.
+
+Do not label the native transition/device experience verified until these checks
+have actual evidence. The existing Files/LiveContainer handoff limitation remains.
+
+## First: fresh-key setup using disposable backups
+
+1. Update the same existing container and confirm its old code/key/media remain
+   valid. Updating must not rotate that library.
+2. In a separate empty container, share a disposable backup through Files →
+   LiveContainer → Arithvale. Use Received Backup, enter its OLD key, then Add
+   Backup to Setup. Verify setup cannot finish until the NEW key is saved,
+   acknowledged and its last eight characters confirmed.
+3. Navigate into cloud setup and back. The displayed new destination key must
+   remain the same. A wrong acknowledgment must not enable creation.
+4. Finish Create Library from Backups. Export a fresh backup and test that exact
+   file with the NEW key. The OLD source key must fail. The original archive must
+   still open with its OLD key, and not the NEW one.
+5. Where document picking works, queue two disposable archives with different
+   old keys before setup. Wrong second key or damaged second archive must leave
+   setup incomplete, with originals unchanged. Correct keys must add both under
+   the one new key. Check dates, albums, favorites, Live Photos and Recently Deleted.
+6. In LiveContainer, finish setup before leaving to share a second archive. Add it
+   through + → From a Backup. Confirm the destination key stays unchanged.
+7. Repeat with empty and legacy backups, and new raw Photos/files/folder imports.
+   Ordinary raw imports occur after Create Library; they must use its fresh key.
+8. With a disposable cloud account/snapshot, repeat the new-key acknowledgment
+   and export test through Restore from Cloud. Test Cloud Recovery must not
+   create a library or rotate any key. Interrupted setup must not publish a
+   partial library. If setup committed before interruption, the saved NEW key
+   must recover access without repeating import.
+9. Confirm Settings → Privacy & Access → Recovery Key explains the distinction
+   without displaying secret values. No actual user keys belong in bug reports.
 
 ## First: compare all six approved designs
 
@@ -41,7 +114,7 @@ Version 0.6.0 test · Build 10
 
 These are pending phone checks, not claimed pass results. Keep your original backup and recovery key.
 
-1. Verify Settings shows 0.6.0 (10). Update the intended LiveContainer entry; do not delete an existing library.
+1. Verify Settings shows 0.8.0 (12). Update the intended LiveContainer entry; do not delete an existing library.
 2. With Arithvale stopped, download a disposable backup in Files. Touch and hold it → Share → LiveContainer → Arithvale → intended container. The calculator must stay private. Enter your code (160160 only for empty setup) and hold =.
 3. On setup or Settings → Backups → Test a Backup, confirm the original filename and **Use Received Backup** appear. No received copy must be called authenticated yet.
 4. Tap Use Received Backup. A wrong recovery key must fail without replacing anything. The original key must restore into an empty test container or pass Test Recovery without changing the current library.
@@ -63,7 +136,7 @@ Use disposable samples first. Do not delete your only library to test recovery.
 6. Interrupt a transfer with Pause, app backgrounding, and loss of Wi-Fi. Unlock and retry. No interrupted catalog should replace an older complete backup. Completed files should be reusable; the currently interrupted file can restart from the beginning.
 7. Confirm Wi-Fi-only behavior; then explicitly test the cellular toggle. Verify MEGA transfer-limit errors leave a usable app and retry path.
 8. Cloud Backup → service → Test Cloud Recovery. Choose a completed snapshot and its original recovery key. A wrong key must fail before media download. A correct test authenticates files without replacing the library. Allow up to 3× the backup size in free phone space for this alpha.
-9. With a separate test installation/container, choose Restore from Cloud before creating a new library. Connect the same account, select the snapshot, enter its original Arithvale key, and choose a new calculator code. Compare media, albums, favorites, original dates and Live Photo pairing.
+9. With a separate test installation/container, choose Restore from Cloud before creating a new library. Connect the same account, select the snapshot, enter its old Arithvale key, save/confirm the new key, and choose a new calculator code. Compare media, albums, favorites, original dates and Live Photo pairing. Future backups must require the new key.
 10. Save the old-dated photo/video back to Photos. Check chronological date order, then separately inspect Recently Added (which can show today). Check that original bytes and metadata were retained; do not infer date correctness just from the displayed filename.
 11. Delete a sample locally and back up. An older remote snapshot must still restore it. No automatic cloud cleanup is implemented, so retained history uses storage.
 12. Disconnect a provider. Its cloud data must remain, while this phone requires sign-in again. Download a complete cloud library folder to a computer and test Scripts/recover.py on one snapshots/*.c84cloud file for independent recovery.
@@ -88,7 +161,7 @@ The checks below cover both new and existing features.
 
 ## 1. Install and enter
 
-- Install Arithvale-0.6.0-test.ipa directly with SideStore. No extension is included. Keep your normal signing/refresh process.
+- Install Arithvale-0.8.0-test.ipa directly with SideStore. No extension is included. Keep your normal signing/refresh process.
 - Launch: calculator first, no photo permission request.
 - Type 160160 and hold =. Save the recovery key outside the app, confirm its final eight characters, and choose a unique 6–12 digit code.
 - Lock; your new code and hold = should reopen it. The public starter must no longer open the configured library.
@@ -163,7 +236,7 @@ Each snapshot is full-sized. Export/restore/testing can need several times your 
 Prefer a second device or separate empty app-data container while keeping the original installation.
 
 1. Keep the external backup and its secret.
-2. Empty installation: 160160 and hold = → Restore an Existing Backup.
+2. Empty installation: 160160 and hold = → Start from Existing Backups. Enter each old source key and Add Backup to Setup, then save/confirm the new key before creating the library.
 3. Select backup, enter key (or original 0.1 password), choose a new calculator code.
 4. Check samples, dates, albums, favorites, Recently Deleted, videos, and Live Photo re-save.
 5. Lock/relaunch and repeat. Re-select the backup folder.

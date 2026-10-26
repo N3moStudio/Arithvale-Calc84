@@ -1,4 +1,4 @@
-# Arithvale · 0.6.0 design
+# Arithvale · 0.8.0 design
 
 Implementation reference: the six interactive library previews and the calculator
 preview approved October 23, 2026. The user explicitly selected **Clear Glass** as
@@ -25,6 +25,18 @@ menus and the existing adjacent-media pager remain. Only the control layer uses
 glass, with native regular Liquid Glass on iOS 26+ and regular material on older
 iOS. Reduce Transparency and increased contrast use an opaque outlined pill.
 Photos and metadata never form translucent backgrounds for one another.
+
+Motion uses native ownership: the collection grid presents a UIKit-hosted SwiftUI
+viewer, with iOS 18 zoom matching the current item's UUID. iOS 17 retains a standard
+full-screen presentation. The viewer's requested page is distinct from the page
+whose transition completed; playback and return identity follow the completed page.
+Details stays in a native medium/large sheet, opened from its button or dedicated
+44-point handle. The image surface has no competing swipe-up recognizer.
+
+Compatible grid changes preserve the first visible item's pixel offset. Layout
+changes use a 0.15-second crossfade; the Clear Glass selection highlight uses a
+0.22-second spring with 0.08 bounce. Reduce Motion omits both effects and uses a
+non-zoom viewer transition. Privacy shielding/lock never waits for an animation.
 
 The root header is Library / Select / + / Settings. Filters are All, Photos,
 Videos and Favorites; Files and Recently Deleted live in Albums. Settings starts
@@ -98,7 +110,7 @@ Only a completed, checked save updates the last-backup timestamp and filename. S
 
 Settings → Backup & Recovery has a MEGA & Blomp entry with overall status, separate service connections, a progress indicator, and Pause. Each provider defaults to manual/empty selection. Automatic-all is optional per provider; Never Upload overrides both modes. Cellular transfers are optional and off initially. Provider screens offer Back Up, Recheck All Remote Files, and Test Cloud Recovery. Item previews show each provider's last completed backup inclusion without adding badges to every gallery tile.
 
-On an empty installation, Restore from Cloud reconnects a service, lists completed catalogs, and requests the original recovery key plus a new local calculator code. Recovery never replaces an existing library. The UI explains that transfers need an open, unlocked app and that backups are separate copies rather than live multi-phone synchronization.
+On an empty installation, Restore from Cloud reconnects a service, lists completed catalogs, and requests the source recovery key plus acknowledgment/confirmation of a new destination recovery key and a new local calculator code. Source archives keep their old key; future destination exports use the new one. Setup never replaces an existing library. The UI explains that transfers need an open, unlocked app and that backups are separate copies rather than live multi-phone synchronization.
 
 MEGA uses direct SDK sign-in, with an application key field for this personal test build. Blomp requires a valid HTTPS storage endpoint; its documented host failed certificate checks during development. Neither provider has been tested with a real account.
 

@@ -10,6 +10,7 @@ private final class BackupReviewModel: ObservableObject {
     @Published private(set) var credential: VaultCredential?
     @Published private(set) var working = false
     @Published private(set) var error: String?
+    @Published private(set) var phase = "Preparing backup…"
     private var operation: Task<Void, Never>?
     init() {
         root = TemporaryFiles.directory.appendingPathComponent("review-" + UUID().uuidString, isDirectory: true)
@@ -17,12 +18,13 @@ private final class BackupReviewModel: ObservableObject {
     }
     func prepare(_ backup: BackupSelection, key: String) {
         guard !working, credential == nil else { return }
-        working = true; error = nil
+        working = true; error = nil; phase = "Preparing backup…"
         operation = Task {
             defer { working = false; withExtendedLifetime(backup) {} }
             do {
                 let bytes = Int64(try backup.url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
                 try StoragePreflight.require(bytes: bytes * 3)
+                phase = "Checking the recovery key and authenticating every file…"
                 let restored = try await engine.restore(from: backup.url, password: key)
                 try Task.checkCancellation()
                 let access = try await engine.credential()
@@ -91,7 +93,7 @@ struct BackupImportView: View {
                             SecureField("This backup’s recovery key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
                             Button("Preview Contents") { review.prepare(backup, key: key); key = "" }
                                 .buttonStyle(.borderedProminent).disabled(key.isEmpty || review.working || vault.busy || input.working)
-                            if review.working { ProgressView("Authenticating the complete backup…") }
+                            if review.working { OperationProgressView(title: "Checking Backup", detail: review.phase) }
                             if let error = review.error { Text(error).foregroundStyle(.secondary) }
                         } footer: { Text("Choose what to add before anything changes. Your current library stays in place.") }
                     }
@@ -102,7 +104,7 @@ struct BackupImportView: View {
                             ForEach(input.entries, id: \.self) { url in
                                 Button(url.lastPathComponent) { input.prepare(url) }
                             }
-                            if input.working { ProgressView("Preparing backup…") }
+                            if input.working { OperationProgressView(title: "Preparing Backup", detail: "Making an encrypted working copy. The original stays in Files.") }
                             if let error = input.error { Text(error).font(.footnote) }
                             if let notice = input.notice { Text(notice).font(.footnote) }
                         }.disabled(review.working || input.working || vault.busy)
@@ -150,7 +152,7 @@ struct BackupImportView: View {
                     if !selected.insert(item.id).inserted { selected.remove(item.id) }
                 }, action: { _, _ in })
             VStack(spacing: 12) {
-                if vault.importing { ProgressView(vault.status) }
+                if vault.importing { OperationProgressView(title: "Importing Selected Items", detail: vault.status) }
                 Button("Add \(selected.count) Items") {
                     guard let credential = review.credential else { return }
                     vault.addFromBackup(root: review.root, credential: credential, selected: selected) { value in

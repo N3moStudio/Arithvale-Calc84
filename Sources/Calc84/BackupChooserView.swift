@@ -47,6 +47,10 @@ final class BackupInputModel: ObservableObject {
         else { prepare(value.1.url, scope: value.1) }
     }
     func cancelPreparation() { preparation?.cancel() }
+    func clearSelection() {
+        guard !working, request == nil else { return }
+        backup = nil; folder = nil; entries = []; error = nil; notice = nil
+    }
 
     private func browse(_ scope: BackupSelection) {
         folder = scope; entries = []; error = nil; notice = nil; working = true

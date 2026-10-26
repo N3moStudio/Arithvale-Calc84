@@ -53,7 +53,8 @@ struct RecoveryKeyHelpView: View {
     var body: some View {
         List {
             Section("Keep your key") {
-                Text("Use the recovery key you saved when creating or restoring this library. The app does not keep a viewable copy of that key.")
+                Text("Use the recovery key saved during this library’s setup. Starting a new library from a backup in version 0.7.0 or later gives it a new key. Earlier restored libraries keep their original key. Updates do not change existing keys.")
+                Text("The app does not keep a viewable copy of your recovery key. The old key for a source backup cannot open a newer library created with a different key.")
                 Text("Your calculator code opens this installation. It cannot decrypt a backup by itself.")
             }
             Section {
@@ -128,11 +129,11 @@ struct BackupSettingsView: View {
                 NavigationLink("Restore after reinstalling") {
                     List {
                         Text("1. Before deleting anything, save a backup outside the app and test that exact file. Wait for your Files provider to finish uploading.")
-                        Text("2. In a fresh installation, enter 160160 and hold =. Choose Restore an Existing Backup before creating a new library.")
-                        Text("3. Select the .c84backup file. Enter its original recovery key, then choose a calculator code.")
+                        Text("2. In a fresh installation, enter 160160 and hold =. Choose Start from Existing Backups, or share a backup from Files to this app.")
+                        Text("3. Select the .c84backup file, enter its old recovery key, and tap Add Backup to Setup. Save and confirm the new recovery key, choose a calculator code, then create the library.")
                         Text("4. Check photos, videos, and dates. Reconnect your backup folder if you used one.")
                         Text("A normal update using the same app identity or LiveContainer data container should retain your library. Make a verified backup first; do not uninstall just to update.")
-                        Text("The key belongs to the library. Restoring an old backup uses the old key. Creating a new library generates a different key that cannot open old backups.")
+                        Text("Every new library gets a new key, even when it starts from the same photos in an old backup. Old archives keep their original keys. Adding more backups later keeps the current library’s key.")
                     }.navigationTitle("Restore Your Library").navigationBarTitleDisplayMode(.inline)
                 }
             } header: { Text("Check & restore") } footer: { Text("A recovery test checks the file you select, not all your backups. A screenshot of the key does not contain your photos.") }

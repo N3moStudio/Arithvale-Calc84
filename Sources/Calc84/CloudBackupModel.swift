@@ -227,8 +227,9 @@ final class CloudBackupModel: ObservableObject {
         snapshots.sort { $0.created > $1.created }
     }
     private func skippedSnapshot() { if !Task.isCancelled { skippedCatalogs += 1 } }
-    func restore(_ summary: CloudSnapshotSummary, provider: CloudProvider, recovery: String, code: String, vault: VaultModel, testOnly: Bool) {
+    func restore(_ summary: CloudSnapshotSummary, provider: CloudProvider, recovery: String, code: String, vault: VaultModel, testOnly: Bool, newRecovery: String? = nil) {
         guard testOnly ? vault.unlocked : !vault.exists else { return }
+        guard testOnly || (newRecovery.map(VaultCode.validRecovery) == true) else { error = VaultError.invalidRecovery.localizedDescription; return }
         start(vault) {
             self.phase = "Checking recovery key…"
             let store = try await self.store(provider)
@@ -247,8 +248,10 @@ final class CloudBackupModel: ObservableObject {
                 vault.recordRecoveryTest(source: provider.title, snapshot: snapshot.id.uuidString, library: snapshot.vaultID.uuidString)
                 self.phase = "Recovery test passed · \(count) items. Your library was not replaced."
             } else {
-                try await vault.finishCloudRestore(archive, recovery: recovery, code: code)
-                self.phase = "Library restored. Your original recovery key still works."
+                guard let newRecovery else { throw VaultError.invalidRecovery }
+                self.phase = "Copying into your new encrypted library…"
+                try await vault.finishCloudRestore(archive, recovery: recovery, newRecovery: newRecovery, code: code)
+                self.phase = "Library created. Future backups use the new recovery key you saved."
             }
         }
     }

@@ -13,6 +13,8 @@ final class MediaPreviewStore: ObservableObject {
     private var assets: [UUID: MediaPreviewAsset] = [:]
     private var prefetch: Task<Void, Never>?
 
+    func image(for id: UUID) -> UIImage? { assets[id]?.thumbnailImage ?? assets[id]?.image }
+
     func asset(for item: VaultItem) -> MediaPreviewAsset {
         if let existing = assets[item.id] { return existing }
         let value = MediaPreviewAsset(item: item); assets[item.id] = value; return value
@@ -64,6 +66,7 @@ final class MediaPreviewStore: ObservableObject {
 final class MediaPreviewAsset: ObservableObject {
     let item: VaultItem
     @Published private(set) var image: UIImage?
+    private(set) var thumbnailImage: UIImage?
     @Published private(set) var livePhoto: PHLivePhoto?
     @Published private(set) var url: URL?
     @Published private(set) var error: String?
@@ -78,7 +81,7 @@ final class MediaPreviewAsset: ObservableObject {
         operationID = UUID(); operation?.cancel(); operation = nil; loadingFull = false
     }
     func dispose() {
-        cancelLoading(); image = nil; livePhoto = nil; error = nil; motionError = nil
+        cancelLoading(); image = nil; thumbnailImage = nil; livePhoto = nil; error = nil; motionError = nil
         if let url { try? FileManager.default.removeItem(at: url) }; url = nil
         if let companion { try? FileManager.default.removeItem(at: companion) }; companion = nil
     }
@@ -99,7 +102,7 @@ final class MediaPreviewAsset: ObservableObject {
                     if let data = try? await vault.engine.contents(id: id) {
                         try valid(vault, generation, request)
                         let thumbnail = await Task.detached(priority: .userInitiated) { UIImage(data: data)?.preparingForDisplay() }.value
-                        try valid(vault, generation, request); image = thumbnail
+                        try valid(vault, generation, request); thumbnailImage = thumbnail; image = thumbnail
                     }
                     try valid(vault, generation, request)
                 }

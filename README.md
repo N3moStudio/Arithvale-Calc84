@@ -4,10 +4,10 @@
 
 <h1 align="center">Arithvale</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.6.0 testing · iOS 17+ · SwiftUI · MIT licensed</p>
+<p align="center">0.8.0 testing · iOS 17+ · SwiftUI · MIT licensed</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
-  <a href="Docs/UPDATE-0.6.0.md">What’s new</a> &nbsp;·&nbsp;
+  <a href="Docs/UPDATE-0.8.0.md">What’s new</a> &nbsp;·&nbsp;
   <a href="Docs/CLOUD-BACKUP.md">Cloud choices</a> &nbsp;·&nbsp;
   <a href="Docs/BUILDING.md">Build from source</a>
 </p>
@@ -26,7 +26,20 @@ control over which memories leave your phone. Previously **Calc 84**, by **N3mo 
 
 ## The latest
 
-**0.6.0** brings all six approved gallery designs to the app. **Clear Glass opens
+**0.8.0** connects the gallery and viewer with native zoom transitions on iOS 18+,
+keeps the active photo tied to completed swipes, and moves Details gestures onto
+a dedicated handle. Gallery sections are cached during selection, layouts retain
+the visible photo where possible, and the Clear Glass navigation highlight moves
+between controls. iOS 17 keeps its standard presentation; Reduce Motion disables
+the added spatial effects. These interactions still require physical-device checks.
+
+The **0.7.0** recovery improvements remain: every new library gets a fresh recovery key, including setup from
+existing Files or cloud backups. Use each source’s old key to read it, save and
+confirm the new destination key, then create the library. Future backups use
+that new key, even when they contain the same photos. Existing libraries and
+old archives keep their keys; later imports do not rotate the destination key.
+
+All six approved gallery designs remain available. **Clear Glass opens
 first**; choose another under **Settings → Appearance** and it stays selected.
 The calculator uses circular keys, a shared backspace/AC capsule, the familiar
 number arrangement, and Blue, Mint, Lilac, or Amber accents.
@@ -49,11 +62,11 @@ leaving the original backup in Files available to share again.
 Your existing library identity and recovery key stay compatible. The IPA contains
 the app, not anyone’s photos, recovery key, or cloud credentials.
 
-[Read the update notes →](Docs/UPDATE-0.6.0.md)
+[Read the update notes →](Docs/UPDATE-0.8.0.md)
 
 ## Get Arithvale
 
-Use the IPA attached to the **0.6.0 test prerelease** in this repository’s
+Use a verified IPA from this repository’s test
 [Releases](https://github.com/N3moStudio/Calc-84/releases). Sign and install it
 with your chosen installer, or import it into your existing LiveContainer setup.
 The supplied IPA is unsigned; compatibility depends on your iOS version and installer.

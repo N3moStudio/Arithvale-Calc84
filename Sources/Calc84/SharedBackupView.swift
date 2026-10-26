@@ -111,7 +111,7 @@ struct SharedBackupGuide: View {
             }
             Section("Back in Arithvale") {
                 Text("4. The calculator stays on screen for privacy. Enter your code and hold =. On an empty installation, use 160160 and hold =.")
-                Text("5. On the setup screen, tap Use Received Backup. Enter the backup’s original recovery key and choose a new calculator code, then tap Restore Library.")
+                Text("5. On setup, tap Use Received Backup, enter the backup’s old key, then Add Backup to Setup. Save and confirm the new recovery key, choose a calculator code, and tap Create Library from Backups. New backups will need the new key.")
                 Text("Already have a library? Unlock it and tap Backup received, or + → From a Backup. Enter the backup’s original recovery key, preview it, and choose items to add. Settings → Backups also has Add from Backup and Test a Backup.")
             }
             Section("If Nothing Arrives") {

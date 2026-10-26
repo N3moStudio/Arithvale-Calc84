@@ -28,6 +28,7 @@ final class VaultModel: ObservableObject {
     @Published var importing = false
     @Published var failedImportCount = 0
     private var importTask: Task<Void, Never>?
+    private var setupTask: Task<Void, Never>?
     private var automaticBackupTask: Task<Void, Never>?
     private var failedPhotos: [PhotosPickerItem] = []
     private var failedFiles: [URL] = []
@@ -74,19 +75,28 @@ final class VaultModel: ObservableObject {
             return false
         }
     }
-    func open(password: String, code: String, creating: Bool, backup: URL?) {
+    func open(password: String, code: String, creating: Bool, backups: [QueuedSetupBackup] = []) {
         guard !busy, VaultCode.valid(code) else { message = VaultError.invalidCode.localizedDescription; return }
         busy = true; let ticket = generation
-        Task {
-            defer { busy = false }
+        setupTask = Task {
+            defer { busy = false; setupTask = nil; withExtendedLifetime(backups) {} }
             await lockTask?.value
             guard ticket == generation else { return }
             do {
+                try Task.checkCancellation()
                 let result: [VaultItem]
-                if let backup {
-                    let access = backup.startAccessingSecurityScopedResource()
-                    defer { if access { backup.stopAccessingSecurityScopedResource() } }
-                    result = try await engine.restore(from: backup, password: password)
+                if creating && !backups.isEmpty {
+                    let bytes = try backups.reduce(Int64(0)) { total, entry in
+                        total + Int64(try entry.backup.url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+                    }
+                    try StoragePreflight.require(bytes: bytes * 2)
+                    status = "Creating your new encrypted library…"
+                    result = try await engine.initializeFromBackups(backups.map(\.source), recovery: password) { [weak self] completed, total in
+                        Task { @MainActor in
+                            guard let self, self.generation == ticket, self.busy else { return }
+                            self.status = "Prepared \(completed) of \(total) backups"
+                        }
+                    }
                 } else if creating { result = try await engine.create(password: password) }
                 else { result = try await engine.unlock(password: password) }
                 // Creation/restore commits before enrollment. A failed Keychain save is recoverable with the saved recovery secret.
@@ -116,7 +126,7 @@ final class VaultModel: ObservableObject {
         } catch { if ticket == generation { message = error.localizedDescription }; return false }
     }
     func lock() {
-        importTask?.cancel(); automaticBackupTask?.cancel(); fileDeletionTask?.cancel()
+        setupTask?.cancel(); importTask?.cancel(); automaticBackupTask?.cancel(); fileDeletionTask?.cancel()
         fileImportReview = nil; failedFileAccess = nil
         failedPhotos = []; failedFiles = []; failedImportCount = 0
         cloud.lock(); cloudPreferences = .init()
@@ -370,10 +380,10 @@ final class VaultModel: ObservableObject {
             } catch { /* A newer change or lock supersedes this request. */ }
         }
     }
-    func finishCloudRestore(_ archive: URL, recovery: String, code: String) async throws {
+    func finishCloudRestore(_ archive: URL, recovery: String, newRecovery: String, code: String) async throws {
         guard !exists, VaultCode.valid(code) else { throw VaultError.exists }
         let ticket = generation
-        let result = try await engine.restore(from: archive, password: recovery)
+        let result = try await engine.initializeFromBackups([.init(url: archive, recovery: recovery)], recovery: newRecovery)
         exists = await engine.exists()
         guard ticket == generation, !Task.isCancelled else { await engine.lock(); throw CancellationError() }
         do { try await deviceAccess.enroll(code: code, credential: engine.credential()) }

@@ -56,10 +56,12 @@ remote backups. No storage quotas are pooled and there is no two-way phone sync.
 ## Recovery
 
 **Test Cloud Recovery** downloads and authenticates a snapshot without replacing
-your library. Restore requires an empty installation and the original recovery
-key. A selected-items snapshot restores only its selected items, preserving their
-original library key. Cloud upload preferences start manual/empty after a cloud
-restore. Full Files backups preserve the library’s preferences and blocks.
+your library. New-library setup requires an empty installation, the source
+recovery key, and saving/confirming a new destination recovery key. A selected-items
+snapshot supplies only its selected items. In 0.7.0 these are re-encrypted under
+the new destination key; future exports require that new key. Existing libraries
+are never rotated by updating. New cloud/Files setup starts manual/empty for
+uploads and preserves source Never Upload blocks. Old archives retain their keys.
 
 The included offline recovery tool also accepts `.c84cloud` catalogs after you
 download the complete provider folder with both `objects/` and `snapshots/` intact.

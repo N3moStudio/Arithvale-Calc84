@@ -9,9 +9,7 @@ public struct SetupSession: Sendable {
     public init() {}
     public var canCreate: Bool {
         let key = VaultCode.normalizeRecovery(recovery)
-        return key.utf8.count == 64 && key.utf8.allSatisfy {
-            (48...57).contains($0) || (65...70).contains($0)
-        } && saved && confirmation.uppercased() == String(key.suffix(8))
+        return VaultCode.validRecovery(key) && saved && confirmation.uppercased() == String(key.suffix(8))
     }
     public mutating func clear() { recovery = ""; confirmation = ""; saved = false }
 }

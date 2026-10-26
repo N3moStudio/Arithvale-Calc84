@@ -66,6 +66,11 @@ public actor VaultEngine {
         try repository.restore(from: from, password: password)
         return repository.items
     }
+    public func initializeFromBackups(_ sources: [SetupBackupSource], recovery: String,
+                                      progress: @Sendable (Int, Int) -> Void = { _, _ in }) throws -> [VaultItem] {
+        try repository.initializeFromBackups(sources, recovery: recovery, progress: progress)
+        return repository.items
+    }
     public func importBackup(from root: URL, credential: VaultCredential, selected: Set<UUID>) throws -> BackupImportResult {
         let source = VaultRepository(root: root)
         defer { source.lock() }

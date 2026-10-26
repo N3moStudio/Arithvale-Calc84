@@ -47,22 +47,22 @@ device. Save and test an external backup before making the vault your only copy.
 ## Restore or update
 
 Install updates into the same app/data container to retain the local library.
-Restore an external backup into an **empty installation** using its original
-recovery key. You can choose a new calculator code, but that does not rotate the
-library’s encryption key. Newly imported items use the restored library key.
+Start from external backups in an **empty installation**. Each source needs its
+old recovery key. Version 0.7.0 creates a new destination key: save and confirm it
+during setup, then use it for all future backups of that destination library.
 
-Restore does not merge with or replace an existing library. Old 0.1 backups use
-their original password. Files backups retain per-provider choices; cloud recovery
-starts with manual/empty cloud choices. Sign-ins and folder permissions must be
+Setup does not replace an existing library. Old 0.1 backups use their original
+password to read the source. New libraries start with manual/empty cloud choices;
+source Never Upload exclusions are retained. Sign-ins and folder permissions must be
 connected again. See [offline computer recovery](Docs/BUILDING.md#recover-without-the-app).
 
 
-## Receive a backup without opening the picker (0.6.0)
+## Receive a backup without opening the picker (0.7.0)
 
 1. Open Apple’s **Files** app yourself. Find the `.c84backup` and download it if it has a cloud icon.
 2. Touch and hold the file → **Share → LiveContainer → Arithvale**. Choose the intended data container. Share one downloaded file, not a folder or collaboration link. A directly installed Arithvale can be selected instead of LiveContainer.
 3. Arithvale still opens as a calculator. Enter your code and hold **=**; an empty installation uses **160160** and hold **=**.
-4. On setup, tap **Use Received Backup**, enter its original recovery key and choose a new calculator code. Tap **Restore Library**. For an existing library, go to **Settings → Backups → Test a Backup → Use Received Backup** instead.
+4. On setup, tap **Use Received Backup**, enter its old key, and tap **Add Backup to Setup**. Save and confirm the **new** recovery key, choose a calculator code, and tap **Create Library from Backups**. For an existing library, use **+ → From a Backup** to add items or **Settings → Backups → Test a Backup** to check a copy without adding it.
 5. Receipt means the encrypted copy arrived; only a successful recovery test or restore authenticates it. **Remove Received Copy** removes this extra copy, not the original in Files or your library. One received backup is retained at a time.
 
 This path never opens Arithvale’s document picker. LiveContainer documents its
@@ -73,7 +73,18 @@ installed/enabled. Keep the original and key; do not delete them to troubleshoot
 
 The original **Choose Backup File** and **Choose Backup Folder** paths remain
 available. Find the build in calculator Help → About or the Recovery footer:
-**0.6.0 (9)** for this update.
+**0.7.0 (11)** for this update.
+
+Where file selection works, you may queue several backups with separate old keys
+before creating the new library. In LiveContainer, finish setup before leaving to
+share the next file, then add it through **+ → From a Backup**. Later additions
+keep the current destination key. Raw Photos/files/folders are imported after
+**Create Library**, which already creates and confirms a fresh key.
+
+Updating an existing library never rotates its keys. Libraries restored in 0.6.0
+or earlier still use their original key. **Settings → Privacy & Access → Recovery
+Key** explains this; it cannot reveal or export a forgotten key. Keep the key
+saved during setup. Old archives continue to require their own original key.
 
 
 ## Add another backup after setup

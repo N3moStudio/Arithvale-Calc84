@@ -135,6 +135,11 @@ final class RecoveryAndLibraryTests: XCTestCase {
         try a.add(data: Data(repeating: 0xA7, count: VaultLimits.chunkBytes + 7), name: "video.mov", contentType: "public.movie")
         try a.add(data: Data(), name: "empty.bin", contentType: "public.data")
         try a.exportBackup(to: destination.appendingPathComponent("v2.c84backup"))
+        // Public, disposable fixture key only; never a user secret or log value.
+        let fresh = repo("fresh")
+        try fresh.initializeFromBackups([.init(url: destination.appendingPathComponent("v2.c84backup"), recovery: secret)],
+                                        recovery: String(repeating: "F", count: 64))
+        try fresh.exportBackup(to: destination.appendingPathComponent("fresh.c84backup"))
         try FileManager.default.copyItem(at: legacyFixture(), to: destination.appendingPathComponent("v1.c84backup"))
     }
     func testPairedMediaBackupVerificationAndDeletion() async throws {

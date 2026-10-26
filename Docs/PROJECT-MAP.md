@@ -37,7 +37,7 @@ and reproducible build/recovery steps live in Docs/BUILDING.md.
 | Files | Responsibility |
 | --- | --- |
 | `Sources/Calc84/MediaPreviewStore.swift` | Current/neighbor cache, background decoding, bounded prefetch, cancellation and plaintext cleanup |
-| `Sources/Calc84/MediaBrowser.swift` | Native horizontal pager, current video player, swipe-up details and accessibility controls |
+| `Sources/Calc84/MediaBrowser.swift` | Native horizontal pager, settled-page playback, dedicated Details handle and accessibility controls |
 | `Sources/Calc84/BackupChooserView.swift` | Inline recovery file/folder buttons and filename selection after opening a folder |
 | `Sources/CalcCore/BackupFileProbe.swift` | Non-downloading folder candidates and content-based backup validation |
 | `Tests/CalcCoreTests/BackupFileProbeTests.swift` | Folder enumeration and renamed-backup restore regression checks |
@@ -84,3 +84,34 @@ core persistence, input rejection, interruption, source safety and authenticatio
 `galleryStyle` defaults to Clear Glass and remembers later choices. Old
 `libraryLayout` is retained but no longer drives the new gallery. Changing a
 visual style does not touch media, encryption identifiers, or cloud preferences.
+
+## 0.7.0 fresh-key setup
+
+| Surface or behavior | Primary files |
+| --- | --- |
+| New key display, saved acknowledgment, last-eight confirmation | `Sources/Calc84/NewRecoveryKeySection.swift`, `Sources/CalcCore/SetupSession.swift` |
+| Files setup queue with one old key per backup | `Sources/Calc84/PrivateSpaceView.swift` |
+| Setup-owned key shared through cloud navigation | `Sources/Calc84/CloudBackupView.swift` |
+| New-destination transaction and re-encryption | `Sources/CalcCore/VaultRepository.swift` (`initializeFromBackups`) |
+| File/cloud setup calls; existing access recovery unchanged | `Sources/Calc84/VaultModel.swift`, `Sources/Calc84/CloudBackupModel.swift` |
+| Version-aware key help | `Sources/Calc84/VaultSettingsView.swift` |
+| Cross-key, rollback, metadata, legacy and empty-source checks | `Tests/CalcCoreTests/FreshLibraryTests.swift`, `Scripts/test_recovery.py` |
+
+The low-level `restore` method remains source-key-preserving for verification,
+preview and offline-format compatibility. User-facing new-library setup must
+call `initializeFromBackups`. Existing-library `Add from Backup` remains separate.
+
+## 0.8.0 motion and presentation
+
+| Surface or behavior | Primary files |
+| --- | --- |
+| Native iOS 18 zoom, fallback, dismissal and privacy cleanup | `Sources/Calc84/MediaViewerController.swift` |
+| Current thumbnail lookup, viewport retention, grid crossfade | `Sources/Calc84/MemoryGrid.swift` |
+| Cached visible items, sections and albums | `Sources/Calc84/LibraryContentStore.swift` |
+| Clear Glass highlight and cached-grid wiring | `Sources/Calc84/LibraryView.swift` |
+| Paging request/commit arbitration and scroll bounds | `Sources/CalcCore/MediaPagingState.swift` |
+| Gesture cancellation, queued requests, viewport regression tests | `Tests/CalcCoreTests/MediaMotionTests.swift` |
+| Preparing/authenticating/importing feedback | `Sources/Calc84/OperationProgressView.swift`, `Sources/Calc84/BackupImportView.swift` |
+
+The calculator's existing press feedback, all six layouts, Clear Glass default,
+encrypted storage and backup compatibility remain unchanged by the motion work.

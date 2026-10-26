@@ -1,10 +1,11 @@
 import Foundation
 
 public enum VaultError: Error, LocalizedError {
-    case invalidPassword, wrongPasswordOrDamaged, invalidBackup, limit, exists, locked, missing, changed, invalidCode
+    case invalidPassword, invalidRecovery, wrongPasswordOrDamaged, invalidBackup, limit, exists, locked, missing, changed, invalidCode
     public var errorDescription: String? {
         switch self {
         case .invalidPassword: return "Use at least 14 characters. A few unrelated words work well."
+        case .invalidRecovery: return "Save the new generated recovery key. It must be different from every source backup’s key."
         case .wrongPasswordOrDamaged: return "The password is incorrect, or the encrypted data is damaged."
         case .invalidBackup: return "This backup is incomplete or unsupported. Your current files have not changed."
         case .limit: return "This version supports files up to 4 GB, libraries up to 64 GB, and 5,000 stored resources including thumbnails and Live Photo videos. Check available storage too."
@@ -62,6 +63,13 @@ public struct BackupImportResult: Sendable {
     public let skipped: Int
 }
 
+/// In-memory setup input only. Never persist or log source recovery secrets.
+public struct SetupBackupSource: Sendable {
+    public let url: URL
+    public let recovery: String
+    public init(url: URL, recovery: String) { self.url = url; self.recovery = recovery }
+}
+
 public enum VaultCode {
     public static let starter = "160160"
     public static func valid(_ code: String) -> Bool {
@@ -74,6 +82,12 @@ public enum VaultCode {
         VaultCrypto.random(32).map { String(format: "%02X", $0) }.enumerated().map {
             ($0.offset > 0 && $0.offset % 4 == 0 ? "-" : "") + $0.element
         }.joined()
+    }
+    public static func validRecovery(_ value: String) -> Bool {
+        let key = normalizeRecovery(value)
+        return key.utf8.count == 64 && key.utf8.allSatisfy {
+            (48...57).contains($0) || (65...70).contains($0)
+        }
     }
     public static func normalizeRecovery(_ text: String) -> String {
         let compact = text.filter { !$0.isWhitespace && $0 != "-" }

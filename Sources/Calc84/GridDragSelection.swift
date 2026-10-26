@@ -37,8 +37,12 @@ final class GridDragSelection: NSObject, UIGestureRecognizerDelegate {
                 }
             }
         }
+        update(selection: selection, enabled: enabled)
+    }
+    func update(selection: Set<UUID>, enabled: Bool) {
+        if !enabled || (sweep != nil && self.selection != selection) { cancel() }
         self.selection = selection
-        pan.isEnabled = enabled
+        if pan.isEnabled != enabled { pan.isEnabled = enabled }
     }
     func cancel() {
         finish()
