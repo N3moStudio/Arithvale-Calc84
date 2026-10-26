@@ -1,4 +1,22 @@
-# Arithvale · 0.8.0 design
+# Arithen · 0.9.0 design
+
+Arithen uses the approved purple Aperture A icon. Purple is the initial glass
+tint. Calculator keys, top controls, library filters/actions/navigation and the
+viewer Details handle share `ArithenGlass`: native regular Liquid Glass on iOS
+26+, translucent material on earlier systems, and opaque outlined controls for
+Reduce Transparency or increased contrast. Nearby controls share a glass
+container; photo content never becomes glass. All layouts now use the same
+floating glass control language while preserving their content geometry.
+
+Calculator and library appearance are separate. Users can select Plum, Neutral,
+Blue, Mint, Rose or Amber, a still background, or their own video. The default
+Purple Glow background is static. Videos loop silently for at most 30 seconds
+using a 720p export, stop in Low Power Mode/Reduce Motion, and stop when covered,
+inactive, or thermally limited. Library video sources stay encrypted at rest;
+protected playback copies are discarded on leaving or locking. Calculator
+backgrounds are intentionally visible before unlock and use separate storage.
+
+The previous approved gallery geometry and motion behavior remain:
 
 Implementation reference: the six interactive library previews and the calculator
 preview approved October 23, 2026. The user explicitly selected **Clear Glass** as
@@ -8,10 +26,10 @@ in those previews are not app content.
 | Layout | Geometry | Navigation |
 | --- | --- | --- |
 | Clear Glass | 3 portrait columns, 0.85 aspect, 2 pt gaps | Floating glass pill |
-| Photo Library | 3 square columns, 2 pt gaps | Opaque bottom bar |
-| Nightroom | 2 portrait columns, 7 pt gaps, 12 pt inset/corners | Dark, quiet bar |
+| Photo Library | 3 square columns, 2 pt gaps | Floating glass bar |
+| Nightroom | 2 portrait columns, 7 pt gaps, 12 pt inset/corners | Dark glass bar |
 | Albums First | 2 columns of four-photo collage covers | Album overview first |
-| Timeline | Month sections, large left photo and two stacked on the right | Standard bar |
+| Timeline | Month sections, large left photo and two stacked on the right | Floating glass bar |
 | Contact Sheet | 4 square columns, 1 pt gaps, compact header | Bar with Add |
 
 All six are persisted options in Appearance. The new galleryStyle preference

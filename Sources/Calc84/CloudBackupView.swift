@@ -120,7 +120,7 @@ struct CloudProviderView: View {
             }
             Section("Your encrypted copy") {
                 Text("Your normal gallery stays on this phone. This connection stores separate encrypted files and recovery catalogs in c84/v1 inside your account.")
-                Text("Keep your Arithvale recovery key separately. The cloud service cannot use your calculator code to recover this library.")
+                Text("Keep your Arithen recovery key separately. The cloud service cannot use your calculator code to recover this library.")
                 if provider == .blomp {
                     Text("Blomp’s storage connection must pass HTTPS checks. If the service returns an insecure address or an invalid certificate, the connection stops.")
                 } else {

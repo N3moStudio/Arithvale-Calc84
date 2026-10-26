@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 @main
-struct ArithvaleApp: App {
+struct ArithenApp: App {
     @UIApplicationDelegateAdaptor(PrivacyDelegate.self) private var delegate
     @StateObject private var vault = VaultModel()
     @StateObject private var sharedBackup = SharedBackupModel()

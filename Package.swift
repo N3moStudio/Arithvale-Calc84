@@ -11,7 +11,7 @@ let sdkSources = nativeRoot.appendingPathComponent("Vendor/MEGASDK").path
 let coreOnly = ProcessInfo.processInfo.environment["CALC84_CORE_ONLY"] == "1"
 
 let package = Package(
-    name: "Arithvale",
+    name: "Arithen",
     platforms: [
         .iOS(.v17),
         .macOS(.v14),
@@ -20,7 +20,7 @@ let package = Package(
         // An xtool project should contain exactly one library product,
         // representing the main app.
         .library(
-            name: "Arithvale",
+            name: "Arithen",
             targets: ["Calc84"]
         ),
     ],

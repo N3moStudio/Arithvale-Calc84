@@ -1,4 +1,4 @@
-# Arithvale source map
+# Arithen source map
 
 | Area | Main files | Responsibility |
 | --- | --- | --- |
@@ -6,6 +6,8 @@
 | Library operations | VaultModel, VaultEngine, VaultRepository | Import transactions, cancellation, encrypted storage, backup/restore |
 | Photo pipeline | MediaBridge, PhotoResourceWriter, PhotoImportReview | Original resources, cancellable protected streaming, verified optional deletion |
 | Browsing | LibraryView, MemoryGrid, MediaBrowser, MediaPreviewStore, FilePreview, LivePhotoPreview | Grid/search/filter, native paging, bounded prepared previews, zoom, paired motion |
+| Glass and backgrounds | ArithenGlass, SurfaceAppearanceSettings, Wallpaper, CalcCore/AppearancePolicy | Per-area tints, native/fallback glass, bounded own-video loops, power/accessibility gates and private playback cleanup |
+| Visible identity | ArithenIdentity, AppBrand, Docs/Brand, Scripts/create_icon.py | Approved purple icon, version/build display, reproducible icon export |
 | Selection | GridDragSelection, LibrarySelectionSweep | Horizontal sweep, reversible ranges, edge scrolling and tap/VoiceOver fallback |
 | Files picker | BackupChooserView, BackupFolder, BackupFileProbe, RecoveryViews, PrivateSpaceView | Direct file/folder selection, scoped candidate list, verified local copies and clear invalid-selection feedback |
 | Export | FilePreview, PrivatePhotoCopy | Original sharing and optional metadata-free JPEG derivatives |

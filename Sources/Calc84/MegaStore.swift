@@ -40,7 +40,7 @@ private let megaCallback: C84MegaCallback = { context, error, result in
     }
 }
 
-/// Official MEGA SDK handles its account encryption and protocol. Arithvale sends
+/// Official MEGA SDK handles its account encryption and protocol. Arithen sends
 /// only its own ciphertext through it; it never implements MEGA cryptography.
 final class MegaStore: CloudStore, @unchecked Sendable {
     private let client: UnsafeMutableRawPointer

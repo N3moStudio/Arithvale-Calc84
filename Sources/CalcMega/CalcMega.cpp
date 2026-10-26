@@ -32,7 +32,7 @@ extern "C" {
 void *c84mega_create(const char *key) {
     // No plaintext node database or session cache. The session goes in Keychain.
     MegaApi::setLogLevel(-1);
-    auto client = new MegaApi(key, static_cast<const char *>(nullptr), "Arithvale/0.4");
+    auto client = new MegaApi(key, static_cast<const char *>(nullptr), "Arithen/0.9");
     client->useHttpsOnly(true); client->setPublicKeyPinning(true); client->retrySSLerrors(false);
     return client;
 }

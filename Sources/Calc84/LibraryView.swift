@@ -25,6 +25,9 @@ struct LibraryView: View {
     @State private var folders = false
     @State private var cloudChoices = false
     @State private var settings = false
+    @AppStorage("libraryGlassTint") private var tintValue = GlassTint.plum.rawValue
+    private var glassTint: GlassTint { GlassTint(rawValue: tintValue) ?? .plum }
+    private var backgroundVisible: Bool { !settings && !adding && !addingBackup && !showingExports && !albumSheet && !cloudChoices && !photoPicker && !files && !folders && !deletion && !removeReceived && !vault.mediaViewerPresented && !vault.busy && vault.photoImportReview == nil && vault.fileImportReview == nil }
     @State private var filter = "All"
     @State private var search = ""
     @State private var searching = false
@@ -101,15 +104,15 @@ struct LibraryView: View {
                         }
                     }
             }
-            if selecting { Divider(); actionBar }
-            else if style != .clearGlass { Divider(); navigationBar.padding(.horizontal, 12).padding(.top, 4) }
+            if selecting { actionBar.modifier(FloatingLibraryBar()).padding(.horizontal, 8).padding(.bottom, 4) }
+            else if style != .clearGlass { navigationBar.padding(6).modifier(FloatingLibraryBar()).padding(.horizontal, 12).padding(.bottom, 6) }
         }
         .overlay(alignment: .bottom) {
             if style == .clearGlass && !selecting {
                 navigationBar.padding(6).modifier(FloatingLibraryBar()).padding(.horizontal, 20).padding(.bottom, 8)
             }
         }
-        .background(Color(uiColor: .systemBackground))
+        .background { ArithenWallpaper(area: .library, visible: backgroundVisible) }
         .preferredColorScheme(style == .nightroom ? .dark : (AppAppearance(rawValue: appearance) ?? .system).scheme)
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $settings) { NavigationStack { VaultSettingsView().environmentObject(vault) } }
@@ -151,7 +154,8 @@ struct LibraryView: View {
         } message: { Text(vault.message ?? "") }
     }
     private var header: some View {
-        HStack(spacing: 2) {
+        ArithenGlassGroup {
+        HStack(spacing: 6) {
             Text(selecting ? "\(selection.count) selected" : showingAlbums ? "Albums" : searching ? "Search" : style == .timeline ? "Your days" : "Library")
                 .font(style == .contactSheet ? .title2.bold() : .largeTitle.bold())
                 .lineLimit(1).minimumScaleFactor(0.7)
@@ -160,12 +164,15 @@ struct LibraryView: View {
             Button(selecting ? "Done" : "Select") {
                 if showingAlbums { tab = "Library"; filter = "All Items" }
                 selecting.toggle(); selection = []
-            }.font(.subheadline.weight(.semibold)).frame(minWidth: 52, minHeight: 44).disabled(vault.busy)
+            }.font(.subheadline.weight(.semibold)).frame(minWidth: 56, minHeight: 44)
+                .modifier(ArithenGlass(tint: glassTint, shape: Capsule())).disabled(vault.busy)
             Button("Add to Library", systemImage: "plus") { adding = true }
                 .labelStyle(.iconOnly).font(.title3).frame(width: 44, height: 44)
-                .background(Color(uiColor: .secondarySystemBackground), in: Circle()).disabled(vault.busy)
+                .modifier(ArithenGlass(tint: glassTint, shape: Circle(), prominent: true)).disabled(vault.busy)
             Button("Settings", systemImage: "gearshape") { settings = true }
                 .labelStyle(.iconOnly).font(.title3).frame(width: 44, height: 44)
+                .modifier(ArithenGlass(tint: glassTint, shape: Circle()))
+        }
         }.padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 12)
     }
     private var receivedBackup: some View {
@@ -191,18 +198,20 @@ struct LibraryView: View {
     }
     private var filters: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
+            ArithenGlassGroup {
+            HStack(spacing: 8) {
                 ForEach(["All", "Photos", "Videos", "Favorites"], id: \.self) { value in
                     let active = filter == value || (value == "All" && filter == "All Items")
                     Button { filter = style == .albumsFirst && value == "All" ? "All Items" : value; selection = [] } label: {
                         Text(value).font(.subheadline.weight(active ? .semibold : .regular))
                             .foregroundStyle(active ? Color.primary : Color.secondary)
                             .padding(.horizontal, 15).frame(minHeight: 44)
-                            .background(active ? Color(uiColor: .secondarySystemBackground) : .clear, in: Capsule())
+                            .modifier(ArithenGlass(tint: glassTint, shape: Capsule(), prominent: active))
                     }.accessibilityAddTraits(active ? .isSelected : [])
                 }
             }.padding(.horizontal, 14)
-        }.padding(.bottom, 5)
+            }
+        }.padding(.bottom, 8)
     }
     private var navigationBar: some View {
         HStack(spacing: 4) {

@@ -49,9 +49,9 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         NotificationCenter.default.addObserver(self, selector: #selector(coverPrivateContent), name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(resumeVisibleContent), name: UIApplication.didBecomeActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(releaseCache), name: UIApplication.didReceiveMemoryWarningNotification, object: nil)
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = .clear
         images.totalCostLimit = 32 * 1024 * 1024
-        grid.backgroundColor = .systemBackground
+        grid.backgroundColor = .clear
         grid.dataSource = self; grid.delegate = self
         grid.alwaysBounceVertical = true; grid.showsVerticalScrollIndicator = false
         grid.contentInsetAdjustmentBehavior = .never
@@ -110,6 +110,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
     }
     @objc private func releaseCache() { images.removeAllObjects() }
     func tearDown() {
+        model.viewerVault?.mediaViewerPresented = false
         mediaHost?.closeForPrivacy(); mediaHost = nil
         clearImages()
         NotificationCenter.default.removeObserver(self)
@@ -173,6 +174,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
             closed: { [weak self, weak vault] id in
                 guard let self else { return }
                 self.mediaHost = nil
+                vault?.mediaViewerPresented = false
                 if vault?.unlocked == true {
                     // The iOS 17/Reduce Motion fallback also returns to the current
                     // item, although it doesn't ask for a native zoom source.
@@ -185,6 +187,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
                 } else { self.clearImages() }
             })
         mediaHost = host
+        vault.mediaViewerPresented = true
         present(host, animated: !UIAccessibility.isReduceMotionEnabled)
     }
     private func transitionSource(id: UUID, preview: UIImage?) -> UIView? {

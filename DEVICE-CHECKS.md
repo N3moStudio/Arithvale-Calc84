@@ -1,12 +1,49 @@
-# Arithvale · phone test guide
-Version 0.8.0 test · Build 12
+# Arithen · phone test guide
+Version 0.9.0 test · Build 13
 
-## First: 0.8.0 motion checks (physical device - NOT RUN here)
+## First: 0.9.0 glass and own-video checks (physical device - NOT RUN here)
+
+Record device, OS, installer/container and PASS/FAIL/NOT RUN. Use disposable media.
+
+1. Confirm Arithen and the purple Aperture A icon on the Home Screen and in About.
+   Version is 0.9.0 (13). Update the existing data container: its library, recovery
+   key, received backup, cloud choices and chosen gallery layout must survive.
+2. On iOS 26+, inspect calculator keys, top controls, library header/filters,
+   floating navigation and viewer Details. They should have native Liquid Glass.
+   Check iOS 17–25 material fallback separately. Keep all six layouts selectable
+   and Clear Glass as the default for an unset appearance preference.
+3. Change each area's six tints independently. Test dark/light mode, Reduce
+   Transparency, increased contrast and maximum Dynamic Type; labels and touch
+   targets must remain usable. Photos themselves must remain unobscured.
+4. In calculator Settings → Glass Tint & Video Background, choose your own short
+   and long videos from Photos. Only the first 30 seconds loop silently; the
+   original is unchanged. Check portrait/landscape clips, iCloud download,
+   unsupported files, the 256 MB limit, cancellation, replacement and removal.
+5. In Library Settings → Appearance → Library Glass & Video Background, choose
+   an imported library video. It must not appear in calculator settings or play
+   before unlock. Remove/delete that item: use the still gradient, not an old copy.
+   Removing its background selection must leave the original library item intact.
+6. While each background is playing, enable Low Power Mode. It must stop moving
+   promptly. Disable it and confirm playback resumes only on the visible active
+   surface. Repeat while a video is still being prepared. Test Reduce Motion and
+   thermal-limit behavior separately. Static backgrounds must never animate.
+7. Open Settings, import, export, Details and the full-screen media viewer; the
+   library background must stop. Background the app, lock the phone and switch
+   back: verify the privacy shield, locked library and temporary-file cleanup.
+   No private frame may appear in the calculator or app-switcher snapshot.
+8. Play music from another app while choosing and using a background. Its audio
+   and Now Playing controls must remain unaffected. Verify no background sound,
+   AirPlay routing or screen-wake behavior.
+9. Compare a still background and a video background on the same physical device
+   at the same brightness for a fixed duration. Record battery, memory, heat and
+   scrolling hitches. Automated tests do not measure these effects.
+
+## Retained motion checks (physical device - NOT RUN here)
 
 Record device, OS, installer/container and PASS/FAIL/NOT RUN for each item.
 Use disposable photos, a large video, a Live Photo, a PDF and a long library.
 
-1. Confirm Settings shows 0.8.0 (12). A new appearance preference starts at
+1. Confirm Settings shows 0.9.0 (13). A new appearance preference starts at
    Clear Glass; an existing chosen layout stays chosen. All six remain selectable.
 2. On iOS 18+, open a thumbnail, swipe to another photo, then close. The return
    transition targets the currently viewed item. Repeat with an offscreen source,
@@ -50,7 +87,7 @@ have actual evidence. The existing Files/LiveContainer handoff limitation remain
 1. Update the same existing container and confirm its old code/key/media remain
    valid. Updating must not rotate that library.
 2. In a separate empty container, share a disposable backup through Files →
-   LiveContainer → Arithvale. Use Received Backup, enter its OLD key, then Add
+   LiveContainer → Arithen. Use Received Backup, enter its OLD key, then Add
    Backup to Setup. Verify setup cannot finish until the NEW key is saved,
    acknowledged and its last eight characters confirmed.
 3. Navigate into cloud setup and back. The displayed new destination key must
@@ -94,7 +131,7 @@ have actual evidence. The existing Files/LiveContainer handoff limitation remain
 1. Keep original files and keys. Use disposable libraries A and B with different
    recovery keys, an exact duplicate, distinct Live Photo motion, favorites,
    albums, and items blocked from each cloud provider.
-2. With B already set up, share A’s backup from Files to LiveContainer/Arithvale.
+2. With B already set up, share A’s backup from Files to LiveContainer/Arithen.
    Unlock B. The received card and + → From a Backup must both reach the flow.
 3. Wrong key and truncated archives must fail before showing contents. With the
    correct A key, preview items and choose a subset. No item is added yet.
@@ -114,15 +151,15 @@ have actual evidence. The existing Files/LiveContainer handoff limitation remain
 
 These are pending phone checks, not claimed pass results. Keep your original backup and recovery key.
 
-1. Verify Settings shows 0.8.0 (12). Update the intended LiveContainer entry; do not delete an existing library.
-2. With Arithvale stopped, download a disposable backup in Files. Touch and hold it → Share → LiveContainer → Arithvale → intended container. The calculator must stay private. Enter your code (160160 only for empty setup) and hold =.
+1. Verify Settings shows 0.9.0 (13). Update the intended LiveContainer entry; do not delete an existing library.
+2. With Arithen stopped, download a disposable backup in Files. Touch and hold it → Share → LiveContainer → Arithen → intended container. The calculator must stay private. Enter your code (160160 only for empty setup) and hold =.
 3. On setup or Settings → Backups → Test a Backup, confirm the original filename and **Use Received Backup** appear. No received copy must be called authenticated yet.
 4. Tap Use Received Backup. A wrong recovery key must fail without replacing anything. The original key must restore into an empty test container or pass Test Recovery without changing the current library.
-5. Repeat with Arithvale already running, then after force quit/relaunch. The received encrypted copy should remain available. Compare restored bytes, counts, dates, albums and favorites using disposable media.
+5. Repeat with Arithen already running, then after force quit/relaunch. The received encrypted copy should remain available. Compare restored bytes, counts, dates, albums and favorites using disposable media.
 6. Share again while a copy is waiting. The first must remain. **Remove Received Copy** must leave both the source in Files and the live library untouched; then sharing another backup should work.
 7. Try a renamed backup, a fake .c84backup, a truncated archive, a large backup and a cloud-only placeholder. An incomplete/failed copy must not become selected. Leave the app during copying and relaunch: only complete copies may appear.
 8. If the filename never appears, record whether LiveContainer was available in Share and whether the correct app/container opened. **No shared backup received yet** means no completed receipt, not a bad recovery key.
-9. Check direct installation's Files → Share → Arithvale separately. Check that calculator Help and app-switcher snapshots reveal no backup filename or private content.
+9. Check direct installation's Files → Share → Arithen separately. Check that calculator Help and app-switcher snapshots reveal no backup filename or private content.
 
 ## Cloud backup checks
 
@@ -131,12 +168,12 @@ Use disposable samples first. Do not delete your only library to test recovery.
 1. Update over the old app using the same installer/signing identity. Check that the existing calculator code, photos, videos, and recovery key still work.
 2. Open Settings → Cloud Copies. Sign in to your own service. MEGA also asks for a developer app key from https://mega.nz/sdk; this is not a recovery key. Blomp must pass HTTPS checks; stop and use another destination if it reports a certificate error.
 3. Import one old-dated photo, one video, and a Live Photo if available. Back Up Now. Wait for the completed catalog, not just an individual upload. Open a photo → Backup Status; check the provider and saved time.
-4. Check the cloud account in its own website/app. Files under c84/v1 should be opaque encrypted objects, with no ordinary media thumbnails or original filenames. Save the Arithvale recovery key separately.
+4. Check the cloud account in its own website/app. Files under c84/v1 should be opaque encrypted objects, with no ordinary media thumbnails or original filenames. Save the Arithen recovery key separately.
 5. Add another sample. Back up again: it should upload only new resource objects plus a catalog. Recheck All Remote Files also downloads unchanged files and consumes bandwidth.
 6. Interrupt a transfer with Pause, app backgrounding, and loss of Wi-Fi. Unlock and retry. No interrupted catalog should replace an older complete backup. Completed files should be reusable; the currently interrupted file can restart from the beginning.
 7. Confirm Wi-Fi-only behavior; then explicitly test the cellular toggle. Verify MEGA transfer-limit errors leave a usable app and retry path.
 8. Cloud Backup → service → Test Cloud Recovery. Choose a completed snapshot and its original recovery key. A wrong key must fail before media download. A correct test authenticates files without replacing the library. Allow up to 3× the backup size in free phone space for this alpha.
-9. With a separate test installation/container, choose Restore from Cloud before creating a new library. Connect the same account, select the snapshot, enter its old Arithvale key, save/confirm the new key, and choose a new calculator code. Compare media, albums, favorites, original dates and Live Photo pairing. Future backups must require the new key.
+9. With a separate test installation/container, choose Restore from Cloud before creating a new library. Connect the same account, select the snapshot, enter its old Arithen key, save/confirm the new key, and choose a new calculator code. Compare media, albums, favorites, original dates and Live Photo pairing. Future backups must require the new key.
 10. Save the old-dated photo/video back to Photos. Check chronological date order, then separately inspect Recently Added (which can show today). Check that original bytes and metadata were retained; do not infer date correctness just from the displayed filename.
 11. Delete a sample locally and back up. An older remote snapshot must still restore it. No automatic cloud cleanup is implemented, so retained history uses storage.
 12. Disconnect a provider. Its cloud data must remain, while this phone requires sign-in again. Download a complete cloud library folder to a computer and test Scripts/recover.py on one snapshots/*.c84cloud file for independent recovery.
@@ -161,7 +198,7 @@ The checks below cover both new and existing features.
 
 ## 1. Install and enter
 
-- Install Arithvale-0.8.0-test.ipa directly with SideStore. No extension is included. Keep your normal signing/refresh process.
+- Install Arithen-0.9.0-test.ipa directly with SideStore. No extension is included. Keep your normal signing/refresh process.
 - Launch: calculator first, no photo permission request.
 - Type 160160 and hold =. Save the recovery key outside the app, confirm its final eight characters, and choose a unique 6–12 digit code.
 - Lock; your new code and hold = should reopen it. The public starter must no longer open the configured library.
@@ -196,7 +233,7 @@ Prepare an old photo, a photo whose date you adjusted in Photos, a screenshot, a
 - Import a mix with an unavailable cloud item: only completed imports may be offered for deletion. All failed/unprocessed originals must remain.
 - Edited photos, alternate/RAW resources, missing asset identifiers, and limited-access fallback imports must be excluded from in-app deletion. Files imports must never offer this action.
 - Change an original in Photos, revoke access, or remove/corrupt a disposable vault copy before deletion: the request must be refused. Background/lock during verification must not start a stale deletion request. Once an OS-confirmed Photos transaction has begun, iOS controls its completion.
-- For a Live Photo, confirm both vault resources work before confirming deletion. Check iCloud Photos propagation on a disposable sample; Arithvale must never empty Recently Deleted.
+- For a Live Photo, confirm both vault resources work before confirming deletion. Check iCloud Photos propagation on a disposable sample; Arithen must never empty Recently Deleted.
 - Change Vault Timeline / Photos Layout, grid size, date source, and oldest/newest.
 - Check capture month/day against the samples. Unknown dates should use import date and say so in preview.
 - Favorite items, move multiple items to an album, search names/albums, and remove from album.
@@ -219,7 +256,7 @@ Exports are plain media and may include GPS. Original resources do not include e
 
 ## 5. External backups
 
-1. Choose your own iCloud Drive or other external folder, outside Arithvale/LiveContainer.
+1. Choose your own iCloud Drive or other external folder, outside Arithen/LiveContainer.
 2. Back Up Now; wait for completion and record the displayed filename/date.
 3. In Files, locate the .c84backup. It must not open as ordinary photos/videos. Its existence remains visible.
 4. Check provider upload status; keep a second copy on a computer/external drive for important files.
@@ -265,7 +302,7 @@ Recovered media are unencrypted. The sidecar retains app metadata; importing int
 - VoiceOver: digits, Equals, selection, setting labels, code/recovery forms.
 - Both gallery styles, empty library, long names, and multi-select.
 - SideStore direct first; LiveContainer separately if intended. Repeat Keychain, app-switcher, folder access, and restore tests in each.
-- Calculator works offline. No Arithvale account, analytics, or subscription is required. Cloud backups use your optional provider accounts.
+- Calculator works offline. No Arithen account, analytics, or subscription is required. Cloud backups use your optional provider accounts.
 
 ## Send useful results
 
@@ -275,7 +312,7 @@ Mark each group passed/failed after your own run. Computer tests are separate fr
 
 ## 0.4.0 regression checks — pending on a real phone
 
-1. Update over an existing installation without uninstalling. The Home Screen, permission prompts, calculator and About must say Arithvale; existing code/recovery files still work. Enter the code and hold Equals.
+1. Update over an existing installation without uninstalling. The Home Screen, permission prompts, calculator and About must say Arithen; existing code/recovery files still work. Enter the code and hold Equals.
 2. On a fresh disposable container, visit cloud recovery and Back repeatedly. The setup key must stay identical and usable; cancel/background then reopen creates a fresh setup session. An empty key can never enable Create.
 3. With disposable cloud catalogs, place a corrupt catalog between two valid ones. Both valid rows remain selectable; skipped damage is explained. Try Next Page and refresh; an account/network failure offers retry and never pretends the account has no backups.
 4. Complete MEGA-only, Blomp-only and Files-only backups. Gallery reports an actual checked destination. Change an item; the corresponding destinations must say changes need backup. Disconnecting does not imply the files were deleted.
@@ -312,7 +349,7 @@ These checks require a signed installation. Linux core tests and an arm64 compil
 - [ ] Calculator C, AC, delete, decimal, sign, operators, scientific mode, DEG/RAD, and hold-equals entry work in portrait/landscape, light/dark, and largest text sizes.
 
 
-Backup picker follow-up: Test and Restore now share an import-as-copy chooser with protected, coordinated staging. If the file is gray, use **Browse a Folder Instead**, choose its folder, tap Open, then select the filename inside Arithvale. Selection checks archive contents rather than the extension. Cancel preserves the previous selection; full recovery still authenticates the key and every record. Actual LiveContainer behavior remains a device check.
+Backup picker follow-up: Test and Restore now share an import-as-copy chooser with protected, coordinated staging. If the file is gray, use **Browse a Folder Instead**, choose its folder, tap Open, then select the filename inside Arithen. Selection checks archive contents rather than the extension. Cancel preserves the previous selection; full recovery still authenticates the key and every record. Actual LiveContainer behavior remains a device check.
 
 
 ## 0.5.1 recovery and viewer follow-up
@@ -322,7 +359,7 @@ Backup picker follow-up: Test and Restore now share an import-as-copy chooser wi
 - File mode: select a local and an iCloud backup; cancel once, retry, and confirm
   the selected filename appears. Check LiveContainer's Fix File Picker setting.
 - Folder mode: Open chooses the folder; then select the actual filename inside
-  Arithvale. Test a renamed backup, empty folder, ordinary non-backup file, missing
+  Arithen. Test a renamed backup, empty folder, ordinary non-backup file, missing
   permission, and cloud placeholder. No restore should start from a folder alone.
 - Restore an exported sample using its original key. Confirm item counts, original
   photo bytes, a full video, dates, and Live Photo pairing. Wrong-key failure must
@@ -344,7 +381,7 @@ Backup picker follow-up: Test and Restore now share an import-as-copy chooser wi
 - Verify 0.5.2 (8) in calculator Help → About.
 - On fresh-install recovery, open Choose Backup File and wait ten seconds before
   touching Files. Browse, cancel, reopen, then select a backup with its original key.
-- Repeat with Choose Backup Folder; Open returns to the filename list in Arithvale.
+- Repeat with Choose Backup Folder; Open returns to the filename list in Arithen.
 - Repeat both paths in Test a Backup after setup, including multiple Cancel/retry cycles.
 - Cancel a later selection and verify the previously selected backup remains selected.
 - Rotate while Files is open and repeat after backgrounding/reopening the app.

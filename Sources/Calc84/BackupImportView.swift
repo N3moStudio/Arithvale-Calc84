@@ -82,7 +82,7 @@ struct BackupImportView: View {
                                 .disabled(input.working || review.working || vault.busy)
                         } else {
                             NavigationLink { SharedBackupGuide() } label: { Label("Receive Backup from Files", systemImage: "square.and.arrow.down") }
-                            Text("In Files, share the backup to LiveContainer, choose Arithvale, then unlock your library.").font(.footnote).foregroundStyle(.secondary)
+                            Text("In Files, share the backup to LiveContainer, choose Arithen, then unlock your library.").font(.footnote).foregroundStyle(.secondary)
                         }
                         if shared.working { ProgressView("Receiving backup…") }
                         if let error = shared.error { Text(error).font(.footnote).foregroundStyle(.secondary) }

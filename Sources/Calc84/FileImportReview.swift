@@ -111,7 +111,7 @@ struct FileImportReviewView: View {
             .confirmationDialog("Allow \(AppBrand.name) to move \(review.originals.count) original files to Trash?", isPresented: $confirming, titleVisibility: .visible) {
                 Button("Move \(review.originals.count) Files to Trash", role: .destructive) { vault.trashImportedFiles(review) }
                 Button("Cancel", role: .cancel) {}
-            } message: { Text("Only the listed, successfully imported files are eligible. Your encrypted copies remain in Arithvale.") }
+            } message: { Text("Only the listed, successfully imported files are eligible. Your encrypted copies remain in Arithen.") }
         }.interactiveDismissDisabled(vault.busy)
     }
 }

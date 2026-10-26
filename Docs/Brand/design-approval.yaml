@@ -1,0 +1,34 @@
+schema_version: 1
+status: approved-flat-artwork-integrated
+concept:
+  id: PA1
+  path: Docs/Brand/Arithen-PA1-approved.png
+  sha256: AD0068B3515A0C10297BBD8174D4B9F0F9F20F68AA232E2FD5887E8D9D0B5427
+approval:
+  explicitly_approved: true
+  approved_at: 2026-10-26
+  evidence_note: 'User: Okay use this new logo A. and then apply it into the app.'
+design_lock:
+  recognition_anchor: rounded A with opening through its right side
+  silhouette: preserve PA1 geometry and negative space
+  composition: centered frontal mark on full square background
+  palette:
+    - name: plum
+      value: '#7861BB'
+    - name: lavender
+      value: '#F3EFFA'
+  protected_invariants:
+    - approved silhouette and opening
+    - approved pale lavender foreground and purple background
+    - original composition, shading and scale
+production_plan:
+  authorized: true
+  delivery_route: flattened PNG using existing xtool iconPath
+  composer_feasibility: simple geometry is suitable, but Icon Composer requires an unavailable Mac
+  composer_adaptation_requires_reapproval: true
+  notes: 'Preserved approved pixels by resizing to 1024 and embedding sRGB. No invented .icon file or unapproved reconstruction.'
+validation:
+  static_bitmap: passed
+  icon_composer: not run
+  simulator_and_device: not run
+

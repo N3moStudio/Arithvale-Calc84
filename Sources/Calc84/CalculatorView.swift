@@ -4,11 +4,9 @@ import CalcCore
 
 enum CalcTheme {
     static let accent = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
-        ? UIColor(red: 0.63, green: 0.76, blue: 1, alpha: 1)
-        : UIColor(red: 0.16, green: 0.28, blue: 0.63, alpha: 1) })
-    static let display = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
-        ? UIColor(red: 0.12, green: 0.15, blue: 0.19, alpha: 1)
-        : UIColor(red: 0.88, green: 0.91, blue: 0.95, alpha: 1) })
+        ? UIColor(red: 0.76, green: 0.67, blue: 0.95, alpha: 1)
+        : UIColor(red: 0.39, green: 0.28, blue: 0.64, alpha: 1) })
+    static let display = Color(uiColor: .secondarySystemBackground)
 }
 
 private struct CalculationRecord: Identifiable {
@@ -22,7 +20,7 @@ struct CalculatorView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var textSize
-    @AppStorage("calculatorAccent") private var accent = CalculatorAccent.blue.rawValue
+    @AppStorage("calculatorGlassTint") private var glassTintValue = GlassTint.plum.rawValue
     @AppStorage("calculatorAppearance") private var appearance = AppAppearance.dark.rawValue
     @State private var expression = ""
     @State private var result = "0"
@@ -31,29 +29,35 @@ struct CalculatorView: View {
     @State private var didEvaluate = false
     @State private var access = false
     @State private var showingHistory = false
+    @State private var showingSettings = false
     @State private var history: [CalculationRecord] = []
     private var dark: Bool { appearance == "dark" || (appearance == "system" && scheme == .dark) }
     private var ink: Color { dark ? Color(white: 0.98) : Color(white: 0.08) }
-    private var background: Color { dark ? Color(red: 0.020, green: 0.024, blue: 0.027) : Color(white: 0.98) }
-    private var operatorColor: Color { (CalculatorAccent(rawValue: accent) ?? .blue).color }
+    private var glassTint: GlassTint { GlassTint(rawValue: glassTintValue) ?? .plum }
 
     var body: some View {
         GeometryReader { geometry in
             let availableWidth = min(geometry.size.width - 36, 390)
             let side = max(44, min((availableWidth - 21) / 4, (geometry.size.height - 215) / 5))
             ScrollView {
+                ArithenGlassGroup {
                 VStack(spacing: 0) {
-                    HStack {
+                    HStack(spacing: 8) {
                         Button("History", systemImage: "clock.arrow.circlepath") { showingHistory = true }
                             .labelStyle(.iconOnly).frame(width: 44, height: 44)
-                            .background(ink.opacity(0.09), in: Circle())
-                        Spacer()
+                            .modifier(ArithenGlass(tint: glassTint, shape: Circle()))
+                        Spacer(minLength: 2)
+                        Text(AppBrand.name).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).lineLimit(1)
+                        Spacer(minLength: 2)
                         Menu {
                             Button(scientific ? "Basic Calculator" : "Scientific Calculator") { scientific.toggle() }
                             Button(degrees ? "Use Radians" : "Use Degrees") { degrees.toggle() }
                         } label: {
-                            Image(systemName: "calculator").frame(width: 44, height: 44).background(ink.opacity(0.09), in: Circle())
+                            Image(systemName: "calculator").frame(width: 44, height: 44).modifier(ArithenGlass(tint: glassTint, shape: Circle()))
                         }.accessibilityLabel("Calculator mode")
+                        Button("Settings", systemImage: "gearshape") { showingSettings = true }
+                            .labelStyle(.iconOnly).frame(width: 44, height: 44)
+                            .modifier(ArithenGlass(tint: glassTint, shape: Circle()))
                     }.padding(.top, 6)
                     Spacer(minLength: 32)
                     VStack(alignment: .trailing, spacing: 6) {
@@ -68,7 +72,7 @@ struct CalculatorView: View {
                             ForEach(["sin", "cos", "tan", "sqrt", "ln", "log", "π", "^", "(", ")", "e", degrees ? "DEG" : "RAD"], id: \.self) { key in
                                 Button(key == "sqrt" ? "√" : key) {
                                     if key == "DEG" || key == "RAD" { degrees.toggle() } else { press(key) }
-                                }.font(.headline).frame(maxWidth: .infinity, minHeight: 44).background(ink.opacity(0.12), in: Capsule())
+                                }.font(.headline).frame(maxWidth: .infinity, minHeight: 44).modifier(ArithenGlass(tint: glassTint, shape: Capsule()))
                             }
                         }.padding(.bottom, 8)
                     }
@@ -78,7 +82,7 @@ struct CalculatorView: View {
                                 Button { press("⌫") } label: { Image(systemName: "delete.left").font(.title2).frame(width: side, height: side) }
                                     .accessibilityLabel("Delete last character")
                                 Button("AC") { press("AC") }.font(.title).frame(width: side + 7, height: side).accessibilityLabel("Clear all")
-                            }.background(dark ? Color(red: 0.337, green: 0.357, blue: 0.392) : Color(white: 0.84), in: Capsule())
+                            }.modifier(ArithenGlass(tint: glassTint, shape: Capsule()))
                                 .contextMenu { Button("Clear Current Entry") { press("C") } }
                             key("%", side: side, utility: true)
                             key("÷", side: side)
@@ -89,8 +93,27 @@ struct CalculatorView: View {
                     }.buttonStyle(CalcKeyStyle()).padding(.bottom, 10)
                 }.foregroundStyle(ink).frame(width: side * 4 + 21, alignment: .center)
                     .frame(minHeight: geometry.size.height, alignment: .bottom).frame(maxWidth: .infinity)
-            }.background(background.ignoresSafeArea())
+                }
+            }.background { ArithenWallpaper(area: .calculator, visible: !access && !showingSettings && !showingHistory) }
         }.preferredColorScheme((AppAppearance(rawValue: appearance) ?? .dark).scheme)
+            .sheet(isPresented: $showingSettings) {
+                NavigationStack {
+                    Form {
+                        Section("Calculator") {
+                            Toggle("Scientific buttons", isOn: $scientific)
+                            Toggle("Use degrees", isOn: $degrees)
+                        }
+                        Section {
+                            NavigationLink("Glass Tint & Video Background") { SurfaceAppearanceSettings(area: .calculator) }
+                            Picker("Appearance", selection: $appearance) {
+                                ForEach(AppAppearance.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+                            }
+                        }
+                        Section { ArithenIdentity() }
+                    }.navigationTitle("Calculator Settings").navigationBarTitleDisplayMode(.inline)
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showingSettings = false } } }
+                }.tint(CalcTheme.accent)
+            }
             .sheet(isPresented: $showingHistory) {
                 NavigationStack {
                     List {
@@ -118,7 +141,7 @@ struct CalculatorView: View {
             } message: { Text(vault.message ?? "") }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
-                    vault.lock(); access = false; showingHistory = false
+                    vault.lock(); access = false; showingHistory = false; showingSettings = false
                     expression = ""; result = "0"; didEvaluate = false; history = []
                 }
             }
@@ -135,8 +158,8 @@ struct CalculatorView: View {
         return Button { press(value) } label: {
             Text(value).font(.system(size: min(36, side * 0.44), weight: .regular))
                 .frame(width: side, height: side)
-                .foregroundStyle(operation ? Color(red: 0.035, green: 0.07, blue: 0.12) : ink)
-                .background(operation ? operatorColor : utility ? (dark ? Color(white: 0.36) : Color(white: 0.84)) : (dark ? Color(red: 0.161, green: 0.173, blue: 0.192) : Color(white: 0.90)), in: Circle())
+                .foregroundStyle(.primary)
+                .modifier(ArithenGlass(tint: glassTint, shape: Circle(), prominent: operation))
         }.accessibilityLabel(label(for: value))
     }
     private func unlockLibrary() {

@@ -20,6 +20,7 @@ final class VaultModel: ObservableObject {
     @Published var items: [VaultItem] = []
     @Published var cloudPreferences = CloudPreferences()
     @Published var unlocked = false
+    @Published var mediaViewerPresented = false
     @Published var exists = false
     @Published var busy = false
     @Published var message: String?
@@ -130,7 +131,7 @@ final class VaultModel: ObservableObject {
         fileImportReview = nil; failedFileAccess = nil
         failedPhotos = []; failedFiles = []; failedImportCount = 0
         cloud.lock(); cloudPreferences = .init()
-        generation = UUID(); unlocked = false; items = []; status = ""; message = nil; photoImportReview = nil
+        generation = UUID(); mediaViewerPresented = false; unlocked = false; items = []; status = ""; message = nil; photoImportReview = nil
         if let pendingBackup { finishBackupExport(pendingBackup, destination: nil) }
         lockTask = Task { await engine.lock(); exists = await engine.exists() }
     }

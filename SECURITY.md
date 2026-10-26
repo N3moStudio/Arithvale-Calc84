@@ -1,10 +1,10 @@
-# Storage and recovery design · 0.7.0
+# Storage and recovery design · 0.9.0
 
 ## Scope and trust
 
 Encrypt photo/video/file contents and library metadata at rest and in portable backups. The calculator is an appearance choice, not encryption or proof of concealment.
 
-No Arithvale account, application telemetry, developer server, or embedded cloud credentials. Optional Blomp and MEGA connections contact the user's provider directly. PhotoKit can fetch iCloud originals when importing; a selected Files provider can also handle snapshot transport. System backups can include encrypted app files, but are not a substitute for tested portable recovery.
+No Arithen account, application telemetry, developer server, or embedded cloud credentials. Optional Blomp and MEGA connections contact the user's provider directly. PhotoKit can fetch iCloud originals when importing; a selected Files provider can also handle snapshot transport. System backups can include encrypted app files, but are not a substitute for tested portable recovery.
 
 ## Optional cloud transport
 
@@ -38,6 +38,25 @@ No key is written to UserDefaults. Key references are released on lock, but Swif
 Existing version 0.1 libraries retain their original v1 password-derived data key. Enrolling a local numeric code does not upgrade their password strength or reencrypt every existing resource. Starting a new library from their backup in 0.7.0 instead authenticates with the old password and re-encrypts into a fresh v2 destination.
 
 ## Private storage and transactions
+
+### Optional video backgrounds
+
+Calculator backgrounds are public decoration, visible before unlocking. Their
+silent, bounded playback copies live in `Application Support/CalculatorWallpapers`,
+use iOS complete file protection and are excluded from system backup. They are
+not encrypted with the library key and are not included in library/cloud backups.
+The picker explains this visibility before selection; original Photos assets are
+not changed or deleted. Replacing/removing a background removes its playback copy.
+
+Library backgrounds reference an existing encrypted library video by UUID. They
+do not export it into calculator storage or change any cloud upload selection.
+Authenticated originals and bounded playback copies are temporarily materialized
+under `Calc84Temporary` with complete file protection. Leaving/locking clears the
+playback copy; canceled preparation removes its working copies. Launch removes
+interrupted temporary files. This is best-effort cleanup, not forensic erasure.
+Background choices are local preferences, separate from portable backup contents.
+
+### Encrypted library
 
 Encrypted files and index live in Application Support/Calc84Library. UIFileSharingEnabled and opening-documents-in-place are disabled. Filenames on disk are random UUIDs, not media titles. Encrypted items use iOS complete file protection; Linux test files use owner-only permissions where available.
 

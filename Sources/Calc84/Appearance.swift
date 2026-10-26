@@ -22,19 +22,9 @@ enum CalculatorAccent: String, CaseIterable {
 
 /// Glass belongs to controls. Content remains opaque and fully legible.
 struct FloatingLibraryBar: ViewModifier {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.colorSchemeContrast) private var contrast
+    @AppStorage("libraryGlassTint") private var tint = GlassTint.plum.rawValue
     func body(content: Content) -> some View {
-        if reduceTransparency || contrast == .increased {
-            content.background(Color(uiColor: .secondarySystemBackground), in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.25)))
-        } else if #available(iOS 26.0, *) {
-            content.glassEffect(.regular, in: Capsule())
-        } else {
-            content.background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(.white.opacity(0.25)))
-                .shadow(color: .black.opacity(0.12), radius: 12, y: 3)
-        }
+        content.modifier(ArithenGlass(tint: GlassTint(rawValue: tint) ?? .plum, shape: Capsule(), interactive: false))
     }
 }
 
@@ -42,11 +32,15 @@ struct AppearanceSettingsView: View {
     @AppStorage("galleryStyle") private var style = GalleryStyle.initial.rawValue
     @AppStorage("appAppearance") private var appearance = AppAppearance.system.rawValue
     @AppStorage("calculatorAppearance") private var calculatorAppearance = AppAppearance.dark.rawValue
-    @AppStorage("calculatorAccent") private var accent = CalculatorAccent.blue.rawValue
+    @AppStorage("calculatorAccent") private var accent = CalculatorAccent.lilac.rawValue
     @AppStorage("libraryDateSource") private var dateSource = LibraryDateSource.captured.rawValue
     @AppStorage("libraryNewestFirst") private var newestFirst = true
     var body: some View {
         List {
+            Section {
+                NavigationLink("Library Glass & Video Background") { SurfaceAppearanceSettings(area: .library) }
+                NavigationLink("Calculator Glass & Video Background") { SurfaceAppearanceSettings(area: .calculator) }
+            }
             Section("Library layout") {
                 ForEach(GalleryStyle.allCases, id: \.rawValue) { option in
                     Button { style = option.rawValue } label: {
@@ -72,9 +66,6 @@ struct AppearanceSettingsView: View {
                 Toggle("Newest first", isOn: $newestFirst)
             } header: { Text("Library") } footer: { Text("Nightroom always uses a dark background. Each layout keeps its own photo size.") }
             Section("Calculator") {
-                Picker("Color", selection: $accent) {
-                    ForEach(CalculatorAccent.allCases, id: \.rawValue) { Text($0.rawValue.capitalized).tag($0.rawValue) }
-                }
                 Picker("Appearance", selection: $calculatorAppearance) {
                     ForEach(AppAppearance.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
                 }

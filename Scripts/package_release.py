@@ -35,6 +35,11 @@ def main():
         assert info['UTExportedTypeDeclarations'][0]['UTTypeIdentifier']=='studio.n3mo.calc84.backup'
         assert info['CFBundleDocumentTypes'][0]['LSItemContentTypes']==['studio.n3mo.calc84.backup']
         assert any(n.endswith('PrivacyInfo.xcprivacy') for n in archive.namelist()), 'Privacy manifest absent'
+        assert info['CFBundleIconFile']=='AppIcon'
+        assert archive.read(app+'AppIcon.png')==(ROOT/'AppIcon.png').read_bytes(), 'Home Screen icon differs from approved export'
+        identity_icons=[n for n in archive.namelist() if n.endswith('/Resources/ArithenIcon.png')]
+        assert len(identity_icons)==1, 'Expected one packaged Arithen identity icon'
+        assert archive.read(identity_icons[0])==(ROOT/'Sources/Calc84/Resources/ArithenIcon.png').read_bytes()
         binary=archive.read(app+info['CFBundleExecutable'])
         # Swift can encode short enum labels as instruction immediates rather
         # than contiguous strings. Layout availability/defaults have core tests;
@@ -43,6 +48,8 @@ def main():
             assert prompt.encode() in binary, 'Missing expected recovery/viewer UI: '+prompt
         for prompt in ('Opens file information. You can also swipe up on this handle.', 'Importing Selected Items'):
             assert prompt.encode() in binary, 'Missing expected motion/progress UI: '+prompt
+        for prompt in ('Glass Tint & Video Background', 'Stops in Low Power Mode', 'Calculator Appearance', 'Choose a Library Video'):
+            assert prompt.encode() in binary, 'Missing expected appearance UI: '+prompt
         assert binary[:4]==bytes.fromhex('cffaedfe') and int.from_bytes(binary[4:8],'little')==0x0100000C
         commands=struct.unpack_from('<I',binary,16)[0]; position=32; min_version=None; sdk=None
         for _ in range(commands):
@@ -53,15 +60,16 @@ def main():
         assert min_version==(17<<16)
         assert sdk==((27<<16)|(1<<8)), 'Expected installed iOS 27.1 SDK metadata'
         assert not any(n.endswith('.mobileprovision') for n in archive.namelist())
-    output=ROOT/'Releases'/('Arithvale-'+brand['version']+'-test-'+result['ipaSHA256'][:8])
+    product=brand['productName']
+    output=ROOT/'Releases'/(product+'-'+brand['version']+'-test-'+result['ipaSHA256'][:8])
     output.mkdir(parents=True,exist_ok=True)
-    artifact=output/('Arithvale-'+brand['version']+'-test.ipa'); shutil.copy2(ipa,artifact)
-    with zipfile.ZipFile(output/'Arithvale-source.zip','w',zipfile.ZIP_DEFLATED) as archive:
+    artifact=output/(product+'-'+brand['version']+'-test.ipa'); shutil.copy2(ipa,artifact)
+    with zipfile.ZipFile(output/(product+'-source.zip'),'w',zipfile.ZIP_DEFLATED) as archive:
         files=set(result['sourceFiles'])
         files.update(p.relative_to(ROOT).as_posix() for p in ROOT.glob('*.md'))
         files.update(p.relative_to(ROOT).as_posix() for p in (ROOT/'Docs').rglob('*') if p.is_file())
         files.update(['LICENSE','Recover Vault.cmd','.gitignore','.gitattributes'])
-        for relative in sorted(files): archive.write(ROOT/relative,Path('Arithvale')/relative)
+        for relative in sorted(files): archive.write(ROOT/relative,Path(product)/relative)
     for name in ('core-tests','recovery-tests','ios-build'):
         shutil.copy2(evidence.parent/(name+'.log'),output/(name+'.log'))
     shutil.copy2(ROOT/'DEVICE-CHECKS.md',output/'TEST-ON-YOUR-IPHONE.md')
@@ -69,7 +77,7 @@ def main():
                    'architecture':'arm64','minimumIOS':'17.0','sdk':'27.1','ipa':artifact.name})
     (output/'BUILD-RESULT.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
     (output/'START-HERE.txt').write_text(
-        'Arithvale '+brand['version']+' test build\n\n'
+        product+' '+brand['version']+' test build\n\n'
         'Update using the same signing identity and data container. Do not uninstall your current library.\n'
         'Enter your existing code and HOLD =. On an empty installation use 160160 and hold =.\n'
         'The display name changed; bundle identity and backup formats did not.\n'

@@ -6,7 +6,7 @@ struct AboutView: View {
     @EnvironmentObject private var vault: VaultModel
     var body: some View {
         List {
-            Section { LabeledContent(AppBrand.name, value: AppBrand.version) }
+            Section { ArithenIdentity() }
             Section("Storage") {
                 LabeledContent("Originals and resources", value: ByteCountFormatter.string(fromByteCount: vault.items.reduce(0) { $0 + Int64($1.byteCount) }, countStyle: .file))
                 LabeledContent("Stored resources", value: "\(vault.items.count) / \(VaultLimits.itemCount)")
@@ -18,7 +18,7 @@ struct AboutView: View {
                     ScrollView { Text("Open with your code and hold =. On a fresh install use 160160, then choose Files or Cloud Recovery. Use the recovery key belonging to that backup. Save and test an external backup before updating or removing the app. Existing Calc 84 libraries and .c84backup files remain compatible.").padding() }.navigationTitle("Recovery Guide")
                 }
                 NavigationLink("Privacy") {
-                    ScrollView { Text("Arithvale encrypts its local library. There is no developer account or analytics. Optional backups send encrypted files to your own MEGA or Blomp account. Those services receive account and connection information under their own policies. Exported originals are ordinary files and may include location. The app does not block screenshots. Your recovery key cannot be reset by the developer.").padding() }.navigationTitle("Privacy")
+                    ScrollView { Text("Arithen encrypts its local library. There is no developer account or analytics. Optional backups send encrypted files to your own MEGA or Blomp account. Those services receive account and connection information under their own policies. Exported originals are ordinary files and may include location. The app does not block screenshots. Your recovery key cannot be reset by the developer.").padding() }.navigationTitle("Privacy")
                 }
                 NavigationLink("Third-party notices") { NoticesView() }
             }

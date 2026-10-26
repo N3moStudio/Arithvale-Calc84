@@ -1,4 +1,4 @@
-# Get started with Arithvale
+# Get started with Arithen
 
 ## First use
 
@@ -60,12 +60,12 @@ connected again. See [offline computer recovery](Docs/BUILDING.md#recover-withou
 ## Receive a backup without opening the picker (0.7.0)
 
 1. Open Apple’s **Files** app yourself. Find the `.c84backup` and download it if it has a cloud icon.
-2. Touch and hold the file → **Share → LiveContainer → Arithvale**. Choose the intended data container. Share one downloaded file, not a folder or collaboration link. A directly installed Arithvale can be selected instead of LiveContainer.
-3. Arithvale still opens as a calculator. Enter your code and hold **=**; an empty installation uses **160160** and hold **=**.
+2. Touch and hold the file → **Share → LiveContainer → Arithen**. Choose the intended data container. Share one downloaded file, not a folder or collaboration link. A directly installed Arithen can be selected instead of LiveContainer.
+3. Arithen still opens as a calculator. Enter your code and hold **=**; an empty installation uses **160160** and hold **=**.
 4. On setup, tap **Use Received Backup**, enter its old key, and tap **Add Backup to Setup**. Save and confirm the **new** recovery key, choose a calculator code, and tap **Create Library from Backups**. For an existing library, use **+ → From a Backup** to add items or **Settings → Backups → Test a Backup** to check a copy without adding it.
 5. Receipt means the encrypted copy arrived; only a successful recovery test or restore authenticates it. **Remove Received Copy** removes this extra copy, not the original in Files or your library. One received backup is retained at a time.
 
-This path never opens Arithvale’s document picker. LiveContainer documents its
+This path never opens Arithen’s document picker. LiveContainer documents its
 share handoff, but that host-to-app transfer still needs testing on your phone.
 If **No shared backup received yet** remains, the host has not delivered a file.
 If LiveContainer is absent from Share → More, check that its share extension is
@@ -89,7 +89,7 @@ saved during setup. Old archives continue to require their own original key.
 
 ## Add another backup after setup
 
-Download the backup in Files, then Share → LiveContainer → Arithvale. Unlock the
+Download the backup in Files, then Share → LiveContainer → Arithen. Unlock the
 library and tap **Backup received**, or **+ → From a Backup**. Use the original
 key for that backup, tap **Preview Contents**, select items, then **Add Items**.
 The current library is preserved. Added items use its current recovery key.
@@ -104,5 +104,20 @@ still available under Settings → Backups when you only want to check a copy.
 
 Settings → Appearance offers all six layouts. Clear Glass is the initial choice;
 subsequent choices are remembered. Nightroom stays dark. The calculator has its
-own appearance and Blue, Mint, Lilac, or Amber colors. Version/build appears at
-the bottom of Settings; it is deliberately absent from the ordinary calculator.
+own appearance. Version/build appears in library Settings and calculator Settings.
+
+For glass colors and a personal video background:
+
+- **Calculator:** top-right Settings → Glass Tint & Video Background → Choose Your Video.
+- **Library:** Settings → Appearance → Library Glass & Video Background → Choose a Library Video.
+  Import your own video with Library → + → Photos & Videos first.
+
+These two areas have separate tints and backgrounds. Purple is the default;
+Neutral, Blue, Mint, Rose and Amber are also available. Liquid Glass requires
+iOS 26+; earlier iOS versions use translucent material.
+
+Videos must be under 256 MB. A silent, reduced-size copy loops for up to 30
+seconds without altering the original. Low Power Mode and Reduce Motion stop
+playback. Background preferences are local to this installation; choose them
+again after restoring into a new installation. A calculator background is visible
+before unlocking, so choose something suitable for that public screen.

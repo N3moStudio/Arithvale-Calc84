@@ -18,6 +18,8 @@ struct MediaBrowser: View {
     let didShow: (UUID) -> Void
     @State private var navigation: MediaPagingState
     @State private var sheet: MediaSheet?
+    @AppStorage("libraryGlassTint") private var tintValue = GlassTint.plum.rawValue
+    private var glassTint: GlassTint { GlassTint(rawValue: tintValue) ?? .plum }
     private enum MediaSheet: Identifiable {
         case details(VaultItem), export(VaultItem)
         var id: String { switch self { case .details(let item): return "details-" + item.id.uuidString; case .export(let item): return "export-" + item.id.uuidString } }
@@ -42,8 +44,10 @@ struct MediaBrowser: View {
                         VStack(spacing: 4) {
                             Capsule().fill(.secondary).frame(width: 30, height: 4)
                             Text("Details").font(.caption)
-                        }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                        }.frame(width: 104).frame(minHeight: 44)
+                            .modifier(ArithenGlass(tint: glassTint, shape: Capsule()))
                     }
+                    .padding(.vertical, 4)
                     .buttonStyle(.plain).foregroundStyle(.secondary)
                     .accessibilityHint("Opens file information. You can also swipe up on this handle.")
                     .simultaneousGesture(DragGesture(minimumDistance: 12).onEnded { value in
@@ -75,7 +79,7 @@ struct MediaBrowser: View {
                 }
             }
         }
-        .tint(CalcTheme.accent)
+        .tint(glassTint == .clear ? .primary : glassTint.color)
         .onAppear { focus(position) }
         .onChange(of: position) { _, index in focus(index) }
         .onChange(of: vault.unlocked) { _, unlocked in if !unlocked { sheet = nil; previews.clear() } }

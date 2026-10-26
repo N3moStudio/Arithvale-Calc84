@@ -1,4 +1,4 @@
-# Build Arithvale
+# Build Arithen
 
 
 With Swift 6, xtool, and the iOS 27.1 Darwin SDK in WSL/Linux or macOS:
@@ -10,7 +10,7 @@ python3 -m venv .build/recovery-venv
 python3 Scripts/verify_release.py --ipa --python "$PWD/.build/recovery-venv/bin/python"
 ```
 
-The verifier runs tests and build sequentially because they share .build. It writes full logs and input hashes, then produces an ignored `Releases/Arithvale-0.5.0-test-<hash>/` test kit. Any changed source invalidates the evidence. Output: xtool/Arithvale.ipa. Bundle identifier: studio.n3mo.calc84. Linux tests use pinned Swift Crypto 4.3.1; iPhone uses CryptoKit/CommonCrypto.
+The verifier runs tests and build sequentially because they share .build. It writes full logs and input hashes, then produces an ignored `Releases/Arithen-0.5.0-test-<hash>/` test kit. Any changed source invalidates the evidence. Output: xtool/Arithen.ipa. Bundle identifier: studio.n3mo.calc84. Linux tests use pinned Swift Crypto 4.3.1; iPhone uses CryptoKit/CommonCrypto.
 
 `prepare_mega.py` downloads checksum-pinned MEGA source and iOS arm64 dependencies into ignored Vendor folders. They are not required for core-only tests. Native builds require them. No credentials are part of the build. The native MEGA dependency bundle is device-only; simulator builds need matching simulator libraries.
 
