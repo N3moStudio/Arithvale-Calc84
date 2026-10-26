@@ -57,10 +57,25 @@ public actor VaultEngine {
         return repository.items
     }
     public func export(to: URL) throws { try repository.exportBackup(to: to) }
-    public func cloudPlan() throws -> CloudPlan { try repository.cloudPlan() }
+    public func cloudPreferences() throws -> CloudPreferences { try repository.cloudPreferences() }
+    public func setCloudPolicy(_ policy: CloudBackupPolicy, provider: CloudProvider) throws {
+        try repository.setCloudPolicy(policy, provider: provider)
+    }
+    public func cloudPlan(provider: CloudProvider) throws -> CloudPlan { try repository.cloudPlan(provider: provider) }
     public func restore(from: URL, password: String) throws -> [VaultItem] {
         try repository.restore(from: from, password: password)
         return repository.items
+    }
+    public func initializeFromBackups(_ sources: [SetupBackupSource], recovery: String,
+                                      progress: @Sendable (Int, Int) -> Void = { _, _ in }) throws -> [VaultItem] {
+        try repository.initializeFromBackups(sources, recovery: recovery, progress: progress)
+        return repository.items
+    }
+    public func importBackup(from root: URL, credential: VaultCredential, selected: Set<UUID>) throws -> BackupImportResult {
+        let source = VaultRepository(root: root)
+        defer { source.lock() }
+        try source.unlock(credential: credential)
+        return try repository.importBackup(source, selected: selected)
     }
     public func verifyBackup(from: URL, password: String) throws -> Int {
         let temporary = repository.root.deletingLastPathComponent().appendingPathComponent("verify-" + UUID().uuidString)

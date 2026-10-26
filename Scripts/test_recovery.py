@@ -7,6 +7,7 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+from cryptography.exceptions import InvalidTag
 from recover import recover, block, number, exact
 
 SECRET = "C24144AF-B3E94438-97C89127-E373D053-9F19F720-E47CA588-7C38BF10-14C2AF32"
@@ -46,6 +47,19 @@ class RecoveryTests(unittest.TestCase):
         result = recover(FIXTURES / "v1.c84backup", "original long password", output)
         self.assertEqual(result["authenticatedRecords"], 1)
         self.assertEqual(next(output.glob("*_legacy.txt")).read_bytes(), b"legacy original bytes")
+
+    def test_fresh_library_export_uses_destination_key(self):
+        # Fixed public fixture key, never real user key material.
+        result = recover(FIXTURES / "fresh.c84backup", "F" * 64, self.base / "fresh")
+        self.assertEqual(result["authenticatedRecords"], 3)
+        records = json.loads((self.base / "fresh" / "metadata.json").read_text())
+        originals = {entry["name"]: (self.base / "fresh" / entry["exportedFilename"]).read_bytes() for entry in records}
+        self.assertTrue(originals["../../AUX.jpg"] == b"portable original bytes")
+        self.assertTrue(originals["video.mov"] == bytes([0xA7]) * (1024 * 1024 + 7))
+        self.assertTrue(originals["empty.bin"] == b"")
+        with self.assertRaises(InvalidTag):
+            recover(FIXTURES / "fresh.c84backup", SECRET, self.base / "must-not-exist")
+        self.assertFalse((self.base / "must-not-exist").exists())
 
     def test_verify_only_leaves_no_plaintext(self):
         result = recover(FIXTURES / "v2.c84backup", SECRET)

@@ -42,6 +42,7 @@ public struct CloudSnapshot: Codable, Sendable {
 public struct CloudPlan: Sendable {
     public let snapshot: CloudSnapshot
     public let sources: [UUID: URL]
+    public let itemIDs: Set<UUID>
 }
 
 public enum CloudBackup {
@@ -90,7 +91,7 @@ public enum CloudError: Error, LocalizedError {
 /// Remote deletion is deliberately absent. Phone deletions never remove backups.
 public protocol CloudStore: Sendable {
     func refresh() async throws
-    func list(prefix: String) async throws -> [String]
+    func listPage(prefix: String, after: String?, limit: Int) async throws -> CloudListingPage
     func size(path: String) async throws -> Int?
     func upload(file: URL, path: String) async throws
     func download(path: String, to: URL, maximum: Int) async throws
@@ -101,6 +102,8 @@ public struct CloudTransferProgress: Sendable {
     public let completed: Int
     public let total: Int
     public let phase: String
+    public var completedBytes: Int64 = 0
+    public var totalBytes: Int64 = 0
 }
 
 public enum CloudTransfer {
@@ -112,10 +115,13 @@ public enum CloudTransfer {
         try plan.snapshot.validate()
         try await store.refresh()
         let total = plan.snapshot.records.count + 1
+        let totalBytes = plan.snapshot.records.reduce(Int64(0)) { $0 + Int64($1.bytes) }
+        var completedBytes: Int64 = 0
         for (position, record) in plan.snapshot.records.enumerated() {
             try Task.checkCancellation()
+            defer { completedBytes += Int64(record.bytes) }
             let path = plan.snapshot.objectPath(record)
-            await progress(.init(completed: position, total: total, phase: "Checking encrypted files"))
+            await progress(.init(completed: position, total: total, phase: "Checking encrypted files", completedBytes: completedBytes, totalBytes: totalBytes))
             var matches = false
             if try await store.size(path: path) == record.bytes {
                 if previouslyVerified.contains(record.filename) { continue }
@@ -126,12 +132,12 @@ public enum CloudTransfer {
             }
             if !matches {
                 guard let source = plan.sources[record.id] else { throw VaultError.missing }
-                await progress(.init(completed: position, total: total, phase: "Uploading encrypted files"))
+                await progress(.init(completed: position, total: total, phase: "Uploading encrypted files", completedBytes: completedBytes, totalBytes: totalBytes))
                 try await store.upload(file: source, path: path)
                 try Task.checkCancellation()
                 let check = scratch.appendingPathComponent(UUID().uuidString)
                 defer { try? FileManager.default.removeItem(at: check) }
-                await progress(.init(completed: position, total: total, phase: "Checking downloaded copy"))
+                await progress(.init(completed: position, total: total, phase: "Checking downloaded copy", completedBytes: completedBytes, totalBytes: totalBytes))
                 try await store.download(path: path, to: check, maximum: record.bytes)
                 guard try CloudBackup.hash(check) == record.sha256 else { throw VaultError.invalidBackup }
             }
@@ -143,11 +149,11 @@ public enum CloudTransfer {
         defer { try? FileManager.default.removeItem(at: catalog); try? FileManager.default.removeItem(at: readBack) }
         let data = try JSONEncoder().encode(plan.snapshot)
         try data.write(to: catalog, options: .withoutOverwriting)
-        await progress(.init(completed: total - 1, total: total, phase: "Saving recovery catalog"))
+        await progress(.init(completed: total - 1, total: total, phase: "Saving recovery catalog", completedBytes: totalBytes, totalBytes: totalBytes))
         try await store.upload(file: catalog, path: plan.snapshot.path)
         try await store.download(path: plan.snapshot.path, to: readBack, maximum: 8 * 1024 * 1024)
         guard try Data(contentsOf: readBack) == data else { throw VaultError.invalidBackup }
-        await progress(.init(completed: total, total: total, phase: "Backup verified"))
+        await progress(.init(completed: total, total: total, phase: "Backup verified", completedBytes: totalBytes, totalBytes: totalBytes))
     }
     public static func download(_ snapshot: CloudSnapshot, store: any CloudStore, scratch: URL,
                                 destination: URL, progress: @Sendable (CloudTransferProgress) async -> Void) async throws {

@@ -1,6 +1,8 @@
 #if os(iOS)
 import SwiftUI
 import UIKit
+import Photos
+import PhotosUI
 import PDFKit
 import AVKit
 #if canImport(_AVKit_SwiftUI)
@@ -8,89 +10,6 @@ import _AVKit_SwiftUI
 #endif
 import UniformTypeIdentifiers
 import CalcCore
-
-struct FilePreview: View {
-    let item: VaultItem
-    @EnvironmentObject private var vault: VaultModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var image: UIImage?
-    @State private var player: AVPlayer?
-    @State private var temporary: URL?
-    @State private var showingExport = false
-    @State private var showingBackup = false
-    @State private var error: String?
-    var body: some View {
-        NavigationStack {
-            Group {
-                if let error { ContentUnavailableView("Couldn’t Open", systemImage: "exclamationmark.triangle", description: Text(error)) }
-                else if let player { VideoPlayer(player: player) }
-                else if let temporary, UTType(item.contentType)?.conforms(to: .pdf) == true { PDFPreview(url: temporary) }
-                else if let image { ZoomableImage(image: image) }
-                else if temporary != nil { ContentUnavailableView("File Is Stored", systemImage: "doc", description: Text("Save or share a copy to open it in another app.")) }
-                else { ProgressView("Opening…") }
-            }
-            .navigationTitle(item.chronologicalDate.formatted(date: .abbreviated, time: .shortened)).navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .secondaryAction) {
-                    Button("Backup Status", systemImage: "icloud") { showingBackup = true }
-                }
-                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Share or Save", systemImage: "square.and.arrow.up") { showingExport = true }.disabled(temporary == nil)
-                }
-            }
-            .safeAreaInset(edge: .bottom) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.name).font(.subheadline).lineLimit(2)
-                        Text(item.captured == nil ? "Original date unavailable · showing import date" : "Original capture date preserved")
-                            .font(.caption).foregroundStyle(.secondary)
-                        if item.companionID != nil { Text("Live Photo · paired video retained").font(.caption).foregroundStyle(.secondary) }
-                    }
-                    Spacer()
-                }.padding().background(.regularMaterial)
-            }
-            .sheet(isPresented: $showingExport) { ExportMediaView(items: [item]).environmentObject(vault) }
-            .sheet(isPresented: $showingBackup) {
-                NavigationStack { CloudItemStatusView(item: item).environmentObject(vault.cloud) }
-            }
-        }
-        .task {
-            let ticket = vault.generation
-            var created: URL?
-            do {
-                let url = try TemporaryFiles.fresh(extension: UTType(item.contentType)?.preferredFilenameExtension ?? "bin")
-                created = url
-                try await vault.engine.materialize(id: item.id, to: url)
-                guard !Task.isCancelled, vault.unlocked, ticket == vault.generation else {
-                    try? FileManager.default.removeItem(at: url); return
-                }
-                if UTType(item.contentType)?.conforms(to: .movie) == true { player = AVPlayer(url: url) }
-                else if UTType(item.contentType)?.conforms(to: .image) == true {
-                    image = await Task.detached(priority: .userInitiated) {
-                        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                              let bitmap = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                                kCGImageSourceThumbnailMaxPixelSize: 4096,
-                                kCGImageSourceCreateThumbnailWithTransform: true] as CFDictionary) else { return UIImage?.none }
-                        return UIImage(cgImage: bitmap)
-                    }.value
-                }
-                guard !Task.isCancelled, ticket == vault.generation else {
-                    player?.pause(); player = nil; image = nil; try? FileManager.default.removeItem(at: url); return
-                }
-                temporary = url
-            } catch {
-                if let created { try? FileManager.default.removeItem(at: created) }
-                if !Task.isCancelled, ticket == vault.generation { self.error = error.localizedDescription }
-            }
-        }
-        .onDisappear {
-            player?.pause(); player?.replaceCurrentItem(with: nil); player = nil; image = nil
-            if let temporary { try? FileManager.default.removeItem(at: temporary) }; temporary = nil
-        }
-    }
-}
 
 struct MediaExport: Identifiable {
     let id = UUID()
@@ -121,6 +40,9 @@ struct ExportMediaView: View {
                     Button("Save to Photos", systemImage: "photo.badge.arrow.down") { start(mode: "photos") }.disabled(!allMedia)
                     Button("Save Originals to Files", systemImage: "folder") { start(mode: "files") }
                     Button("Share / AirDrop Originals", systemImage: "square.and.arrow.up") { start(mode: "share") }
+                    Button("Share Photo Copies without Metadata", systemImage: "location.slash") { start(mode: "privatePhotos") }
+                        .disabled(!items.allSatisfy { UTType($0.contentType)?.conforms(to: .image) == true })
+                    Text("Photo copies are new JPEGs up to 4096 pixels, with location and original metadata omitted. Live Photos become stills. Visible details in the picture remain. Originals stay unchanged.").font(.footnote).foregroundStyle(.secondary)
                 }.disabled(working || vault.busy)
                 if working { Section { ProgressView("Preparing originals…") } }
                 if !result.isEmpty { Section { Label(result, systemImage: "checkmark.circle") } }
@@ -172,6 +94,13 @@ struct ExportMediaView: View {
                     let main = folder.appendingPathComponent("\(index + 1)-\(safe)")
                     try await vault.engine.materialize(id: item.id, to: main)
                     if let captured = item.captured { try? FileManager.default.setAttributes([.creationDate: captured, .modificationDate: captured], ofItemAtPath: main.path) }
+                    if mode == "privatePhotos" {
+                        let copy = folder.appendingPathComponent("Photo-\(index + 1).jpg")
+                        try await Task.detached(priority: .utility) { try PrivatePhotoCopy.make(from: main, to: copy) }.value
+                        try? FileManager.default.removeItem(at: main)
+                        urls.append(copy)
+                        continue
+                    }
                     var companion: URL?
                     if let id = item.companionID {
                         let url = folder.appendingPathComponent("\(index + 1)-LivePhoto.mov")
@@ -189,7 +118,7 @@ struct ExportMediaView: View {
                 try Task.checkCancellation()
                 guard vault.unlocked, ticket == vault.generation else { throw VaultError.locked }
                 if mode == "photos" { result = "Saved \(saved) to Photos with their stored dates." }
-                else { export = MediaExport(urls: urls, share: mode == "share", folder: folder); handedOff = true }
+                else { export = MediaExport(urls: urls, share: mode == "share" || mode == "privatePhotos", folder: folder); handedOff = true }
             } catch {
                 if !Task.isCancelled, ticket == vault.generation { self.error = (saved > 0 ? "Saved \(saved) items. " : "") + error.localizedDescription }
             }
@@ -246,9 +175,15 @@ struct PDFPreview: UIViewRepresentable {
 }
 struct ZoomableImage: UIViewRepresentable {
     let image: UIImage
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    var zoomChanged: (Bool) -> Void = { _ in }
+    func makeCoordinator() -> Coordinator { Coordinator(zoomChanged) }
     func makeUIView(context: Context) -> UIScrollView {
         let scroll = UIScrollView(); scroll.minimumZoomScale = 1; scroll.maximumZoomScale = 5; scroll.delegate = context.coordinator
+        scroll.showsHorizontalScrollIndicator = false; scroll.showsVerticalScrollIndicator = false
+        scroll.panGestureRecognizer.isEnabled = false
+        let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.doubleTap(_:)))
+        doubleTap.numberOfTapsRequired = 2; scroll.addGestureRecognizer(doubleTap)
+        context.coordinator.scroll = scroll
         let view = context.coordinator.imageView; view.image = image; view.contentMode = .scaleAspectFit
         view.isAccessibilityElement = true; view.accessibilityLabel = "Imported image"; view.translatesAutoresizingMaskIntoConstraints = false
         scroll.addSubview(view)
@@ -258,11 +193,32 @@ struct ZoomableImage: UIViewRepresentable {
             view.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor), view.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor)])
         return scroll
     }
-    func updateUIView(_ view: UIScrollView, context: Context) {}
+    func updateUIView(_ view: UIScrollView, context: Context) {
+        context.coordinator.zoomChanged = zoomChanged
+        if context.coordinator.imageView.image !== image { context.coordinator.imageView.image = image }
+    }
     static func dismantleUIView(_ view: UIScrollView, coordinator: Coordinator) { coordinator.imageView.image = nil }
     final class Coordinator: NSObject, UIScrollViewDelegate {
         let imageView = UIImageView()
+        weak var scroll: UIScrollView?
+        var zoomChanged: (Bool) -> Void
+        private var wasZoomed = false
+        init(_ zoomChanged: @escaping (Bool) -> Void) { self.zoomChanged = zoomChanged }
         func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
+        func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            let zoomed = scrollView.zoomScale > 1.01
+            scrollView.panGestureRecognizer.isEnabled = zoomed
+            if wasZoomed != zoomed { wasZoomed = zoomed; zoomChanged(zoomed) }
+        }
+        @objc func doubleTap(_ gesture: UITapGestureRecognizer) {
+            guard let scroll else { return }
+            if scroll.zoomScale > 1.01 { scroll.setZoomScale(1, animated: !UIAccessibility.isReduceMotionEnabled) }
+            else {
+                let point = gesture.location(in: imageView), size = scroll.bounds.size
+                scroll.zoom(to: CGRect(x: point.x - size.width / 4, y: point.y - size.height / 4,
+                                       width: size.width / 2, height: size.height / 2), animated: !UIAccessibility.isReduceMotionEnabled)
+            }
+        }
     }
 }
 #endif

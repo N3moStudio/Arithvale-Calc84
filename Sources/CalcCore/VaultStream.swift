@@ -63,6 +63,27 @@ enum VaultStream {
         try process(source, size: size, key: key, context: context) { data.append($0) }
         return data
     }
+    static func digest(_ source: URL, size: Int, key: SymmetricKey, context: String) throws -> Data {
+        var hash = SHA256()
+        try process(source, size: size, key: key, context: context) { hash.update(data: $0) }
+        return Data(hash.finalize())
+    }
+    /// Authenticate each source chunk and immediately seal it under the destination
+    /// key with fresh nonces. No plaintext file or whole-video allocation is needed.
+    static func reencrypt(_ source: URL, to destination: URL, size: Int,
+                          sourceKey: SymmetricKey, sourceContext: String,
+                          key: SymmetricKey, context: String) throws {
+        let output = try newFile(destination)
+        var complete = false
+        defer { try? output.close(); if !complete { try? FileManager.default.removeItem(at: destination) } }
+        try output.write(contentsOf: Data("C84F0002".utf8)); try number(UInt64(size), to: output)
+        var index = 0
+        try process(source, size: size, key: sourceKey, context: sourceContext) { chunk in
+            try block(VaultCrypto.seal(chunk, key: key, context: "\(context)/chunk/\(index)/\(size)"), to: output)
+            index += 1
+        }
+        try output.synchronize(); complete = true
+    }
     private static func process(_ source: URL, size: Int, key: SymmetricKey, context: String, consume: (Data) throws -> Void) throws {
         let input = try FileHandle(forReadingFrom: source)
         defer { try? input.close() }

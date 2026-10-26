@@ -7,6 +7,8 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 
+/.bsp/
+/Releases/
 /xtool
 *.ipa
 *.c84backup

@@ -3,11 +3,16 @@ import SwiftUI
 import UIKit
 
 @main
-struct Calc84App: App {
+struct ArithvaleApp: App {
     @UIApplicationDelegateAdaptor(PrivacyDelegate.self) private var delegate
     @StateObject private var vault = VaultModel()
+    @StateObject private var sharedBackup = SharedBackupModel()
     var body: some Scene {
-        WindowGroup { CalculatorView().environmentObject(vault).environmentObject(vault.cloud) }
+        WindowGroup {
+            CalculatorView().environmentObject(vault).environmentObject(vault.cloud)
+                .environmentObject(sharedBackup)
+                .onOpenURL { sharedBackup.receive($0) }
+        }
     }
 }
 

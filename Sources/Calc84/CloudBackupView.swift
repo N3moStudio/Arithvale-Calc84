@@ -4,9 +4,9 @@ import CalcCore
 
 struct CloudBackupView: View {
     var restoring = false
+    var setup: Binding<SetupSession>? = nil
     @EnvironmentObject private var vault: VaultModel
     @EnvironmentObject private var cloud: CloudBackupModel
-    @AppStorage("cloudAfterChanges") private var automatic = false
     @AppStorage("cloudUseCellular") private var cellular = false
     var body: some View {
         List {
@@ -25,12 +25,12 @@ struct CloudBackupView: View {
                 }
             } footer: {
                 Text(restoring ? "Use the recovery key belonging to the saved library. Cloud sign-in alone cannot decrypt it."
-                     : "Originals, thumbnails, and dates are encrypted before upload. Backups stay in your own accounts.")
+                     : "Only eligible items and their thumbnails, Live Photo videos, and dates are included. Each provider starts with no items selected.")
             }
             Section("Your services") {
                 ForEach(CloudProvider.allCases) { provider in
                     NavigationLink {
-                        CloudProviderView(provider: provider, restoring: restoring)
+                        CloudProviderView(provider: provider, restoring: restoring, setup: setup)
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(provider.title).font(.headline)
@@ -44,13 +44,12 @@ struct CloudBackupView: View {
             }
             if !restoring {
                 Section("When to back up") {
-                    Toggle("Back up after changes", isOn: $automatic)
                     Toggle("Allow cellular data", isOn: $cellular)
                         .onChange(of: cellular) { _, _ in cloud.connectionChanged() }
                 }.disabled(vault.busy)
                 Section {
                     Text("Keep the app open and unlocked while transferring. Locking pauses the job. Tap Back Up Now to resume; completed files are reused.")
-                    Text("Both connections back up the same library. Their storage allowances are not combined. This version does not merge changes from two phones.")
+                    Text("Choose items separately for each provider. Automatic mode backs up all eligible items after changes while the app is open. Never Upload overrides both modes. This version does not merge changes from two phones.")
                     Text("Deleting from this phone never deletes cloud backups. Old recovery catalogs are kept; retained files can use extra cloud space.")
                     Text("The first upload includes a download check. Full recovery tests also download everything and need free space on your phone.")
                 } header: { Text("How it works") }
@@ -69,6 +68,7 @@ struct CloudBackupView: View {
 struct CloudProviderView: View {
     let provider: CloudProvider
     var restoring = false
+    var setup: Binding<SetupSession>? = nil
     @EnvironmentObject private var vault: VaultModel
     @EnvironmentObject private var cloud: CloudBackupModel
     @State private var email = ""
@@ -103,10 +103,13 @@ struct CloudProviderView: View {
                         Button("Recheck All Remote Files") { cloud.backup(vault: vault, only: provider, verifyAll: true) }.disabled(vault.busy)
                     }
                     NavigationLink(restoring ? "Find & Restore a Backup" : "Test Cloud Recovery") {
-                        CloudRestoreView(provider: provider, testOnly: !restoring)
+                        CloudRestoreView(provider: provider, testOnly: !restoring, setup: setup)
                     }.disabled(vault.busy)
                     Button("Disconnect", role: .destructive) { disconnecting = true }.disabled(vault.busy)
                 }
+            }
+            if !restoring {
+                CloudPolicySection(provider: provider)
             }
             if cloud.running || cloud.error != nil {
                 Section {
@@ -117,7 +120,7 @@ struct CloudProviderView: View {
             }
             Section("Your encrypted copy") {
                 Text("Your normal gallery stays on this phone. This connection stores separate encrypted files and recovery catalogs in c84/v1 inside your account.")
-                Text("Keep your Calc 84 recovery key separately. The cloud service cannot use your calculator code to recover this library.")
+                Text("Keep your Arithvale recovery key separately. The cloud service cannot use your calculator code to recover this library.")
                 if provider == .blomp {
                     Text("Blomp’s storage connection must pass HTTPS checks. If the service returns an insecure address or an invalid certificate, the connection stops.")
                 } else {
@@ -136,6 +139,7 @@ struct CloudProviderView: View {
 struct CloudRestoreView: View {
     let provider: CloudProvider
     let testOnly: Bool
+    var setup: Binding<SetupSession>? = nil
     @EnvironmentObject private var vault: VaultModel
     @EnvironmentObject private var cloud: CloudBackupModel
     @State private var selected: UUID?
@@ -145,16 +149,16 @@ struct CloudRestoreView: View {
     var body: some View {
         List {
             Section {
-                Text(testOnly ? "Download and authenticate a backup without replacing your library." : "Restore into this empty installation. Your saved capture dates and recovery key stay the same.")
-                Button("Find Backups") { cloud.findBackups(provider, vault: vault) }.disabled(vault.busy)
+                Text(testOnly ? "Download and authenticate a backup without replacing your library." : "Start a new library from a cloud backup. Your photos and dates are copied under a fresh key. The original cloud backup keeps its old key.")
+                Button("Find Backups") { selected = nil; cloud.findBackups(provider, vault: vault) }.disabled(vault.busy)
             }
             Section("Saved backups") {
                 ForEach(cloud.snapshots) { record in
                     Button { selected = record.id } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(record.snapshot.created, format: .dateTime.year().month().day().hour().minute())
-                                Text("Library " + String(record.snapshot.vaultID.uuidString.prefix(8))).font(.caption).foregroundStyle(.secondary)
+                                Text(record.created, format: .dateTime.year().month().day().hour().minute())
+                                Text("Library " + String(record.vaultID.uuidString.prefix(8))).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
                             if selected == record.id { Image(systemName: "checkmark").accessibilityLabel("Selected") }
@@ -162,20 +166,28 @@ struct CloudRestoreView: View {
                     }.disabled(vault.busy)
                 }
             }
+            if cloud.nextPage != nil {
+                Button("Next Page of Backups") { selected = nil; cloud.findBackups(provider, vault: vault, next: true) }.disabled(vault.busy)
+            }
             if selected != nil {
+                if !testOnly, let setup { NewRecoveryKeySection(setup: setup).disabled(vault.busy) }
                 Section {
-                    SecureField("Calc 84 recovery key", text: $recovery).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    SecureField("Source backup’s recovery key", text: $recovery).textInputAutocapitalization(.never).autocorrectionDisabled()
                     if !testOnly {
                         SecureField("New calculator code", text: $code).keyboardType(.numberPad)
                         SecureField("Repeat code", text: $repeatCode).keyboardType(.numberPad)
                     }
-                    Button(testOnly ? "Test Recovery" : "Restore Library") {
-                        if let snapshot = cloud.snapshots.first(where: { $0.id == selected })?.snapshot {
-                            cloud.restore(snapshot, provider: provider, recovery: recovery, code: code, vault: vault, testOnly: testOnly)
+                    Button(testOnly ? "Test Recovery" : "Create Library from Backup") {
+                        if let snapshot = cloud.snapshots.first(where: { $0.id == selected }) {
+                            cloud.restore(snapshot, provider: provider, recovery: recovery, code: code, vault: vault, testOnly: testOnly,
+                                          newRecovery: testOnly ? nil : setup?.wrappedValue.recovery)
                             recovery = ""; code = ""; repeatCode = ""
                         }
-                    }.disabled(vault.busy || recovery.isEmpty || (!testOnly && (!VaultCode.valid(code) || code != repeatCode)))
-                } header: { Text("Unlock the saved library") } footer: { Text("This downloads the backup. Allow up to three times its size in free phone storage while recovery is checked.") }
+                    }.disabled(vault.busy || recovery.isEmpty || (!testOnly && (setup?.wrappedValue.canCreate != true || !VaultCode.valid(code) || code != repeatCode)))
+                } header: { Text("Unlock the source backup") } footer: {
+                    Text(testOnly ? "This only checks the backup with its existing key. It does not create a library or change any key. Allow up to three times the backup size in free storage."
+                         : "Keep both keys: the old key for the source, and the new key for future backups. Allow up to three times the backup size in free storage while it is checked and copied.")
+                }
             }
             Section {
                 Text(cloud.phase)
@@ -184,7 +196,7 @@ struct CloudRestoreView: View {
             }
         }
         .navigationTitle(testOnly ? "Test Recovery" : "Restore Library").navigationBarTitleDisplayMode(.inline)
-        .onAppear { cloud.snapshots = [] }
+        .onAppear { cloud.snapshots = []; cloud.nextPage = nil }
         .onDisappear { recovery = ""; code = ""; repeatCode = "" }
     }
 }
@@ -193,18 +205,36 @@ struct CloudItemStatusView: View {
     let item: VaultItem
     @EnvironmentObject private var cloud: CloudBackupModel
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var vault: VaultModel
     var body: some View {
         List {
             Section { Text(item.name).font(.headline) }
             ForEach(CloudProvider.allCases) { provider in
                 Section(provider.title) {
                     Text(cloud.itemStatus(item, provider: provider))
+                    Toggle("Never upload to " + provider.title, isOn: Binding(
+                        get: { vault.cloudPreferences[provider].blocked.contains(item.id) },
+                        set: { value in
+                            var policy = vault.cloudPreferences[provider]
+                            if value { policy.blocked.insert(item.id); policy.selected.remove(item.id) }
+                            else { policy.blocked.remove(item.id) }
+                            Task { _ = await vault.saveCloudPolicy(policy, provider: provider) }
+                        })).disabled(vault.busy || item.deletedAt != nil)
+                    if vault.cloudPreferences[provider].mode == .manual {
+                        Toggle("Include in manual backup", isOn: Binding(
+                            get: { vault.cloudPreferences[provider].selected.contains(item.id) },
+                            set: { value in
+                                var policy = vault.cloudPreferences[provider]
+                                if value { policy.selected.insert(item.id) } else { policy.selected.remove(item.id) }
+                                Task { _ = await vault.saveCloudPolicy(policy, provider: provider) }
+                            })).disabled(vault.busy || item.deletedAt != nil || vault.cloudPreferences[provider].blocked.contains(item.id))
+                    }
                     if cloud.receipts[provider]?.itemIDs.contains(item.id) == true, let date = cloud.receipts[provider]?.saved {
                         LabeledContent("Backup saved") { Text(date, format: .dateTime.month().day().hour().minute()) }
                     }
                 }
             }
-            Section { Text("A completed backup includes the original, its encrypted thumbnail, any Live Photo companion, and stored dates. This status records the last completed backup; it cannot detect files someone later removes from your cloud account.") }
+            Section { Text("A completed backup includes the original, its encrypted thumbnail, any Live Photo companion, and stored dates. Never Upload stops future uploads of this library item; it does not erase older cloud copies. Removing a block in automatic mode makes it eligible again. This status records the last completed backup; it cannot detect files someone later removes from your cloud account.") }
         }.navigationTitle("Backup Status").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .onAppear { cloud.refresh() }

@@ -26,28 +26,30 @@ struct ChangeCodeView: View {
 }
 struct RecoveryTestView: View {
     @EnvironmentObject private var vault: VaultModel
-    @State private var picker = false
-    @State private var backup: URL?
+    @StateObject private var backupInput = BackupInputModel()
     @State private var secret = ""
     @State private var passed = false
     var body: some View {
         Form {
+            SharedBackupSection(input: backupInput)
+            BackupInputSection(input: backupInput, enabled: !vault.busy)
             Section {
                 Text("This decrypts and checks the complete backup in a separate temporary library. Your current library is left in place. You need free space for another encrypted copy.")
-                Button(backup == nil ? "Choose Backup" : "Choose a Different Backup") { picker = true }
-                if let backup { Text(backup.lastPathComponent).font(.footnote) }
                 SecureField("Recovery key or original password", text: $secret)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                 Button("Test Recovery") {
-                    if let backup { Task { passed = await vault.verifyBackup(url: backup, recovery: secret); secret = "" } }
-                }.disabled(backup == nil || secret.isEmpty || vault.busy)
+                    if let backup = backupInput.backup { Task { passed = await vault.verifyBackup(url: backup.url, recovery: secret); secret = "" } }
+                }.disabled(backupInput.backup == nil || secret.isEmpty || vault.busy || backupInput.working)
                 if vault.busy { ProgressView("Authenticating backup…") }
                 if passed { Label("Recovery test passed", systemImage: "checkmark.shield.fill") }
             }
-        }.navigationTitle("Test a Backup")
-            .fileImporter(isPresented: $picker, allowedContentTypes: [.data]) {
-                do { backup = try $0.get(); passed = false } catch { vault.message = error.localizedDescription }
-            }.onDisappear { secret = "" }
+            Section { LabeledContent(AppBrand.name, value: AppBrand.version) }
+        }.backupPicker(backupInput).navigationTitle("Test a Backup")
+            .onChange(of: backupInput.backup?.url) { _, _ in passed = false }
+            .alert("Couldn’t Test Backup", isPresented: Binding(get: { vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
+                Button("Close", role: .cancel) { vault.message = nil }
+            } message: { Text(vault.message ?? "") }
+            .onDisappear { secret = "" }
     }
 }
 #endif

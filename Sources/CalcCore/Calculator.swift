@@ -12,6 +12,11 @@ public enum CalculationError: Error, LocalizedError {
 
 /// A bounded recursive-descent parser. Never evaluates scripts or arbitrary code.
 public struct Calculator {
+    public static func clearEntry(_ expression: String) -> String {
+        guard let boundary = expression.lastIndex(where: { "+−×÷*/^".contains($0) }) else { return "" }
+        return String(expression[...boundary])
+    }
+
     public static func evaluate(_ expression: String, degrees: Bool = true) throws -> Double {
         guard expression.count <= 256 else { throw CalculationError.invalidExpression }
         var parser = Parser(text: expression, degrees: degrees)

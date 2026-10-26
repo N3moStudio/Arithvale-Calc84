@@ -68,6 +68,7 @@ enum MediaBridge {
             throw failure("Allow access to this Live Photo in Settings → Photos, then import it again. Its original has not changed.")
         }
         guard let media = try await selection.loadTransferable(type: PickedMedia.self) else { throw VaultError.missing }
+        if Task.isCancelled { try? FileManager.default.removeItem(at: media.url); throw CancellationError() }
         let type = UTType(filenameExtension: media.url.pathExtension)?.identifier
             ?? selection.supportedContentTypes.first?.identifier ?? UTType.data.identifier
         return PreparedMedia(url: media.url, name: media.name, type: type, details: await metadata(media.url, type: type),
@@ -95,15 +96,8 @@ enum MediaBridge {
         let suffix = UTType(resource.uniformTypeIdentifier)?.preferredFilenameExtension ?? "bin"
         let url = try TemporaryFiles.fresh(extension: suffix)
         do {
-            let options = PHAssetResourceRequestOptions(); options.isNetworkAccessAllowed = true
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                PHAssetResourceManager.default().writeData(for: resource, toFile: url, options: options) { error in
-                    if let error { continuation.resume(throwing: error) } else { continuation.resume() }
-                }
-            }
-            try FileManager.default.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: url.path)
-            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max
-            guard size <= VaultLimits.fileBytes else { throw VaultError.limit }
+            try Task.checkCancellation()
+            try await PhotoResource.write(resource, to: url)
             return url
         } catch { try? FileManager.default.removeItem(at: url); throw error }
     }
@@ -159,7 +153,7 @@ enum MediaBridge {
         }
         let isVideo = UTType(item.contentType)?.conforms(to: .movie) == true
         guard isVideo || UTType(item.contentType)?.conforms(to: .image) == true else { throw failure("This file can be exported to Files.") }
-        try await PHPhotoLibrary.shared().performChanges {
+        try await PHPhotoLibrary.shared().performChanges { @Sendable in
             let request = PHAssetCreationRequest.forAsset()
             let options = PHAssetResourceCreationOptions()
             options.originalFilename = item.name; options.uniformTypeIdentifier = item.contentType
@@ -204,6 +198,7 @@ struct PickedMedia: Transferable, Sendable {
             let output = try FileHandle(forWritingTo: url); defer { try? output.close() }
             var written = 0
             while let chunk = try input.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+                try Task.checkCancellation()
                 written += chunk.count; guard written <= VaultLimits.fileBytes else { throw VaultError.limit }
                 try output.write(contentsOf: chunk)
             }

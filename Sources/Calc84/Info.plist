@@ -1,21 +1,67 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CFBundleDisplayName</key><string>Calc 84</string>
-<key>CFBundleShortVersionString</key><string>0.3.0</string>
-<key>CFBundleVersion</key><string>3</string>
-<key>NSPhotoLibraryUsageDescription</key><string>Calc 84 imports your selected photos and videos with their original dates and Live Photo resources. After verified import, you can choose to delete those originals from Photos with your confirmation.</string>
-<key>NSPhotoLibraryAddUsageDescription</key><string>Calc 84 saves the photos and videos you select back to Photos with their stored capture dates.</string>
-<key>LSRequiresIPhoneOS</key><true/>
-<key>UIFileSharingEnabled</key><false/>
-<key>LSSupportsOpeningDocumentsInPlace</key><false/>
-<key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
-<key>UILaunchScreen</key><dict/>
-<key>UIApplicationSupportsMultipleScenes</key><false/>
-<key>UTExportedTypeDeclarations</key><array><dict>
-<key>UTTypeIdentifier</key><string>studio.n3mo.calc84.backup</string>
-<key>UTTypeDescription</key><string>Calc 84 Backup</string>
-<key>UTTypeConformsTo</key><array><string>public.data</string></array>
-<key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>c84backup</string></array></dict>
-</dict></array>
-</dict></plist>
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>Arithvale</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.8.0</string>
+	<key>CFBundleVersion</key>
+	<string>12</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Arithvale imports your selected photos and videos with their original dates and Live Photo resources. After verified import, you can choose to delete those originals from Photos with your confirmation.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Arithvale saves the photos and videos you select back to Photos with their stored capture dates.</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
+	<false/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<false/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UIApplicationSupportsMultipleScenes</key>
+	<false/>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>studio.n3mo.calc84.backup</string>
+			<key>UTTypeDescription</key>
+			<string>Arithvale Backup</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>c84backup</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Arithvale Backup</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>studio.n3mo.calc84.backup</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

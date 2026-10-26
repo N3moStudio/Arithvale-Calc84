@@ -9,7 +9,10 @@ private actor MemoryCloud: CloudStore {
     func configure(failAfter: Int? = nil, corruptDownload: Bool = false) {
         self.failAfter = failAfter; self.corruptDownload = corruptDownload
     }
-    func list(prefix: String) async throws -> [String] { files.keys.filter { $0.hasPrefix(prefix) }.sorted() }
+    func listPage(prefix: String, after: String?, limit: Int) async throws -> CloudListingPage {
+        let paths = Array(files.keys.filter { $0.hasPrefix(prefix) && $0 > (after ?? "") }.sorted().prefix(limit))
+        return CloudListingPage(paths: paths, next: paths.count == limit ? paths.last : nil)
+    }
     func size(path: String) async throws -> Int? { files[path]?.count }
     func upload(file: URL, path: String) async throws {
         if let failAfter, uploaded.count >= failAfter { throw CloudError.retry }
@@ -43,7 +46,7 @@ final class CloudBackupTests: XCTestCase {
         let thumbnail = try repo.add(data: Data("private thumbnail".utf8), name: "thumb.jpg", contentType: "public.jpeg")
         try repo.associate(primary: item.id, companion: companion.id, thumbnail: thumbnail.id)
         try repo.update(id: item.id, favorite: true, album: "secret album")
-        let plan = try repo.cloudPlan(); let store = MemoryCloud()
+        let plan = try repo.cloudPlanIncludingAllForTest(); let store = MemoryCloud()
         try await CloudTransfer.upload(plan, store: store, scratch: root, progress: { _ in })
         let rawCatalog = await store.raw(plan.snapshot.path)
         let catalog = try XCTUnwrap(rawCatalog)
@@ -67,7 +70,7 @@ final class CloudBackupTests: XCTestCase {
         let repo = try library()
         try repo.add(data: Data([1, 2]), name: "a", contentType: "public.data")
         try repo.add(data: Data([3, 4]), name: "b", contentType: "public.data")
-        let plan = try repo.cloudPlan(); let store = MemoryCloud()
+        let plan = try repo.cloudPlanIncludingAllForTest(); let store = MemoryCloud()
         await store.configure(failAfter: 1)
         do { try await CloudTransfer.upload(plan, store: store, scratch: root, progress: { _ in }); XCTFail("Must fail") } catch {}
         let missing = await store.raw(plan.snapshot.path); XCTAssertNil(missing)
@@ -79,18 +82,18 @@ final class CloudBackupTests: XCTestCase {
     }
     func testCorruptReadBackDoesNotReportComplete() async throws {
         let repo = try library(); try repo.add(data: Data([1]), name: "a", contentType: "public.data")
-        let plan = try repo.cloudPlan(); let store = MemoryCloud(); await store.configure(corruptDownload: true)
+        let plan = try repo.cloudPlanIncludingAllForTest(); let store = MemoryCloud(); await store.configure(corruptDownload: true)
         do { try await CloudTransfer.upload(plan, store: store, scratch: root, progress: { _ in }); XCTFail("Must fail") } catch {}
         let catalog = await store.raw(plan.snapshot.path); XCTAssertNil(catalog)
     }
     func testIncrementalUploadRetainsEarlierDeletedObjectAndSnapshot() async throws {
         let repo = try library()
         let original = try repo.add(data: Data([1, 2, 3]), name: "a", contentType: "public.data")
-        let first = try repo.cloudPlan(); let store = MemoryCloud()
+        let first = try repo.cloudPlanIncludingAllForTest(); let store = MemoryCloud()
         try await CloudTransfer.upload(first, store: store, scratch: root, progress: { _ in })
         try repo.remove(id: original.id)
         try repo.add(data: Data([4, 5]), name: "b", contentType: "public.data")
-        let second = try repo.cloudPlan()
+        let second = try repo.cloudPlanIncludingAllForTest()
         try await CloudTransfer.upload(second, store: store, scratch: root, previouslyVerified: Set(first.snapshot.records.map(\.filename)), progress: { _ in })
         let old = await store.raw(first.snapshot.path); XCTAssertNotNil(old)
         let object = await store.raw(first.snapshot.objectPath(first.snapshot.records[0])); XCTAssertNotNil(object)
@@ -98,14 +101,14 @@ final class CloudBackupTests: XCTestCase {
     }
     func testBadRecoveryKeyAndMissingInventoryFailBeforeDownload() throws {
         let repo = try library(); try repo.add(data: Data([1]), name: "a", contentType: "public.data")
-        let snapshot = try repo.cloudPlan().snapshot
+        let snapshot = try repo.cloudPlanIncludingAllForTest().snapshot
         XCTAssertThrowsError(try VaultRepository.validateCloudRecovery(snapshot, password: "incorrect recovery secret"))
         let bad = CloudSnapshot(id: snapshot.id, vaultID: snapshot.vaultID, created: snapshot.created, header: snapshot.header, index: snapshot.index, records: [])
         XCTAssertThrowsError(try VaultRepository.validateCloudRecovery(bad, password: password))
     }
     func testCatalogBoundsAndTransportURLRestrictions() throws {
         let repo = try library(); try repo.add(data: Data([1]), name: "a", contentType: "public.data")
-        let snapshot = try repo.cloudPlan().snapshot
+        let snapshot = try repo.cloudPlanIncludingAllForTest().snapshot
         let record = CloudRecord(id: UUID(), bytes: 30, sha256: "../../outside")
         let bad = CloudSnapshot(id: UUID(), vaultID: snapshot.vaultID, created: Date(), header: snapshot.header, index: snapshot.index, records: [record])
         XCTAssertThrowsError(try bad.validate())

@@ -18,26 +18,28 @@ struct PrivateSpaceView: View {
                 else { AccessView(close: close) }
             }
         }.tint(CalcTheme.accent)
+            .onChange(of: vault.unlocked) { old, new in if old && !new { close() } }
     }
 }
 
 private struct AccessView: View {
     @EnvironmentObject private var vault: VaultModel
     let close: () -> Void
-    @State private var recovery = VaultCode.generateRecovery()
+    @State private var setup = SetupSession()
     @State private var password = ""
     @State private var code = ""
     @State private var confirmation = ""
-    @State private var recoveryConfirmation = ""
-    @State private var saved = false
     @State private var restoring = false
-    @State private var backup: URL?
-    @State private var picker = false
-    private var creating: Bool { !vault.exists && !restoring }
+    @State private var backups: [QueuedSetupBackup] = []
+    @StateObject private var backupInput = BackupInputModel()
+    private var creating: Bool { !vault.exists }
     private var canContinue: Bool {
-        !vault.busy && VaultCode.valid(code) && code == confirmation
-        && (creating ? (saved && recoveryConfirmation.uppercased() == String(VaultCode.normalizeRecovery(recovery).suffix(8))) : !password.isEmpty)
-        && (!restoring || backup != nil)
+        !vault.busy && !backupInput.working && VaultCode.valid(code) && code == confirmation
+        && (creating ? setup.canCreate : !password.isEmpty)
+        && (!creating || !restoring || (!backups.isEmpty && backupInput.backup == nil && password.isEmpty))
+    }
+    private func clearSecrets() {
+        setup.clear(); password = ""; code = ""; confirmation = ""; backups = []
     }
     var body: some View {
         Form {
@@ -45,37 +47,61 @@ private struct AccessView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Image(systemName: "lock.square.stack").font(.system(size: 40, weight: .medium))
                         .foregroundStyle(CalcTheme.accent).accessibilityHidden(true)
-                    Text(creating ? "A space of your own." : "Bring your library back.").font(.largeTitle.bold())
+                    Text(creating ? "A space of your own." : "Recover access.").font(.largeTitle.bold())
                     Text(creating ? "Your calculator code opens this phone. Your recovery key brings your files back on another."
-                         : "Use your recovery key, or the password from Calc 84 version 0.1. Your existing files won’t be replaced.")
+                         : "Use your recovery key, or the password from the original version 0.1. Your existing files won’t be replaced.")
                         .foregroundStyle(.secondary)
                 }.padding(.vertical, 12)
             }
             if !vault.exists {
                 Section {
-                    Toggle("Restore an Existing Backup", isOn: $restoring)
+                    Toggle("Start from Existing Backups", isOn: $restoring)
                         .disabled(vault.busy)
                     NavigationLink {
-                        CloudBackupView(restoring: true)
-                    } label: { Label("Restore from Cloud", systemImage: "icloud.and.arrow.down") }.disabled(vault.busy)
+                        CloudBackupView(restoring: true, setup: $setup)
+                    } label: { Label("Restore from Cloud", systemImage: "icloud.and.arrow.down") }
+                        .disabled(vault.busy || !backups.isEmpty || backupInput.backup != nil || backupInput.working)
+                    if !backups.isEmpty {
+                        Text("Remove the queued backups to switch to cloud setup.").font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
             }
-            if restoring {
-                Section("Encrypted Backup") {
-                    Button(backup == nil ? "Choose Backup" : "Choose a Different Backup", systemImage: "folder") { picker = true }
-                    if let backup { Text(backup.lastPathComponent).font(.footnote).foregroundStyle(.secondary) }
+            if !vault.exists {
+                SharedBackupSection(input: backupInput) { restoring = true }
+            }
+            if creating && restoring {
+                BackupInputSection(input: backupInput, enabled: !vault.busy)
+                if let backup = backupInput.backup {
+                    Section {
+                        SecureField("Source recovery key or original password", text: $password)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        Button("Add Backup to Setup") {
+                            backups.append(.init(backup: backup, recovery: password))
+                            password = ""; backupInput.clearSelection()
+                        }.disabled(password.isEmpty || vault.busy || backups.count >= 32)
+                    } header: { Text("This backup’s old key") } footer: {
+                        Text("This key only reads this source. Your new key below protects the new library. Every source is checked before setup completes.")
+                    }
+                }
+                if !backups.isEmpty {
+                    Section("Backups to Add") {
+                        ForEach(backups) { entry in
+                            HStack {
+                                Text(entry.backup.displayName).lineLimit(2)
+                                Spacer()
+                                Button("Remove", role: .destructive) { backups.removeAll { $0.id == entry.id } }
+                                    .buttonStyle(.borderless).disabled(vault.busy)
+                            }
+                        }
+                        Text("You can choose another backup above, with its own old key, or finish setup now. In LiveContainer, finish setup before leaving to share another backup; then use + → From a Backup. All additions use the new library’s key.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
             }
-            Section(creating ? "Save Your Recovery Key" : "Recovery Secret") {
-                if creating {
-                    Text(recovery).font(.body.monospaced()).textSelection(.enabled)
-                    Text("Store this separately from your backup. We cannot reset it. Don’t keep your only copy inside this app.")
-                        .foregroundStyle(.secondary)
-                    Toggle("I Saved My Key Somewhere Safe", isOn: $saved)
-                    TextField("Confirm the last 8 characters", text: $recoveryConfirmation)
-                        .textInputAutocapitalization(.characters).autocorrectionDisabled()
-                        .accessibilityLabel("Last eight recovery key characters")
-                } else {
+            if creating {
+                NewRecoveryKeySection(setup: $setup).disabled(vault.busy)
+            } else {
+                Section("Current Recovery Key") {
                     SecureField("Recovery key or original password", text: $password)
                         .textInputAutocapitalization(.never).autocorrectionDisabled()
                 }
@@ -84,26 +110,35 @@ private struct AccessView: View {
                 SecureField("New calculator code", text: $code).keyboardType(.numberPad)
                 SecureField("Repeat calculator code", text: $confirmation).keyboardType(.numberPad)
             } header: { Text("Calculator Code") } footer: {
-                Text("Choose 6–12 digits. Type them in the calculator and press =. The starter code 160160 cannot protect an imported library.")
+                if !code.isEmpty && !VaultCode.valid(code) { Text("Use 6–12 digits, different from 160160.") }
+                else if !confirmation.isEmpty && code != confirmation { Text("The codes don’t match yet.") }
+                Text("Choose 6–12 digits. Type them in the calculator and hold =. The starter code 160160 cannot protect an imported library.")
             }
             Section {
                 Button {
-                    vault.open(password: creating ? recovery : password, code: code, creating: creating, backup: restoring ? backup : nil)
+                    vault.open(password: creating ? setup.recovery : password, code: code, creating: creating, backups: creating && restoring ? backups : [])
                 } label: {
                     HStack {
-                        Text(creating ? "Create Library" : restoring ? "Restore Library" : "Recover Access")
+                        Text(creating ? (restoring ? "Create Library from Backups" : "Create Library") : "Recover Access")
                         Spacer()
                         if vault.busy { ProgressView() } else { Image(systemName: "arrow.right") }
                     }.frame(minHeight: 44)
                 }.disabled(!canContinue)
+                if vault.busy && !vault.status.isEmpty { Text(vault.status).font(.footnote).foregroundStyle(.secondary) }
             }
         }
+        .backupPicker(backupInput)
+        .safeAreaInset(edge: .bottom) { Text(AppBrand.name + " " + AppBrand.version).font(.caption).foregroundStyle(.secondary).padding(6).frame(maxWidth: .infinity).background(.bar) }
         .navigationTitle(creating ? "Welcome" : "Recovery").navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Calculator", action: close) } }
-        .fileImporter(isPresented: $picker, allowedContentTypes: [.data]) {
-            do { backup = try $0.get() } catch { vault.message = error.localizedDescription }
+        .interactiveDismissDisabled(vault.busy)
+        .toolbar { ToolbarItem(placement: .cancellationAction) {
+            Button(vault.busy ? "Cancel Setup" : "Calculator") { vault.lock(); clearSecrets(); close() }
+        } }
+        .onChange(of: vault.unlocked) { _, unlocked in if unlocked { clearSecrets() } }
+        .onChange(of: vault.generation) { _, _ in clearSecrets() }
+        .onChange(of: restoring) { _, value in
+            if !value { backups = []; password = ""; backupInput.clearSelection() }
         }
-        .onDisappear { password = ""; code = ""; confirmation = ""; recovery = ""; recoveryConfirmation = "" }
         .alert("Couldn’t Complete", isPresented: Binding(get: { vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
             Button("Close", role: .cancel) { vault.message = nil }
         } message: { Text(vault.message ?? "") }

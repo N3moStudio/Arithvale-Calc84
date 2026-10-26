@@ -6,11 +6,43 @@ import UniformTypeIdentifiers
 
 /// Keep the picker's temporary permission alive until its sheet has finished
 /// dismissing. Only then start validation and show any result/error.
-final class BackupSelection {
+final class BackupSelection: @unchecked Sendable {
     let url: URL
+    let displayName: String
     private let access: Bool
-    init(_ url: URL) { self.url = url; access = url.startAccessingSecurityScopedResource() }
-    deinit { if access { url.stopAccessingSecurityScopedResource() } }
+    private let owned: Bool
+    init(_ url: URL, owned: Bool = false, displayName: String? = nil) {
+        self.url = url; self.owned = owned; self.displayName = displayName ?? url.lastPathComponent
+        access = url.startAccessingSecurityScopedResource()
+    }
+    deinit {
+        if access { url.stopAccessingSecurityScopedResource() }
+        if owned { try? FileManager.default.removeItem(at: url) }
+    }
+    static func backupFile(_ source: URL, displayName: String? = nil) throws -> BackupSelection {
+        let scope = BackupSelection(source)
+        defer { withExtendedLifetime(scope) {} }
+        let copy = try TemporaryFiles.fresh(extension: "c84backup")
+        var succeeded = false
+        defer { if !succeeded { try? FileManager.default.removeItem(at: copy) } }
+        var coordinationError: NSError?
+        var result: Result<Void, Error>?
+        NSFileCoordinator().coordinate(readingItemAt: source, options: [], error: &coordinationError) { url in
+            result = Result {
+                try Task.checkCancellation()
+                try BackupFileProbe.validate(url)
+                let bytes = Int64(try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+                try StoragePreflight.require(bytes: bytes * 2)
+                try BackupCopy.copy(url, to: copy)
+                try FileManager.default.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: copy.path)
+                try Task.checkCancellation()
+            }
+        }
+        if let coordinationError { throw coordinationError }
+        guard let result else { throw VaultError.invalidBackup }
+        try result.get(); succeeded = true
+        return BackupSelection(copy, owned: true, displayName: displayName ?? source.lastPathComponent)
+    }
 }
 
 enum BackupFolder {
@@ -95,7 +127,7 @@ enum BackupFolder {
 
 /// Cancel and interactive dismissal never count as a successful save.
 struct BackupDocumentPicker: UIViewControllerRepresentable {
-    enum Purpose { case folder, save(URL) }
+    enum Purpose { case folder, openBackup, save(URL) }
     let purpose: Purpose
     let finished: (URL?) -> Void
     func makeCoordinator() -> Coordinator { Coordinator(finished) }
@@ -104,8 +136,13 @@ struct BackupDocumentPicker: UIViewControllerRepresentable {
         switch purpose {
         case .folder:
             picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
-            picker.title = "Choose Backup Folder"
+            picker.title = "Choose Folder, Then Tap Open"
             // Do not force Files to reopen a stale provider URL.
+        case .openBackup:
+            // LiveContainer may not register the guest app's exported UTI. The archive
+            // reader still authenticates the content; the picker must not hide the file.
+            picker = UIDocumentPickerViewController(forOpeningContentTypes: [.data], asCopy: true)
+            picker.title = "Import Backup File"
         case .save(let url):
             picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
         }
@@ -116,16 +153,22 @@ struct BackupDocumentPicker: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ controller: UIDocumentPickerViewController, context: Context) {}
     static func dismantleUIViewController(_ controller: UIDocumentPickerViewController, coordinator: Coordinator) {
-        DispatchQueue.main.async { coordinator.finish(nil) }
+        // SwiftUI can dismantle an obsolete controller while replacing its presentation.
+        // Teardown is cleanup, not a user cancellation; never mutate sheet state here.
+        controller.delegate = nil
+        coordinator.invalidate()
     }
     final class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let finished: (URL?) -> Void
+        private var finished: ((URL?) -> Void)?
         private var completed = false
         init(_ finished: @escaping (URL?) -> Void) { self.finished = finished }
         func finish(_ url: URL?) {
             guard !completed else { return }
-            completed = true; finished(url)
+            completed = true
+            let callback = finished; finished = nil
+            callback?(url)
         }
+        func invalidate() { completed = true; finished = nil }
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { finish(urls.first) }
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { finish(nil) }
     }

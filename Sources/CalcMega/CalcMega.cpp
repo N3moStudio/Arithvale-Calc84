@@ -2,6 +2,7 @@
 #include "megaapi.h"
 #include <memory>
 #include <string>
+#include <set>
 using namespace mega;
 
 // These one-shot listeners live until the SDK's final callback, including errors.
@@ -31,7 +32,7 @@ extern "C" {
 void *c84mega_create(const char *key) {
     // No plaintext node database or session cache. The session goes in Keychain.
     MegaApi::setLogLevel(-1);
-    auto client = new MegaApi(key, static_cast<const char *>(nullptr), "Calc84/0.3");
+    auto client = new MegaApi(key, static_cast<const char *>(nullptr), "Arithvale/0.4");
     client->useHttpsOnly(true); client->setPublicKeyPinning(true); client->retrySSLerrors(false);
     return client;
 }
@@ -54,10 +55,11 @@ int64_t c84mega_size(void *client, const char *path) {
     std::unique_ptr<MegaNode> node(api(client)->getNodeByPath(path));
     return node && node->isFile() ? node->getSize() : -1;
 }
-void c84mega_list(void *client, C84MegaCallback cb, void *ctx) {
+void c84mega_list(void *client, const char *after, int32_t limit, C84MegaCallback cb, void *ctx) {
     std::unique_ptr<MegaNode> root(api(client)->getNodeByPath("/c84/v1"));
     if (!root) { cb(ctx, 0, ""); return; }
-    std::string result;
+    if (limit < 1 || limit > 40) { cb(ctx, MegaError::API_EARGS, ""); return; }
+    std::set<std::string> page;
     std::unique_ptr<MegaNodeList> libraries(api(client)->getChildren(root.get()));
     for (int i = 0; i < libraries->size(); ++i) {
         auto library = libraries->get(i);
@@ -70,10 +72,14 @@ void c84mega_list(void *client, C84MegaCallback cb, void *ctx) {
             if (!file->isFile()) continue;
             std::string name(file->getName());
             if (name.size() != 45 || name.substr(36) != ".c84cloud") continue;
-            result += "c84/v1/" + std::string(library->getName()) + "/snapshots/" + name + "\n";
-            if (result.size() > 1024 * 1024) { cb(ctx, MegaError::API_ETOOMANY, ""); return; }
+            std::string path = "c84/v1/" + std::string(library->getName()) + "/snapshots/" + name;
+            if (path.size() >= 512 || path <= std::string(after ? after : "")) continue;
+            page.insert(path);
+            if (page.size() > static_cast<size_t>(limit)) page.erase(std::prev(page.end()));
         }
     }
+    std::string result;
+    for (const auto &path : page) result += path + "\n";
     cb(ctx, 0, result.c_str());
 }
 void c84mega_upload(void *client, const char *local, const char *parent, const char *name, C84MegaCallback cb, void *ctx) {

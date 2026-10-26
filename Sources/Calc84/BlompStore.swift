@@ -99,7 +99,7 @@ actor BlompStore: CloudStore {
         let base = try BlompEndpoint.storage(endpoint)
         self.base = base; self.token = token
         // Test the user's existing container; Blomp doesn't permit creating one.
-        _ = try await list(prefix: "c84/v1/")
+        _ = try await listPage(prefix: "c84/v1/", after: nil, limit: 1)
     }
     private func request(path: String?, method: String) throws -> URLRequest {
         guard let base, let token else { throw CloudError.configuration }
@@ -108,11 +108,14 @@ actor BlompStore: CloudStore {
         request.setValue(token, forHTTPHeaderField: "X-Auth-Token")
         return request
     }
-    func list(prefix: String) async throws -> [String] {
-        guard prefix.hasPrefix("c84/v1/"), prefix.count < 512 else { throw CloudError.configuration }
-        var result: [String] = []; var marker = ""
-        // Pagination is bounded; never enumerate unrelated account data.
-        for _ in 0..<100 {
+    func listPage(prefix: String, after: String?, limit: Int) async throws -> CloudListingPage {
+        guard prefix == "c84/v1/", (1...CloudDiscovery.pageSize).contains(limit) else { throw CloudError.configuration }
+        var marker = after ?? ""
+        var catalogs: [String] = []
+        // Bound each interaction to 25 provider requests. If exhausted, expose the
+        // continuation rather than declaring the account too large to recover.
+        for _ in 0..<25 {
+            try Task.checkCancellation()
             var request = try request(path: nil, method: "GET")
             var url = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
             url.queryItems = [URLQueryItem(name: "format", value: "json"), URLQueryItem(name: "prefix", value: prefix),
@@ -120,15 +123,17 @@ actor BlompStore: CloudStore {
             request.url = url.url
             let (data, response) = try await CloudHTTP.run(request, limit: 2 * 1024 * 1024, cellular: cellular)
             try Self.check(response.statusCode)
-            let values = try JSONDecoder().decode([ObjectName].self, from: data)
-            let names = values.map(\.name)
-            guard names.allSatisfy({ $0.hasPrefix(prefix) }), names.count <= 1000 else { throw CloudError.service }
-            result += names.filter { $0.hasSuffix(".c84cloud") }
-            if names.count < 1000 { return result }
-            guard let last = names.last, last > marker else { throw CloudError.service }
-            marker = last
+            let names = try JSONDecoder().decode([ObjectName].self, from: data).map(\.name)
+            guard names.count <= 1000, names.allSatisfy({ $0.hasPrefix(prefix) && $0 > marker && $0.count < 512 }),
+                  names == names.sorted(), Set(names).count == names.count else { throw CloudError.service }
+            for name in names {
+                marker = name
+                if name.hasSuffix(".c84cloud") { catalogs.append(name) }
+                if catalogs.count == limit { return .init(paths: catalogs, next: marker) }
+            }
+            if names.count < 1000 { return .init(paths: catalogs, next: nil) }
         }
-        throw VaultError.limit
+        return .init(paths: catalogs, next: marker)
     }
     func size(path: String) async throws -> Int? {
         let (_, response) = try await CloudHTTP.run(request(path: path, method: "HEAD"), limit: 8192, cellular: cellular)
