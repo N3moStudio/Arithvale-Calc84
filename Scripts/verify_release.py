@@ -1,7 +1,7 @@
 """Run fresh checks sequentially, bind evidence to source hashes, then package.
 
-Linux + installed Swift/xtool/Darwin SDK are required for --ipa. No Apple/GitHub
-password is used. An unsigned IPA is for the user's existing signing installer.
+macOS with Xcode/xtool or Linux with Swift/xtool/Darwin SDK supports --ipa.
+No Apple/GitHub password is used. The IPA is for an existing signing installer.
 """
 from pathlib import Path
 import argparse
@@ -9,6 +9,7 @@ import datetime
 import hashlib
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -24,6 +25,7 @@ def source_manifest():
     paths = [p for directory in ('Sources', 'Tests', 'Scripts') for p in (ROOT / directory).rglob('*')
              if p.is_file() and '__pycache__' not in p.parts]
     paths += [ROOT / p for p in ('Package.swift','Package.resolved','xtool.yml','AppIcon.png','Brand.json')]
+    paths += list((ROOT / '.github' / 'workflows').glob('*.yml'))
     return {p.relative_to(ROOT).as_posix(): sha(p) for p in sorted(paths)}
 
 def main():
@@ -61,6 +63,12 @@ def main():
     if not count or not re.search(r'^OK$',recovery,re.M): raise SystemExit('Missing successful recovery summary')
     info['independentRecoveryTests'] = {'passed':int(count[1]),'failed':0}
     if args.ipa:
+        sdk_version = (subprocess.check_output(['xcrun','--sdk','iphoneos','--show-sdk-version'],text=True).strip()
+                       if sys.platform == 'darwin' else '27.1')
+        info['buildEnvironment'] = {'host':platform.system(), 'iosSDKVersion':sdk_version,
+                                    'swiftVersion':subprocess.check_output(['swift','--version'],text=True).strip()}
+        save()
+        print(f'iOS SDK: {sdk_version}; host: {platform.system()}',flush=True)
         step('ios-build',['xtool','dev','build','--configuration','release','--ipa'])
         brand = json.loads((ROOT/'Brand.json').read_text())
         ipa = ROOT/'xtool'/(brand['productName']+'.ipa')

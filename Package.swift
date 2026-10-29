@@ -10,6 +10,17 @@ let sdkSources = nativeRoot.appendingPathComponent("Vendor/MEGASDK").path
 // The MEGA native library is iOS-only; Linux core tests don't compile it.
 let coreOnly = ProcessInfo.processInfo.environment["CALC84_CORE_ONLY"] == "1"
 
+// Only the Linux cross-linker needs this override. Xcode supplies its own
+// selected SDK version on macOS; do not stamp a different SDK into that binary.
+#if os(Linux)
+let iosLinkerSettings: [LinkerSetting] = [.unsafeFlags([
+    "-Xlinker", "-platform_version", "-Xlinker", "ios",
+    "-Xlinker", "17.0", "-Xlinker", "27.1"
+], .when(platforms: [.iOS]))]
+#else
+let iosLinkerSettings: [LinkerSetting] = []
+#endif
+
 let package = Package(
     name: "Arithen",
     platforms: [
@@ -31,12 +42,7 @@ let package = Package(
         .target(
             name: "Calc84", dependencies: coreOnly ? ["CalcCore"] : ["CalcCore", .target(name: "CalcMega", condition: .when(platforms: [.iOS]))],
             exclude: ["Info.plist"], resources: [.copy("Resources"), .copy("PrivacyInfo.xcprivacy")],
-            // The Linux Swift Build linker otherwise records the deployment target
-            // as the SDK version. Match the installed iOS 27.1 SDK while retaining iOS 17 support.
-            linkerSettings: [.unsafeFlags([
-                "-Xlinker", "-platform_version", "-Xlinker", "ios",
-                "-Xlinker", "17.0", "-Xlinker", "27.1"
-            ], .when(platforms: [.iOS]))]
+            linkerSettings: iosLinkerSettings
         ),
         .target(name: "MEGACore", path: "Vendor/MEGASDK", exclude: [
             "bindings", "cmake", "contrib", "examples", "tests", "tools",

@@ -168,7 +168,11 @@ final class WallpaperPlayback: ObservableObject {
         queue.isMuted = true
         queue.preventsDisplaySleepDuringVideoPlayback = false
         queue.allowsExternalPlayback = false
+        // The iOS 27 SDK ships with Swift 6.4. Runtime availability alone
+        // cannot hide this symbol from older SDKs used by hosted builders.
+        #if compiler(>=6.4)
         if #available(iOS 27.0, *) { queue.setDisconnectedFromSystemAudio(true) }
+        #endif
         loop = AVPlayerLooper(player: queue, templateItem: item)
         player = queue
         if allowed { queue.play() }

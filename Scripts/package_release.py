@@ -9,6 +9,13 @@ import struct
 import zipfile
 from verify_release import ROOT, source_manifest, sha
 
+def packed_version(value):
+    parts = [int(part) for part in value.split('.')]
+    assert 1 <= len(parts) <= 3 and 0 < parts[0] <= 65535, 'Invalid SDK version'
+    parts += [0] * (3 - len(parts))
+    assert all(0 <= part <= 255 for part in parts[1:]), 'Invalid SDK version'
+    return (parts[0] << 16) | (parts[1] << 8) | parts[2]
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--evidence',type=Path,required=True)
@@ -62,7 +69,8 @@ def main():
                 platform,min_version,sdk=struct.unpack_from('<III',binary,position+8); assert platform==2
             position+=size
         assert min_version==(17<<16)
-        assert sdk==((27<<16)|(1<<8)), 'Expected installed iOS 27.1 SDK metadata'
+        sdk_version = result.get('buildEnvironment', {}).get('iosSDKVersion', '27.1')
+        assert sdk == packed_version(sdk_version), 'IPA SDK differs from the SDK used for this build'
         assert not any(n.endswith('.mobileprovision') for n in archive.namelist())
     product=brand['productName']
     output=ROOT/'Releases'/(product+'-'+brand['version']+'-test-'+result['ipaSHA256'][:8])
@@ -78,7 +86,7 @@ def main():
         shutil.copy2(evidence.parent/(name+'.log'),output/(name+'.log'))
     shutil.copy2(ROOT/'DEVICE-CHECKS.md',output/'TEST-ON-YOUR-IPHONE.md')
     result.update({'app':brand['displayName'],'version':brand['version'],'build':brand['build'],'releaseStage':'test',
-                   'architecture':'arm64','minimumIOS':'17.0','sdk':'27.1','ipa':artifact.name})
+                   'architecture':'arm64','minimumIOS':'17.0','sdk':sdk_version,'ipa':artifact.name})
     (output/'BUILD-RESULT.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
     (output/'START-HERE.txt').write_text(
         product+' '+brand['version']+' test build\n\n'
