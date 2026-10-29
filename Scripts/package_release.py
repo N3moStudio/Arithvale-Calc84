@@ -70,7 +70,7 @@ def main():
             position+=size
         assert min_version==(17<<16)
         sdk_version = result.get('buildEnvironment', {}).get('iosSDKVersion', '27.1')
-        assert sdk == packed_version(sdk_version), 'IPA SDK differs from the SDK used for this build'
+        assert sdk == packed_version(sdk_version), f'IPA SDK {sdk:#x} differs from selected SDK {sdk_version} ({packed_version(sdk_version):#x})'
         assert not any(n.endswith('.mobileprovision') for n in archive.namelist())
     product=brand['productName']
     output=ROOT/'Releases'/(product+'-'+brand['version']+'-test-'+result['ipaSHA256'][:8])

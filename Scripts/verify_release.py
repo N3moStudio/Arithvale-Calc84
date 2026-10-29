@@ -75,7 +75,8 @@ def main():
                                     'swiftVersion':subprocess.check_output(['swift','--version'],text=True).strip()}
         save()
         print(f'iOS SDK: {sdk_version}; host: {platform.system()}',flush=True)
-        step('ios-build',['xtool','dev','build','--configuration','release','--ipa'])
+        build_env = dict(os.environ, ARITHEN_IOS_SDK_VERSION=sdk_version)
+        step('ios-build',['xtool','dev','build','--configuration','release','--ipa'],build_env)
         brand = json.loads((ROOT/'Brand.json').read_text())
         ipa = ROOT/'xtool'/(brand['productName']+'.ipa')
         if not ipa.is_file(): raise SystemExit('Native build did not produce the expected IPA')
@@ -84,7 +85,13 @@ def main():
     info['completedAt'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     save()
     if args.ipa:
-        subprocess.run([sys.executable,str(ROOT/'Scripts/package_release.py'),'--evidence',str(report)],cwd=ROOT,check=True)
+        try:
+            step('package-check',[sys.executable,str(ROOT/'Scripts/package_release.py'),'--evidence',str(report)])
+        except SystemExit:
+            # Retain the rejected package for diagnosis, separately from a
+            # successful release kit. The workflow already uploads this folder.
+            shutil.copy2(ipa,run/('UNVERIFIED-'+ipa.name))
+            raise
     print(f'Verification: {report}',flush=True)
 
 if __name__ == '__main__': main()

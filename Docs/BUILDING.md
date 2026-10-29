@@ -26,10 +26,13 @@ macOS so packaging cannot request unused Swift Crypto resource bundles.
 
 `prepare_mega.py` downloads checksum-pinned MEGA source and iOS arm64 dependencies into ignored Vendor folders. They are not required for core-only tests. Native builds require them. No credentials are part of the build. The native MEGA dependency bundle is device-only; simulator builds need matching simulator libraries.
 
-The minimum iOS version is 17.0. macOS builds use and record Xcode's selected iOS
-SDK. The Linux cross-linker explicitly records SDK 27.1 to correct its fallback
-metadata. If changing that Linux SDK, update its linker declaration and verifier
-SDK value together. Packaging checks the binary against the recorded SDK.
+The minimum iOS version is 17.0. The verifier records Xcode's selected iOS SDK on
+macOS, or the configured Darwin SDK version on Linux, and passes that version to
+the linker through `ARITHEN_IOS_SDK_VERSION`. This prevents SwiftPM/xtool fallback
+SDK metadata. Linux defaults to 27.1; when changing its SDK, update the package's
+default and verifier SDK value together. Packaging checks the binary against the
+recorded SDK. Rejected packages are saved as `UNVERIFIED-Arithen.ipa` with their
+diagnostic logs, never in a successful release kit.
 
 For independent recovery tests: set C84_FIXTURE_DIR to a new persistent folder, run the Swift fixture test, then Scripts/test_recovery.py with the same environment setting.
 

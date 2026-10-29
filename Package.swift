@@ -10,8 +10,6 @@ let sdkSources = nativeRoot.appendingPathComponent("Vendor/MEGASDK").path
 // The MEGA native library is iOS-only; Linux core tests don't compile it.
 let coreOnly = ProcessInfo.processInfo.environment["CALC84_CORE_ONLY"] == "1"
 
-// Only the Linux cross-linker needs this override. Xcode supplies its own
-// selected SDK version on macOS; do not stamp a different SDK into that binary.
 #if os(Linux)
 // Apple platforms use the system CryptoKit/CommonCrypto frameworks. Keeping
 // swift-crypto in their package graph makes xtool seek unbuilt resource bundles.
@@ -22,15 +20,25 @@ let cryptoTargets: [Target.Dependency] = [
     .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
     .product(name: "CryptoExtras", package: "swift-crypto", condition: .when(platforms: [.linux]))
 ]
-let iosLinkerSettings: [LinkerSetting] = [.unsafeFlags([
-    "-Xlinker", "-platform_version", "-Xlinker", "ios",
-    "-Xlinker", "17.0", "-Xlinker", "27.1"
-], .when(platforms: [.iOS]))]
+let defaultIOSSDKVersion: String? = "27.1"
 #else
 let cryptoPackages: [Package.Dependency] = []
 let cryptoTargets: [Target.Dependency] = []
-let iosLinkerSettings: [LinkerSetting] = []
+let defaultIOSSDKVersion: String? = nil
 #endif
+
+// SwiftPM/xtool can stamp fallback SDK metadata even with Xcode's iOS SDK.
+// The verifier supplies the actual selected SDK version on macOS. Linux uses
+// the installed Darwin SDK version above unless the verifier specifies it.
+let iosSDKVersion = ProcessInfo.processInfo.environment["ARITHEN_IOS_SDK_VERSION"] ?? defaultIOSSDKVersion
+let iosLinkerSettings: [LinkerSetting] = iosSDKVersion.map { sdk in
+    precondition(sdk.range(of: #"^\d+\.\d+(\.\d+)?$"#, options: .regularExpression) != nil,
+                 "Invalid ARITHEN_IOS_SDK_VERSION")
+    return [.unsafeFlags([
+        "-Xlinker", "-platform_version", "-Xlinker", "ios",
+        "-Xlinker", "17.0", "-Xlinker", sdk
+    ], .when(platforms: [.iOS]))]
+} ?? []
 
 let package = Package(
     name: "Arithen",
