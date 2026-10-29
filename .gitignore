@@ -1,5 +1,7 @@
 .DS_Store
 /.build
+# Generated from Scripts/Linux-Package.resolved by the Linux verifier.
+/Package.resolved
 /Packages
 xcuserdata/
 DerivedData/

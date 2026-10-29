@@ -1,24 +1,39 @@
 # Build Arithen
 
 
-With Swift 6, xtool, and the iOS 27.1 Darwin SDK in WSL/Linux or macOS:
+GitHub Actions builds each push to `main`; the **Build Arithen IPA** workflow can
+also be started manually. A successful run provides an IPA, source archive, test
+logs, and a build report as its downloadable artifact. Failed runs retain logs
+for diagnosis and do not produce a verified release kit.
+
+For local builds, use Swift 6 and xtool with Xcode's iOS SDK on macOS, or the
+configured iOS 27.1 Darwin SDK in WSL/Linux:
 
 ```sh
-python Scripts/prepare_mega.py
+python3 Scripts/prepare_mega.py
 python3 -m venv .build/recovery-venv
 .build/recovery-venv/bin/python -m pip install -r Scripts/recovery-requirements.txt
 python3 Scripts/verify_release.py --ipa --python "$PWD/.build/recovery-venv/bin/python"
 ```
 
-The verifier runs tests and build sequentially because they share .build. It writes full logs and input hashes, then produces an ignored `Releases/Arithen-0.5.0-test-<hash>/` test kit. Any changed source invalidates the evidence. Output: xtool/Arithen.ipa. Bundle identifier: studio.n3mo.calc84. Linux tests use pinned Swift Crypto 4.3.1; iPhone uses CryptoKit/CommonCrypto.
+The verifier runs tests and build sequentially because they share .build. It writes full logs and input hashes, then produces an ignored `Releases/Arithen-<version>-test-<hash>/` test kit. Any changed source invalidates the evidence. Output: xtool/Arithen.ipa. Bundle identifier: studio.n3mo.calc84.
+
+Apple builds use system CryptoKit/CommonCrypto. Linux tests use pinned Swift
+Crypto 4.3.1; the verifier copies `Scripts/Linux-Package.resolved` to the ignored
+root `Package.resolved` before running them. When running `swift test` directly
+on Linux, copy that lockfile first. The Linux dependency graph is omitted on
+macOS so packaging cannot request unused Swift Crypto resource bundles.
 
 `prepare_mega.py` downloads checksum-pinned MEGA source and iOS arm64 dependencies into ignored Vendor folders. They are not required for core-only tests. Native builds require them. No credentials are part of the build. The native MEGA dependency bundle is device-only; simulator builds need matching simulator libraries.
 
-The app's iOS linker settings explicitly record SDK 27.1 while keeping the minimum OS at 17.0. This corrects this cross-build toolchain's fallback SDK metadata so native appearance follows the modern SDK. If changing SDKs, update the linker declaration and package check to match the SDK actually used.
+The minimum iOS version is 17.0. macOS builds use and record Xcode's selected iOS
+SDK. The Linux cross-linker explicitly records SDK 27.1 to correct its fallback
+metadata. If changing that Linux SDK, update its linker declaration and verifier
+SDK value together. Packaging checks the binary against the recorded SDK.
 
 For independent recovery tests: set C84_FIXTURE_DIR to a new persistent folder, run the Swift fixture test, then Scripts/test_recovery.py with the same environment setting.
 
-See [SECURITY.md](SECURITY.md), [DESIGN.md](DESIGN.md), and [DEVICE-CHECKS.md](DEVICE-CHECKS.md).
+See [SECURITY.md](../SECURITY.md), [DESIGN.md](../DESIGN.md), and [DEVICE-CHECKS.md](../DEVICE-CHECKS.md).
 
 
 ## Recover without the app

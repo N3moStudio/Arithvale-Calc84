@@ -11,6 +11,7 @@ import json
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import uuid
@@ -24,7 +25,7 @@ def sha(path):
 def source_manifest():
     paths = [p for directory in ('Sources', 'Tests', 'Scripts') for p in (ROOT / directory).rglob('*')
              if p.is_file() and '__pycache__' not in p.parts]
-    paths += [ROOT / p for p in ('Package.swift','Package.resolved','xtool.yml','AppIcon.png','Brand.json')]
+    paths += [ROOT / p for p in ('Package.swift','xtool.yml','AppIcon.png','Brand.json')]
     paths += list((ROOT / '.github' / 'workflows').glob('*.yml'))
     return {p.relative_to(ROOT).as_posix(): sha(p) for p in sorted(paths)}
 
@@ -36,6 +37,11 @@ def main():
     args = parser.parse_args()
     run = args.output or ROOT / '.build' / 'verification' / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'-'+uuid.uuid4().hex[:6])
     run = run.resolve(); run.mkdir(parents=True, exist_ok=False)
+    # Apple builds use system CryptoKit and have no Swift package dependencies.
+    # SwiftPM removes an unused root lockfile there. Keep the Linux pins as a
+    # tracked input under Scripts, and materialize them only for Linux builds.
+    if sys.platform.startswith('linux'):
+        shutil.copyfile(ROOT/'Scripts/Linux-Package.resolved', ROOT/'Package.resolved')
     before = source_manifest()
     info = {'sourceFiles': before, 'headAtStart': subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
             'startedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(), 'steps':{},

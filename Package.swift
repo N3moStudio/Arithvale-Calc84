@@ -13,11 +13,22 @@ let coreOnly = ProcessInfo.processInfo.environment["CALC84_CORE_ONLY"] == "1"
 // Only the Linux cross-linker needs this override. Xcode supplies its own
 // selected SDK version on macOS; do not stamp a different SDK into that binary.
 #if os(Linux)
+// Apple platforms use the system CryptoKit/CommonCrypto frameworks. Keeping
+// swift-crypto in their package graph makes xtool seek unbuilt resource bundles.
+let cryptoPackages: [Package.Dependency] = [
+    .package(url: "https://github.com/apple/swift-crypto.git", exact: "4.3.1")
+]
+let cryptoTargets: [Target.Dependency] = [
+    .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
+    .product(name: "CryptoExtras", package: "swift-crypto", condition: .when(platforms: [.linux]))
+]
 let iosLinkerSettings: [LinkerSetting] = [.unsafeFlags([
     "-Xlinker", "-platform_version", "-Xlinker", "ios",
     "-Xlinker", "17.0", "-Xlinker", "27.1"
 ], .when(platforms: [.iOS]))]
 #else
+let cryptoPackages: [Package.Dependency] = []
+let cryptoTargets: [Target.Dependency] = []
 let iosLinkerSettings: [LinkerSetting] = []
 #endif
 
@@ -35,9 +46,7 @@ let package = Package(
             targets: ["Calc84"]
         ),
     ],
-    dependencies: [
-        .package(url: "https://github.com/apple/swift-crypto.git", exact: "4.3.1")
-    ],
+    dependencies: cryptoPackages,
     targets: [
         .target(
             name: "Calc84", dependencies: coreOnly ? ["CalcCore"] : ["CalcCore", .target(name: "CalcMega", condition: .when(platforms: [.iOS]))],
@@ -62,10 +71,7 @@ let package = Package(
             .linkedFramework("ImageIO"), .linkedFramework("UIKit"), .linkedFramework("UniformTypeIdentifiers")]),
         .target(name: "CalcMega", dependencies: ["MEGACore"], publicHeadersPath: "include",
             cxxSettings: [.unsafeFlags(["-I" + sdkSources + "/include", "-I" + sdkSources + "/bindings/ios", "-I" + megaHeaders])]),
-        .target(name: "CalcCore", dependencies: [
-            .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
-            .product(name: "CryptoExtras", package: "swift-crypto", condition: .when(platforms: [.linux]))
-        ]),
+        .target(name: "CalcCore", dependencies: cryptoTargets),
         .testTarget(name: "CalcCoreTests", dependencies: ["CalcCore"])
     ].filter { !coreOnly || !["MEGACore", "CalcMega"].contains($0.name) },
     swiftLanguageModes: [.v5],
