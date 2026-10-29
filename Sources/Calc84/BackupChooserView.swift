@@ -112,6 +112,7 @@ struct BackupInputSection: View {
                     .font(.subheadline).textSelection(.enabled)
                 Text("Backup selected. Enter its original recovery key below.")
                     .font(.footnote).foregroundStyle(.secondary)
+                StorageEstimateView(bytes: Int64((try? backup.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0))
             }
             if let folder = input.folder {
                 Text("Files in \(folder.displayName)").font(.headline)

@@ -48,6 +48,17 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(result["authenticatedRecords"], 1)
         self.assertEqual(next(output.glob("*_legacy.txt")).read_bytes(), b"legacy original bytes")
 
+    def test_multiple_albums_and_tags_survive_independent_recovery(self):
+        for archive, secret in (("v2.c84backup", SECRET), ("fresh.c84backup", "F" * 64)):
+            output = self.base / archive
+            recover(FIXTURES / archive, secret, output)
+            records = json.loads((output / "metadata.json").read_text())
+            photo = next(item for item in records if item["name"].endswith("AUX.jpg"))
+            self.assertEqual(photo["album"], "Travel")
+            self.assertEqual(photo["albums"], ["Travel", "Receipts"])
+            self.assertEqual(photo["tags"], ["ticket", "été"])
+            self.assertEqual((output / photo["exportedFilename"]).read_bytes(), b"portable original bytes")
+
     def test_fresh_library_export_uses_destination_key(self):
         # Fixed public fixture key, never real user key material.
         result = recover(FIXTURES / "fresh.c84backup", "F" * 64, self.base / "fresh")

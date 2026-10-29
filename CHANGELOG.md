@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.10.0 · Library Tools
+
+**October 28, 2026 · Build 14 · Test build · iOS 17+**
+
+- Add a Backup Center with Create, Import and Test actions; separate Files/MEGA/
+  Blomp coverage, working-space estimates and direct Files-share instructions.
+- Bind recovery-test results to the exact archive digest or provider snapshot;
+  older tests cannot certify newer backups.
+- Add optional on-device text recognition for photos/screenshots, an encrypted
+  local search index, pause/resume indexing, and search across names/albums/tags/text.
+- Add encrypted storage usage, largest-item review and exact-duplicate scans.
+  Removals require explicit selection; recoverable deletion remains the default.
+- Add an import review before Photos/files/folders enter the vault. Report unknown
+  provider sizes honestly and keep runtime free-space checks.
+- Add multiple album memberships, tags, pinned albums, custom covers, compatible
+  archive metadata and privacy-filtered provider snapshots without duplicating media.
+- Add loop start/length, crop positioning, a chosen Low Power Mode still frame,
+  silent previews and re-editing for personal video backgrounds in both areas.
+- Preserve existing keys, bundle identity, archive encryption, cloud exclusions,
+  Clear Glass default, purple branding and all six gallery layouts.
+- Add migration, recovery, storage, search authentication, duplicate and wallpaper
+  policy tests. Physical-device and live-provider checks remain pending.
+
+[Detailed changes, usage, privacy and compatibility](Docs/UPDATE-0.10.0.md)
+
 ## 0.9.0 · Arithen — Glass & Personal Backgrounds
 
 **October 26, 2026 · Build 13 · Test prerelease · iOS 17+**

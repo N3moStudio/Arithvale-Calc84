@@ -47,23 +47,26 @@ enum WallpaperFiles {
         var values = URLResourceValues(); values.isExcludedFromBackup = true
         try folder.setResourceValues(values)
     }
-    static func remove(_ value: String) { if let url = url(value) { try? FileManager.default.removeItem(at: url) } }
+    static func source(_ value: String) -> URL? { url(value)?.deletingPathExtension().appendingPathExtension("source.mov") }
+    static func remove(_ value: String) {
+        for url in [url(value), source(value)].compactMap({ $0 }) { try? FileManager.default.removeItem(at: url) }
+    }
 }
 
 /// Converts a bounded local source once, not during each animation frame.
 enum WallpaperVideo {
-    static func prepare(_ source: URL) async throws -> URL {
+    static func prepare(_ source: URL, edit: WallpaperEdit = .init()) async throws -> URL {
         let asset = AVURLAsset(url: source)
         let duration = try await asset.load(.duration)
         let tracks = try await asset.loadTracks(withMediaType: .video)
-        guard let seconds = WallpaperPolicy.clipDuration(duration.seconds),
+        guard let chosen = edit.normalized(sourceDuration: duration.seconds),
               let sourceTrack = tracks.first
         else { throw WallpaperError.invalid }
         // Keep only video, so a decorative background has no audio track to route.
         let composition = AVMutableComposition()
         guard let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
         else { throw WallpaperError.invalid }
-        let range = CMTimeRange(start: .zero, duration: CMTime(seconds: seconds, preferredTimescale: 600))
+        let range = CMTimeRange(start: CMTime(seconds: chosen.start, preferredTimescale: 600), duration: CMTime(seconds: chosen.duration, preferredTimescale: 600))
         try track.insertTimeRange(range, of: sourceTrack, at: .zero)
         track.preferredTransform = try await sourceTrack.load(.preferredTransform)
         guard let export = AVAssetExportSession(asset: composition, presetName: AVAssetExportPreset1280x720)
@@ -71,7 +74,7 @@ enum WallpaperVideo {
         let result = try TemporaryFiles.fresh(extension: "mov")
         var keep = false
         defer { if !keep { try? FileManager.default.removeItem(at: result) } }
-        export.timeRange = range
+        export.timeRange = CMTimeRange(start: .zero, duration: range.duration)
         export.shouldOptimizeForNetworkUse = false
         try Task.checkCancellation()
         try await export.export(to: result, as: .mov)
@@ -80,11 +83,16 @@ enum WallpaperVideo {
         keep = true
         return result
     }
-    static func poster(_ url: URL) async throws -> UIImage {
-        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+    static func poster(_ url: URL, seconds: Double = 0) async throws -> UIImage {
+        let asset = AVURLAsset(url: url)
+        let duration = try await asset.load(.duration).seconds
+        guard duration.isFinite, duration > 0 else { throw WallpaperError.invalid }
+        let chosen = min(max(0, seconds.isFinite ? seconds : 0), max(0, duration - 0.01))
+        let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = CGSize(width: 900, height: 900)
-        let frame = try await generator.image(at: .zero)
+        generator.requestedTimeToleranceBefore = .zero; generator.requestedTimeToleranceAfter = .zero
+        let frame = try await generator.image(at: CMTime(seconds: chosen, preferredTimescale: 600))
         return UIImage(cgImage: frame.image)
     }
 }
@@ -108,17 +116,17 @@ final class WallpaperPlayback: ObservableObject {
         self.allowed = allowed
         if allowed { player?.play() } else { player?.pause() }
     }
-    func loadPublic(_ id: String) async {
+    func loadPublic(_ id: String, edit: WallpaperEdit) async {
         clear(); let ticket = request
         guard let url = WallpaperFiles.url(id), FileManager.default.fileExists(atPath: url.path) else { return }
         do {
-            let image = try await WallpaperVideo.poster(url)
+            let image = try await WallpaperVideo.poster(url, seconds: edit.still)
             try Task.checkCancellation()
             guard request == ticket else { return }
             install(url, image: image)
         } catch { /* A removed/missing wallpaper falls back to the static gradient. */ }
     }
-    func loadPrivate(_ item: VaultItem, vault: VaultModel) async {
+    func loadPrivate(_ item: VaultItem, vault: VaultModel, edit: WallpaperEdit) async {
         clear(); let ticket = request; let generation = vault.generation
         guard vault.unlocked, item.byteCount <= WallpaperPolicy.maximumSourceBytes else { return }
         var original: URL?
@@ -135,12 +143,22 @@ final class WallpaperPlayback: ObservableObject {
             try await vault.engine.materialize(id: item.id, to: file)
             try Task.checkCancellation()
             guard vault.unlocked, vault.generation == generation, request == ticket else { return }
-            let movie = try await WallpaperVideo.prepare(file); prepared = movie
-            let image = try await WallpaperVideo.poster(movie)
+            let movie = try await WallpaperVideo.prepare(file, edit: edit); prepared = movie
+            let image = try await WallpaperVideo.poster(movie, seconds: edit.still)
             try Task.checkCancellation()
             guard vault.unlocked, vault.generation == generation, request == ticket else { return }
             temporary = movie; retained = true; install(movie, image: image)
         } catch { /* Library lock, cancellation or removed media restores the static background. */ }
+    }
+    func preview(_ source: URL, edit: WallpaperEdit) async throws {
+        clear(); let ticket = request
+        let movie = try await WallpaperVideo.prepare(source, edit: edit)
+        var keep = false
+        defer { if !keep { try? FileManager.default.removeItem(at: movie) } }
+        let image = try await WallpaperVideo.poster(movie, seconds: edit.still)
+        try Task.checkCancellation()
+        guard request == ticket else { throw CancellationError() }
+        temporary = movie; keep = true; install(movie, image: image)
     }
     private func install(_ url: URL, image: UIImage) {
         poster = image
@@ -186,6 +204,7 @@ struct ArithenWallpaper: View {
     @AppStorage private var styleValue: String
     @AppStorage private var video: String
     @AppStorage private var dimming: Double
+    @AppStorage private var editData: Data
     @StateObject private var playback = WallpaperPlayback()
     @State private var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
     @State private var thermal = ProcessInfo.processInfo.thermalState
@@ -194,7 +213,9 @@ struct ArithenWallpaper: View {
         _styleValue = AppStorage(wrappedValue: WallpaperStyle.gradient.rawValue, area.backgroundKey)
         _video = AppStorage(wrappedValue: "", area.videoKey)
         _dimming = AppStorage(wrappedValue: 0.55, area.dimmingKey)
+        _editData = AppStorage(wrappedValue: Data(), area.editKey)
     }
+    private var edit: WallpaperEdit { (try? JSONDecoder().decode(WallpaperEdit.self, from: editData)) ?? .init() }
     private var privateItem: VaultItem? {
         guard area == .library, vault.unlocked, let id = WallpaperPolicy.videoID(video) else { return nil }
         return vault.items.first { $0.id == id && $0.visible && $0.deletedAt == nil && UTType($0.contentType)?.conforms(to: .movie) == true }
@@ -206,8 +227,8 @@ struct ArithenWallpaper: View {
     }
     private var loadIdentity: String {
         guard active, styleValue == WallpaperStyle.video.rawValue else { return "" }
-        if area == .library { return privateItem.map { $0.id.uuidString + vault.generation.uuidString } ?? "" }
-        return video
+        if area == .library { return privateItem.map { $0.id.uuidString + vault.generation.uuidString + editData.base64EncodedString() } ?? "" }
+        return video + editData.base64EncodedString()
     }
     var body: some View {
         GeometryReader { geometry in
@@ -221,9 +242,8 @@ struct ArithenWallpaper: View {
                 }
                 if styleValue == WallpaperStyle.video.rawValue {
                     if let poster = playback.poster {
-                        Image(uiImage: poster).resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                        CroppedWallpaper(image: poster, player: shouldPlay ? playback.player : nil, edit: edit)
                     }
-                    if playback.player != nil { WallpaperSurface(player: playback.player) }
                     (scheme == .dark ? Color.black : Color.white).opacity(WallpaperPolicy.dimming(dimming))
                 }
             }.frame(width: geometry.size.width, height: geometry.size.height).clipped()
@@ -231,8 +251,8 @@ struct ArithenWallpaper: View {
             .task(id: loadIdentity) {
                 playback.clear()
                 guard !loadIdentity.isEmpty else { return }
-                if area == .library, let item = privateItem { await playback.loadPrivate(item, vault: vault) }
-                else if area == .calculator { await playback.loadPublic(video) }
+                if area == .library, let item = privateItem { await playback.loadPrivate(item, vault: vault, edit: edit) }
+                else if area == .calculator { await playback.loadPublic(video, edit: edit) }
                 // Completion must not overwrite a newer power/accessibility decision.
                 // install() uses the permission maintained by the observers below.
             }
@@ -242,6 +262,23 @@ struct ArithenWallpaper: View {
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in playback.playback(false); if area == .library { playback.clear() } }
             .onChange(of: vault.unlocked) { _, value in if area == .library && !value { playback.clear() } }
             .onDisappear { playback.clear() }
+    }
+}
+
+struct CroppedWallpaper: View {
+    let image: UIImage
+    var player: AVQueuePlayer?
+    let edit: WallpaperEdit
+    var body: some View {
+        GeometryReader { geometry in
+            let crop = WallpaperCrop.layout(sourceWidth: image.size.width, sourceHeight: image.size.height,
+                width: geometry.size.width, height: geometry.size.height, edit: edit)
+            ZStack(alignment: .topLeading) {
+                Color.clear
+                Image(uiImage: image).resizable().frame(width: crop.width, height: crop.height).offset(x: crop.x, y: crop.y)
+                if let player { WallpaperSurface(player: player).frame(width: crop.width, height: crop.height).offset(x: crop.x, y: crop.y) }
+            }.frame(width: geometry.size.width, height: geometry.size.height).clipped()
+        }
     }
 }
 #endif

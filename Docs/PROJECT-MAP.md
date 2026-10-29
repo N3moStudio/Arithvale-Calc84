@@ -1,5 +1,17 @@
 # Arithen source map
 
+## 0.10.0 library tools
+
+| Area | Files | Notes |
+| --- | --- | --- |
+| Organization | `CalcCore/LibraryOrganization`, `VaultTypes`, `VaultRepository`, `AlbumTagEditor`, `AlbumLibraryView` | Optional memberships/tags, pins/covers, atomic writes, filtered cloud metadata and import ID mapping |
+| Private OCR | `LibraryTextSearch`, `PrivateSearchIndex` in `CalcCore/LibraryOrganization` | Opt-in Vision, encrypted local sidecar, bounded decoding, cancellation and batches |
+| Search | `LibraryContentStore`, `LibraryOrganization.matches` | AND-term matching across names, all albums, tags and recognized text |
+| Storage | `CalcCore/LibraryStorage`, `LibraryStorageView`, `ImportCapacityView`, `StoragePreflight` | Encrypted bytes, authenticated duplicate review, import/restore estimates |
+| Backup evidence | `BackupCoverageView`, `RecoveryEvidenceStore`, `CalcCore/BackupStatus`, `CloudBackupModel` | Exact snapshot/digest recovery matching and per-provider coverage |
+| Wallpaper editing | `WallpaperEditor`, `Wallpaper`, `CalcCore/AppearancePolicy` | Range/crop/still-frame preferences, source retention for public re-editing, private temp cleanup |
+| Verification | `LibraryToolsTests`, `test_recovery.py` | Migration, encrypted-index bounds/authentication, cloud metadata filtering, duplicate and wallpaper policy regressions |
+
 | Area | Main files | Responsibility |
 | --- | --- | --- |
 | Calculator/access | CalculatorView, PrivateSpaceView, SetupSession, DeviceAccess | Calculation, explicit hold-to-unlock, recovery key setup, throttled device access |

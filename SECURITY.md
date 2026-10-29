@@ -1,4 +1,38 @@
-# Storage and recovery design · 0.9.0
+# Storage and recovery design · 0.10.0
+
+## 0.10.0 additions
+
+Album memberships/tags and album pin/cover preferences are optional fields in the
+existing authenticated encrypted manifest. Legacy single-album data remains
+readable. Changes are committed by the existing atomic encrypted-index write;
+media files are not duplicated. Cloud projections copy only preferences for
+included albums and remove cover references to excluded items. Cross-library
+imports remap cover IDs and merge memberships/tags for exact-content duplicates.
+
+Private text search is opt-in. Apple's Vision reads a bounded decoded image from
+a protected temporary original; no OCR service or system-wide search index is
+used. The derived index is encrypted in `search.enc` with the library key and the
+distinct `private-search-v1` context, capped at 4 KiB UTF-8 per image and 24 MiB per
+sidecar. It is not part of portable backups or cloud snapshots. Only active,
+visible library IDs can be returned/searched. Lock clears the UI copy; disabling
+search removes the file. Completed batches survive pause. This does not promise
+secure erasure of prior file blocks or immediate zeroization of framework memory.
+
+Duplicate review hashes authenticated original content and Live Photo companions,
+not names or thumbnails; it never deletes automatically. Storage reports count
+encrypted resource bytes. Import/restore estimates are advisory; the operation
+rechecks capacity. Unknown provider sizes are explicitly reported as unknown.
+
+Recovery-check history stores only source, opaque snapshot/digest, count and time
+locally. A checked-copy receipt is distinct from a recovery test. The new Backup
+Center matches exact snapshot identities, never just the most recent test date.
+
+The public calculator now retains both a protected source copy and its prepared
+silent wallpaper loop to allow re-editing. Both are excluded from system backup
+and removed on replacement/removal. Private wallpaper sources remain encrypted
+library items; editing/preparation uses protected, cleaned temporary files. Trim,
+crop and still-frame preferences contain only numeric values and opaque item IDs.
+
 
 ## Scope and trust
 

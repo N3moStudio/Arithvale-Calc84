@@ -50,6 +50,10 @@ def main():
             assert prompt.encode() in binary, 'Missing expected motion/progress UI: '+prompt
         for prompt in ('Glass Tint & Video Background', 'Stops in Low Power Mode', 'Calculator Appearance', 'Choose a Library Video'):
             assert prompt.encode() in binary, 'Missing expected appearance UI: '+prompt
+        for prompt in ('Your backup copies', 'Recovery not yet tested for this exact backup',
+                       'Search Text in Photos', 'Index New Photos', 'Find Exact Duplicates',
+                       'Tags, separated by commas', 'Edit Loop, Crop & Still Frame', 'Still frame within loop'):
+            assert prompt.encode() in binary, 'Missing expected library-tools UI: '+prompt
         assert binary[:4]==bytes.fromhex('cffaedfe') and int.from_bytes(binary[4:8],'little')==0x0100000C
         commands=struct.unpack_from('<I',binary,16)[0]; position=32; min_version=None; sdk=None
         for _ in range(commands):

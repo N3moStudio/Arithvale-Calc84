@@ -249,7 +249,8 @@ private struct MediaDetailsView: View {
                     Text(item.name).textSelection(.enabled)
                     LabeledContent("Type", value: UTType(item.contentType)?.localizedDescription ?? item.contentType)
                     LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: Int64(item.byteCount), countStyle: .file))
-                    if let album = item.album, !album.isEmpty { LabeledContent("Album", value: album) }
+                    if !item.albumNames.isEmpty { LabeledContent("Albums", value: item.albumNames.joined(separator: ", ")) }
+                    if let tags = item.tags, !tags.isEmpty { LabeledContent("Tags", value: tags.joined(separator: ", ")) }
                 }
                 Section("Dates") {
                     if let date = item.captured { LabeledContent("Captured") { Text(date, format: .dateTime) } }

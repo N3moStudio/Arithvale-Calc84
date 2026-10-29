@@ -130,8 +130,10 @@ final class RecoveryAndLibraryTests: XCTestCase {
         let destination = URL(fileURLWithPath: path)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         let a = repo("a"); try a.create(password: secret)
-        try a.add(data: Data("portable original bytes".utf8), name: "../../AUX.jpg", contentType: "public.jpeg",
+        let photo = try a.add(data: Data("portable original bytes".utf8), name: "../../AUX.jpg", contentType: "public.jpeg",
             details: MediaDetails(captured: Date(timeIntervalSince1970: 1_680_000_000)))
+        try a.organize(ids: [photo.id], albums: ["Travel", "Receipts"], tags: ["ticket", "été"], mode: .add)
+        try a.setAlbumPreference(.init(pinned: true, coverID: photo.id), name: "Travel")
         try a.add(data: Data(repeating: 0xA7, count: VaultLimits.chunkBytes + 7), name: "video.mov", contentType: "public.movie")
         try a.add(data: Data(), name: "empty.bin", contentType: "public.data")
         try a.exportBackup(to: destination.appendingPathComponent("v2.c84backup"))

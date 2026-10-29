@@ -5,18 +5,36 @@ import UniformTypeIdentifiers
 import CalcCore
 
 struct AlbumLibraryView: View {
+    @EnvironmentObject private var vault: VaultModel
     @Environment(\.dynamicTypeSize) private var textSize
     let items: [VaultItem]
     let engine: VaultEngine
     let open: (String) -> Void
-    private var names: [String] { Set(items.compactMap(\.album).filter { !$0.isEmpty }).sorted() }
+    private struct EditingAlbum: Identifiable { let name: String; var id: String { name } }
+    @State private var editing: EditingAlbum?
+    private var names: [String] {
+        Set(items.flatMap(\.albumNames) + Array(vault.albumPreferences.keys)).sorted {
+            let a = vault.albumPreferences[$0]?.pinned == true, b = vault.albumPreferences[$1]?.pinned == true
+            return a == b ? $0.localizedStandardCompare($1) == .orderedAscending : a
+        }
+    }
     var body: some View {
         ScrollView {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: textSize.isAccessibilitySize ? 1 : 2), alignment: .leading, spacing: 18) {
                 album("All items", values: items, filter: "All")
                 album("Favorites", values: items.filter { $0.favorite == true }, filter: "Favorites")
                 ForEach(names, id: \.self) { name in
-                    album(name, values: items.filter { $0.album == name }, filter: "album:" + name)
+                    VStack(alignment: .leading, spacing: 2) {
+                        album(name, values: items.filter { $0.albumNames.contains(name) }, filter: "album:" + name)
+                            .contextMenu { Button("Customize Album", systemImage: "slider.horizontal.3") { editing = .init(name: name) } }
+                        Button { editing = .init(name: name) } label: {
+                            HStack {
+                                if vault.albumPreferences[name]?.pinned == true { Label("Pinned", systemImage: "pin.fill") }
+                                Spacer()
+                                Image(systemName: "ellipsis")
+                            }.font(.caption).frame(minHeight: 44).contentShape(Rectangle())
+                        }.accessibilityLabel("Customize \(name)")
+                    }
                 }
             }.padding(.horizontal, 15)
             HStack {
@@ -25,11 +43,19 @@ struct AlbumLibraryView: View {
             }.font(.subheadline).padding(15)
             Color.clear.frame(height: 90)
         }
+        .sheet(item: $editing) { album in NavigationStack {
+            AlbumCustomizationView(name: album.name, preference: vault.albumPreferences[album.name] ?? .init())
+        } }
+        .onChange(of: editing?.id) { _, value in vault.libraryToolPresented = value != nil }
+        .onDisappear { vault.libraryToolPresented = false }
     }
     private func album(_ name: String, values: [VaultItem], filter: String) -> some View {
         Button { open(filter) } label: {
             VStack(alignment: .leading, spacing: 6) {
                 GeometryReader { geometry in
+                    if filter.hasPrefix("album:"), let id = vault.albumPreferences[name]?.coverID, let item = values.first(where: { $0.id == id }) {
+                        LibraryThumbnail(item: item, engine: engine)
+                    } else {
                     let side = (geometry.size.width - 1) / 2
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 1), GridItem(.flexible(), spacing: 1)], spacing: 1) {
                         ForEach(0..<4) { index in
@@ -38,6 +64,7 @@ struct AlbumLibraryView: View {
                                 else { Color(uiColor: .secondarySystemBackground).overlay { if index == 0 { Image(systemName: "photo").foregroundStyle(.tertiary) } } }
                             }.frame(width: side, height: (geometry.size.height - 1) / 2).clipped()
                         }
+                    }
                     }
                 }.aspectRatio(1.18, contentMode: .fit).clipShape(RoundedRectangle(cornerRadius: 13))
                 Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(2)

@@ -8,6 +8,7 @@ struct CloudReceipt: Codable {
     var saved: Date?
     var vaultID: UUID?
     var needsBackup = true
+    var snapshotID: UUID? = nil
 }
 
 @MainActor
@@ -177,6 +178,7 @@ final class CloudBackupModel: ObservableObject {
                     receipt.objects = Set(plan.snapshot.records.map(\.filename))
                     receipt.itemIDs = plan.itemIDs
                     receipt.vaultID = plan.snapshot.vaultID; receipt.saved = Date(); receipt.needsBackup = false
+                    receipt.snapshotID = plan.snapshot.id
                     self.receipts[provider] = receipt; self.persist(provider); completed += 1
                 } catch {
                     if Task.isCancelled { throw CancellationError() }
@@ -246,6 +248,7 @@ final class CloudBackupModel: ObservableObject {
                 let count = try await vault.engine.verifyBackup(from: archive, password: recovery)
                 try Task.checkCancellation()
                 vault.recordRecoveryTest(source: provider.title, snapshot: snapshot.id.uuidString, library: snapshot.vaultID.uuidString)
+                vault.recordRecoveryEvidence(source: provider.title, snapshotID: snapshot.id.uuidString, items: count)
                 self.phase = "Recovery test passed · \(count) items. Your library was not replaced."
             } else {
                 guard let newRecovery else { throw VaultError.invalidRecovery }

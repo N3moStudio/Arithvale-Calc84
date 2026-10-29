@@ -13,6 +13,8 @@ struct SurfaceAppearanceSettings: View {
     @AppStorage private var background: String
     @AppStorage private var video: String
     @AppStorage private var dimming: Double
+    @AppStorage private var editData: Data
+    @State private var editor: WallpaperEditorRequest?
     @State private var picked: PhotosPickerItem?
     @State private var importing = false
     @State private var error: String?
@@ -23,6 +25,7 @@ struct SurfaceAppearanceSettings: View {
         _background = AppStorage(wrappedValue: WallpaperStyle.gradient.rawValue, area.backgroundKey)
         _video = AppStorage(wrappedValue: "", area.videoKey)
         _dimming = AppStorage(wrappedValue: 0.55, area.dimmingKey)
+        _editData = AppStorage(wrappedValue: Data(), area.editKey)
     }
     private var selectedTint: GlassTint { GlassTint(rawValue: tint) ?? .plum }
     var body: some View {
@@ -60,9 +63,19 @@ struct SurfaceAppearanceSettings: View {
                 }
                 if importing { ProgressView("Preparing your background…") }
                 if !video.isEmpty {
+                    Button("Edit Loop, Crop & Still Frame", systemImage: "slider.horizontal.3") {
+                        let edit = (try? JSONDecoder().decode(WallpaperEdit.self, from: editData)) ?? .init()
+                        if area == .library { editor = WallpaperEditorRequest(libraryID: WallpaperPolicy.videoID(video), edit: edit) }
+                        else if let original = WallpaperFiles.source(video), FileManager.default.fileExists(atPath: original.path) {
+                            editor = WallpaperEditorRequest(source: original, edit: edit)
+                        } else if let oldClip = WallpaperFiles.url(video) {
+                            // Earlier versions retained only their prepared loop.
+                            editor = WallpaperEditorRequest(source: oldClip)
+                        }
+                    }.disabled(importing)
                     Button("Remove Background Video", role: .destructive) {
                         let previous = video
-                        video = ""; background = WallpaperStyle.gradient.rawValue
+                        video = ""; editData = Data(); background = WallpaperStyle.gradient.rawValue
                         if area == .calculator { WallpaperFiles.remove(previous) }
                     }.disabled(importing)
                 }
@@ -75,13 +88,13 @@ struct SurfaceAppearanceSettings: View {
                 }
             } header: { Text("Your background") } footer: {
                 Text(area == .calculator
-                    ? "Choose something suitable for the calculator screen: it is visible before unlocking. A silent, reduced-size copy loops for up to 30 seconds. Your original stays in Photos."
+                    ? "Choose something suitable for the calculator screen: it is visible before unlocking. Pick a silent loop up to 30 seconds, its crop, and a still frame. A protected source copy is kept here for later editing; your original stays in Photos."
                     : "Choose from videos already imported into your encrypted library. The original stays encrypted; a temporary playback copy is cleared when you lock or leave. Removing the background does not delete the library video.")
             }
             Section {
                 Label("Stops in Low Power Mode", systemImage: "battery.25percent")
                 Label("Respects Reduce Motion", systemImage: "accessibility")
-                Text("Video also pauses when this screen is covered or inactive, or the phone is running hot. The paused frame or still background stays visible.")
+                Text("Video also pauses when this screen is covered or inactive, or the phone is running hot. Your chosen still frame stays visible when movement is disabled.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }.navigationTitle(area == .calculator ? "Calculator Appearance" : "Library Appearance")
@@ -94,28 +107,21 @@ struct SurfaceAppearanceSettings: View {
                 importTask = Task {
                     defer { importing = false; picked = nil }
                     var input: URL?
-                    var output: URL?
                     defer {
                         if let input { try? FileManager.default.removeItem(at: input) }
-                        if let output { try? FileManager.default.removeItem(at: output) }
                     }
                     do {
                         guard let transfer = try await item.loadTransferable(type: WallpaperTransfer.self) else { throw WallpaperError.invalid }
                         input = transfer.url
-                        let prepared = try await WallpaperVideo.prepare(transfer.url); output = prepared
                         try Task.checkCancellation()
-                        try WallpaperFiles.prepareDirectory()
-                        let id = UUID().uuidString
-                        guard let destination = WallpaperFiles.url(id) else { throw WallpaperError.invalid }
-                        try FileManager.default.moveItem(at: prepared, to: destination)
-                        let previous = video
-                        video = id; background = WallpaperStyle.video.rawValue
-                        WallpaperFiles.remove(previous)
+                        editor = WallpaperEditorRequest(source: transfer.url, ownsSource: true)
+                        input = nil // The editor now owns and cleans this temporary source.
                     } catch {
                         if !Task.isCancelled { self.error = error.localizedDescription }
                     }
                 }
             }
+            .sheet(item: $editor) { request in WallpaperEditor(area: area, request: request) }
             .onDisappear { importTask?.cancel() }
             .alert("Couldn’t Set Background", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK", role: .cancel) { error = nil }
@@ -128,19 +134,22 @@ struct LibraryWallpaperPicker: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("libraryBackgroundVideo") private var selected = ""
     @AppStorage("libraryBackgroundStyle") private var style = WallpaperStyle.gradient.rawValue
+    @AppStorage("libraryBackgroundEdit.v1") private var editData = Data()
+    @State private var editor: WallpaperEditorRequest?
     private var videos: [VaultItem] {
         vault.items.filter { $0.visible && $0.deletedAt == nil && UTType($0.contentType)?.conforms(to: .movie) == true }
     }
     var body: some View {
         List {
             Section {
-                Text("Import your video using Library → + → Photos & Videos, then choose it here. Only the first 30 seconds loop, without sound.")
+                Text("Import your video using Library → + → Photos & Videos, then choose it here. Pick the section to loop, position the crop and choose a still frame. Originals stay unchanged.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             if videos.isEmpty { ContentUnavailableView("No Library Videos", systemImage: "video", description: Text("Import a video into your library first.")) }
             ForEach(videos) { item in
                 Button {
-                    selected = item.id.uuidString; style = WallpaperStyle.video.rawValue; dismiss()
+                    let edit = selected == item.id.uuidString ? ((try? JSONDecoder().decode(WallpaperEdit.self, from: editData)) ?? .init()) : WallpaperEdit()
+                    editor = WallpaperEditorRequest(libraryID: item.id, edit: edit)
                 } label: {
                     HStack(spacing: 12) {
                         LibraryThumbnail(item: item, engine: vault.engine).frame(width: 60, height: 60).clipShape(RoundedRectangle(cornerRadius: 10))
@@ -154,6 +163,7 @@ struct LibraryWallpaperPicker: View {
                 }.disabled(item.byteCount > WallpaperPolicy.maximumSourceBytes || !vault.unlocked)
             }
         }.navigationTitle("Choose a Video").navigationBarTitleDisplayMode(.inline)
+            .sheet(item: $editor) { request in WallpaperEditor(area: .library, request: request) }
     }
 }
 #endif

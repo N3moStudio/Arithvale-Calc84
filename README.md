@@ -4,10 +4,10 @@
 
 <h1 align="center">Arithen</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.9.0 testing · iOS 17+ · SwiftUI · MIT licensed</p>
+<p align="center">0.10.0 testing · iOS 17+ · SwiftUI · MIT licensed</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
-  <a href="Docs/UPDATE-0.9.0.md">What’s new</a> &nbsp;·&nbsp;
+  <a href="Docs/UPDATE-0.10.0.md">What’s new</a> &nbsp;·&nbsp;
   <a href="CHANGELOG.md">Changelog</a> &nbsp;·&nbsp;
   <a href="Docs/CLOUD-BACKUP.md">Cloud choices</a> &nbsp;·&nbsp;
   <a href="Docs/BUILDING.md">Build from source</a>
@@ -28,7 +28,22 @@ control over which memories leave your phone. Previously **Arithvale / Calc 84**
 
 ## The latest
 
-**0.9.0** introduces Arithen’s approved purple Aperture A icon and puts glass on
+**0.10.0** makes the library easier to organize and recover:
+
+- **Backup Center:** create, import and test from one place. See separate Files,
+  MEGA and Blomp coverage; recovery checks belong to the exact tested snapshot.
+- **Private Text Search:** opt in to reading words inside photos/screenshots on
+  the phone. The local search index is encrypted and never uploaded.
+- **Storage:** review large files and exact duplicates, see encrypted storage
+  usage, and check working-space estimates before importing/restoring.
+- **Albums & Tags:** put one photo in multiple albums without extra copies,
+  add tags, pin albums and choose covers.
+- **Background editor:** choose the loop section, crop position and Low Power
+  Mode still frame independently for the calculator and library.
+
+[Read the 0.10.0 update notes →](Docs/UPDATE-0.10.0.md)
+
+The **0.9.0** design remains: Arithen’s approved purple Aperture A icon and glass on
 calculator keys, library controls, filters, and the viewer’s Details handle.
 Native Liquid Glass is available on iOS 26+; iOS 17–25 uses translucent material.
 Reduce Transparency and increased contrast use opaque controls.
@@ -56,8 +71,9 @@ first**; choose another under **Settings → Appearance** and it stays selected.
 The calculator keeps circular keys, a shared backspace/AC capsule, and the familiar
 number arrangement. Purple is the default glass tint.
 
-Settings now starts with four choices: **Backups**, **Cloud Copies**,
-**Privacy & Access**, and **Appearance**. Version and build are visible there.
+Settings starts with **Backups**, **Cloud Copies**, **Privacy & Access**, and
+**Appearance**, followed by **Storage** and **Private Text Search** under Library
+tools. Version and build are visible there.
 
 Shared backups appear on the unlocked library as **Backup received**. Tap it,
 or **+ → From a Backup**, enter the original recovery key, preview the contents,

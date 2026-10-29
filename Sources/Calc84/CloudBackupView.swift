@@ -173,6 +173,7 @@ struct CloudRestoreView: View {
                 if !testOnly, let setup { NewRecoveryKeySection(setup: setup).disabled(vault.busy) }
                 Section {
                     SecureField("Source backup’s recovery key", text: $recovery).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    if let snapshot = cloud.snapshots.first(where: { $0.id == selected }) { StorageEstimateView(bytes: snapshot.bytes) }
                     if !testOnly {
                         SecureField("New calculator code", text: $code).keyboardType(.numberPad)
                         SecureField("Repeat code", text: $repeatCode).keyboardType(.numberPad)

@@ -30,6 +30,9 @@ public struct VaultItem: Codable, Identifiable, Equatable, Sendable {
     public var longitude: Double? = nil
     public var favorite: Bool? = nil
     public var album: String? = nil
+    // Optional additions keep pre-0.10 archives readable. `album` mirrors the first membership.
+    public var albums: [String]? = nil
+    public var tags: [String]? = nil
     public var deletedAt: Date? = nil
     public var storageVersion: Int? = nil
     public var companionID: UUID? = nil
@@ -40,6 +43,7 @@ public struct VaultItem: Codable, Identifiable, Equatable, Sendable {
     public var pendingImport: Bool? = nil
     public var chronologicalDate: Date { captured ?? added }
     public var visible: Bool { isCompanion != true && isThumbnail != true && pendingImport != true }
+    public var albumNames: [String] { albums ?? album.map { $0.isEmpty ? [] : [$0] } ?? [] }
 }
 
 public struct MediaDetails: Sendable {
@@ -108,6 +112,7 @@ struct VaultManifest: Codable {
     var version = 2
     var items: [VaultItem] = []
     var cloudPreferences: CloudPreferences? = nil
+    var albumPreferences: [String: AlbumPreference]? = nil
 }
 
 struct VaultHeader: Codable {

@@ -13,6 +13,10 @@ struct VaultSettingsView: View {
                 NavigationLink { PrivacyAccessView() } label: { settingsRow("Privacy & Access", detail: "Calculator code and recovery key", symbol: "lock") }
                 NavigationLink { AppearanceSettingsView() } label: { settingsRow("Appearance", detail: "Layout, colors and display", symbol: "paintpalette") }
             }
+            Section("Library tools") {
+                NavigationLink { LibraryStorageView() } label: { settingsRow("Storage", detail: "Space, large items and duplicates", symbol: "internaldrive") }
+                NavigationLink { PrivateSearchSettings(search: vault.textSearch) } label: { settingsRow("Private Text Search", detail: "Find words inside photos", symbol: "text.magnifyingglass") }
+            }
             Section {
                 NavigationLink { AboutView() } label: { LabeledContent(AppBrand.name, value: AppBrand.version).font(.footnote).foregroundStyle(.secondary) }
                 Button("Lock & Return to Calculator", systemImage: "lock.fill") { vault.lock(); dismiss() }
@@ -86,16 +90,24 @@ struct BackupSettingsView: View {
     var body: some View {
         List {
             Section {
-                NavigationLink { BackupImportView() } label: { Label("Add from Backup", systemImage: "externaldrive.badge.plus").frame(minHeight: 44) }
                 Button {
                     preparation = Task {
                         if let request = await vault.prepareBackupForFiles() {
                             activeExport = request; sheet = .save(request)
                         }
                     }
-                } label: { Label("Save a Backup", systemImage: "square.and.arrow.down").fontWeight(.semibold).frame(minHeight: 44) }
+                } label: { Label("Create Backup", systemImage: "square.and.arrow.down").fontWeight(.semibold).frame(minHeight: 44) }
                 .disabled(vault.busy)
+                NavigationLink { BackupImportView() } label: { Label("Import Backup", systemImage: "externaldrive.badge.plus").frame(minHeight: 44) }.disabled(vault.busy)
+                NavigationLink { RecoveryTestView() } label: { Label("Test Backup", systemImage: "checkmark.shield").frame(minHeight: 44) }.disabled(vault.busy)
             } footer: { Text("Choose a location outside \(AppBrand.name) / LiveContainer. No folder connection is required for this save.") }
+            BackupCoverageView()
+            Section {
+                NavigationLink { SharedBackupGuide() } label: { Label("How to Import from Files", systemImage: "square.and.arrow.down") }
+                Text("Files → Share → LiveContainer → Arithen. Unlock the library, then tap Backup received or Import Backup above. You can add another backup any time.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                StorageEstimateView(bytes: vault.items.reduce(Int64(0)) { $0 + Int64($1.byteCount) }, copies: 2)
+            }
             if vault.busy || !vault.status.isEmpty {
                 Section {
                     HStack(spacing: 12) {
@@ -119,8 +131,6 @@ struct BackupSettingsView: View {
                 }.navigationTitle("Last Saved Copy") }
             }
             Section {
-                NavigationLink { RecoveryTestView() } label: { Label("Test a Backup", systemImage: "checkmark.shield") }
-                    .disabled(vault.busy)
                 if lastTest > 0 {
                     Text(lastTestIdentity.isEmpty ? "Older test · snapshot identity was not recorded" : lastTestIdentity).font(.caption).textSelection(.enabled)
                     LabeledContent("Last test") { Text(Date(timeIntervalSince1970: lastTest), format: .dateTime.month().day().hour().minute()) }
@@ -149,10 +159,10 @@ struct BackupSettingsView: View {
                 }
                 }.navigationTitle("Connected Folder") }
             } footer: {
-                Text("Choose a writable folder, then tap Open. We check access before connecting it. If your provider or installer cannot keep folder access, use Save Backup to Files above. Automatic backups run only while the app is open; older snapshots stay until you delete them.")
+                Text("Choose a writable folder, then tap Open. We check access before connecting it. If your provider or installer cannot keep folder access, use Create Backup above. Automatic backups run only while the app is open; older snapshots stay until you delete them.")
             }
         }
-        .navigationTitle("Backups").navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Backup Center").navigationBarTitleDisplayMode(.inline)
         .onDisappear { if activeExport == nil { preparation?.cancel() } }
         .sheet(item: $sheet, onDismiss: {
             if let activeExport { vault.finishBackupExport(activeExport, destination: picked?.url) }

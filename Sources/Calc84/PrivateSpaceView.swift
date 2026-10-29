@@ -93,6 +93,7 @@ private struct AccessView: View {
                                     .buttonStyle(.borderless).disabled(vault.busy)
                             }
                         }
+                        StorageEstimateView(bytes: backups.reduce(Int64(0)) { $0 + Int64((try? $1.backup.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }, copies: 2)
                         Text("You can choose another backup above, with its own old key, or finish setup now. In LiveContainer, finish setup before leaving to share another backup; then use + → From a Backup. All additions use the new library’s key.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }

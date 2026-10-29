@@ -6,7 +6,7 @@
 2. Enter **160160**, then **hold = for about 0.6 seconds**.
 3. Save the generated recovery key somewhere separate from this app. Confirm its last eight characters.
 4. Choose a personal **6–12 digit calculator code**. Enter that code and hold = to return to the library.
-5. Import a few disposable samples. Photos uses the Import button; Files offers **Import Files** and **Import Folder**.
+5. Tap **+ → Photos & Videos**, **Files**, or **A Folder**. Review the space estimate, then tap **Import** with a few disposable samples.
 
 The calculator Help screen contains only calculator help. If you forget the code,
 enter 160160 and hold = to reach the locked recovery form. Your original recovery
@@ -14,9 +14,9 @@ key is still required; the starter code does not decrypt an existing library.
 
 ## Keep a backup outside the app
 
-1. Open **Settings → Backups → Save Backup to Files**.
+1. Open **Settings → Backups → Create Backup**.
 2. Save to your own iCloud Drive folder or another Files location outside the app/LiveContainer.
-3. Open **Test a Backup**, select the actual `.c84backup` file, and enter its recovery key. If the picker closes, use the sharing route below.
+3. Open **Test Backup**, select the actual `.c84backup` file, and enter its recovery key. If the picker closes, use the sharing route below.
 4. Check the Files provider’s upload status separately. A successful local save is not proof of cloud upload.
 
 The local encrypted library is private app data. It is not a normal Photos album
@@ -73,7 +73,7 @@ installed/enabled. Keep the original and key; do not delete them to troubleshoot
 
 The original **Choose Backup File** and **Choose Backup Folder** paths remain
 available. Find the build in calculator Help → About or the Recovery footer:
-**0.7.0 (11)** for this update.
+**0.10.0 (14)** for this update.
 
 Where file selection works, you may queue several backups with separate old keys
 before creating the new library. In LiveContainer, finish setup before leaving to
@@ -116,8 +116,24 @@ These two areas have separate tints and backgrounds. Purple is the default;
 Neutral, Blue, Mint, Rose and Amber are also available. Liquid Glass requires
 iOS 26+; earlier iOS versions use translucent material.
 
-Videos must be under 256 MB. A silent, reduced-size copy loops for up to 30
-seconds without altering the original. Low Power Mode and Reduce Motion stop
-playback. Background preferences are local to this installation; choose them
+Videos must be under 256 MB. Choose the loop start/length, crop position and a
+still frame, then tap **Use Background**. A silent, reduced-size copy loops for
+up to 30 seconds without altering the original. Low Power Mode and Reduce Motion
+show the chosen still frame. **Edit Loop, Crop & Still Frame** lets you revise it.
+Background preferences are local to this installation; choose them
 again after restoring into a new installation. A calculator background is visible
 before unlocking, so choose something suitable for that public screen.
+
+## Organize and find things
+
+- **Select → album button:** add/remove multiple album memberships and tags.
+  A photo remains one encrypted original even when it belongs to several albums.
+- **Albums → …:** pin an album or choose one of its items as the cover.
+- **Settings → Private Text Search:** opt in, then index photos/screenshots to
+  search their words. Tap **Index New Photos** after later imports. Turning this
+  off removes the local encrypted index; names, albums and tags still work.
+- **Settings → Storage:** review largest items, Recently Deleted and exact
+  duplicates. Choose copies yourself; permanent deletion is a separate action.
+- **Settings → Backups:** compare provider coverage and exact-backup recovery
+  results. **Import Backup** adds another archive after setup without replacing
+  the library or rotating its key.

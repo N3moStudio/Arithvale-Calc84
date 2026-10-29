@@ -170,9 +170,94 @@ public final class VaultRepository {
     public func update(id: UUID, favorite: Bool? = nil, album: String? = nil, deleted: Bool? = nil) throws {
         guard let key, let header, var next = manifest, let i = next.items.firstIndex(where: { $0.id == id }) else { throw VaultError.locked }
         if let favorite { next.items[i].favorite = favorite }
-        if let album { next.items[i].album = String(album.prefix(100)) }
+        if let album {
+            let names = LibraryOrganization.names([album])
+            next.items[i].albums = names; next.items[i].album = names.first
+        }
         if let deleted { next.items[i].deletedAt = deleted ? Date() : nil }
+        cleanAlbumCovers(&next)
         try persist(next, key: key, header: header); manifest = next
+    }
+    public func albumPreferences() throws -> [String: AlbumPreference] {
+        guard let manifest else { throw VaultError.locked }
+        return manifest.albumPreferences ?? [:]
+    }
+    public func organize(ids: Set<UUID>, albums: [String], tags: [String], mode: OrganizationMode) throws {
+        guard let key, let header, var next = manifest else { throw VaultError.locked }
+        guard !ids.isEmpty, ids.isSubset(of: Set(next.items.filter(\.visible).map(\.id))) else { throw VaultError.missing }
+        for i in next.items.indices where ids.contains(next.items[i].id) {
+            let names = LibraryOrganization.applying(albums, to: next.items[i].albumNames, mode: mode, limit: 100)
+            let labels = LibraryOrganization.applying(tags, to: next.items[i].tags ?? [], mode: mode, limit: 64)
+            guard names.count <= 24, labels.count <= 32 else { throw VaultError.limit }
+            next.items[i].albums = names; next.items[i].album = names.first; next.items[i].tags = labels
+        }
+        cleanAlbumCovers(&next)
+        try persist(next, key: key, header: header); manifest = next
+    }
+    public func setAlbumPreference(_ value: AlbumPreference, name: String) throws {
+        guard let key, let header, var next = manifest else { throw VaultError.locked }
+        guard let clean = LibraryOrganization.names([name]).first else { throw VaultError.missing }
+        var preferences = next.albumPreferences ?? [:]; preferences[clean] = value
+        next.albumPreferences = preferences
+        try LibraryOrganization.validate(next)
+        try persist(next, key: key, header: header); manifest = next
+    }
+    private func cleanAlbumCovers(_ next: inout VaultManifest) {
+        for name in Array((next.albumPreferences ?? [:]).keys) {
+            if let id = next.albumPreferences?[name]?.coverID,
+               !next.items.contains(where: { $0.id == id && $0.visible && $0.albumNames.contains(name) }) {
+                next.albumPreferences?[name]?.coverID = nil
+            }
+        }
+    }
+    public func searchIndex() throws -> PrivateSearchIndex {
+        guard let key, let header, let manifest else { throw VaultError.locked }
+        let url = root.appendingPathComponent("search.enc")
+        guard fm.fileExists(atPath: url.path) else { return .init() }
+        let data = try Self.read(url, limit: PrivateSearchIndex.fileBytes)
+        var result = try JSONDecoder().decode(PrivateSearchIndex.self, from: VaultCrypto.open(data, key: key, context: Self.context(header, "private-search-v1")))
+        try result.validate(); result.prune(items: manifest.items)
+        return result
+    }
+    public func saveSearchIndex(_ value: PrivateSearchIndex) throws {
+        guard let key, let header, let manifest else { throw VaultError.locked }
+        try Task.checkCancellation()
+        var value = value; value.prune(items: manifest.items); try value.validate()
+        let url = root.appendingPathComponent("search.enc")
+        if !value.enabled {
+            if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
+            return
+        }
+        let data = try JSONEncoder().encode(value)
+        guard data.count + 28 <= PrivateSearchIndex.fileBytes else { throw VaultError.limit }
+        try Self.write(VaultCrypto.seal(data, key: key, context: Self.context(header, "private-search-v1")), to: url)
+    }
+    public func storageReport() throws -> LibraryStorageReport {
+        guard manifest != nil else { throw VaultError.locked }
+        var resources: [UUID: Int64] = [:]
+        var total: Int64 = 0, search: Int64 = 0
+        for url in try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey]) {
+            try Task.checkCancellation()
+            let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+            guard values.isRegularFile == true else { continue }
+            let bytes = Int64(values.fileSize ?? 0); total += bytes
+            if url.lastPathComponent == "search.enc" { search = bytes }
+            if let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent), url.pathExtension == "enc" { resources[id] = bytes }
+        }
+        return .init(encryptedBytes: total, searchBytes: search, resourceBytes: resources)
+    }
+    public func duplicates() throws -> [DuplicateGroup] {
+        guard manifest != nil else { throw VaultError.locked }
+        let active = items.filter { $0.visible && $0.deletedAt == nil }
+        let candidates = Dictionary(grouping: active) { "\($0.contentType)|\($0.byteCount)|\($0.companionID != nil)" }.values.filter { $0.count > 1 }
+        var matches: [String: [UUID]] = [:]
+        for group in candidates {
+            for item in group.sorted(by: { $0.added < $1.added }) {
+                try Task.checkCancellation()
+                matches[try importSignature(item), default: []].append(item.id)
+            }
+        }
+        return matches.values.filter { $0.count > 1 }.map { DuplicateGroup(ids: $0) }.sorted { $0.id.uuidString < $1.id.uuidString }
     }
     public func remove(id: UUID) throws {
         guard let key, let header, var next = manifest else { throw VaultError.locked }
@@ -180,6 +265,7 @@ public final class VaultRepository {
         let ids = Set([id, target?.companionID, target?.thumbnailID].compactMap { $0 })
         next.items.removeAll { ids.contains($0.id) }
         next.cloudPreferences?.remove(ids)
+        cleanAlbumCovers(&next)
         try persist(next, key: key, header: header); manifest = next
         for id in ids { try? fm.removeItem(at: assetURL(id)) }
     }
@@ -213,6 +299,9 @@ public final class VaultRepository {
         var subset = VaultManifest()
         subset.version = committed.version
         subset.items = committed.items.filter { resourceIDs.contains($0.id) }
+        let names = Set(roots.flatMap(\.albumNames))
+        subset.albumPreferences = (committed.albumPreferences ?? [:]).filter { names.contains($0.key) }
+            .mapValues { AlbumPreference(pinned: $0.pinned, coverID: $0.coverID.flatMap { selected.contains($0) ? $0 : nil }) }
         guard subset.items.count == resourceIDs.count,
               subset.items.allSatisfy({ item in
                   item.pendingImport != true && (selected.contains(item.id) || !item.visible)
@@ -391,7 +480,16 @@ public final class VaultRepository {
                     known[candidateSignature] = candidate.id
                 }
             }
-            if let existing = known[signature] { mapping[item.id] = existing; skipped += 1; continue }
+            if let existing = known[signature] {
+                mapping[item.id] = existing; skipped += 1
+                if let index = next.items.firstIndex(where: { $0.id == existing }) {
+                    let names = LibraryOrganization.names(next.items[index].albumNames + item.albumNames)
+                    let tags = LibraryOrganization.names((next.items[index].tags ?? []) + (item.tags ?? []), limit: 64)
+                    guard names.count <= 24, tags.count <= 32 else { throw VaultError.limit }
+                    next.items[index].albums = names; next.items[index].album = names.first; next.items[index].tags = tags
+                }
+                continue
+            }
             guard next.items.count + resources.count <= VaultLimits.itemCount,
                   next.items.reduce(0, { $0 + $1.byteCount }) + resources.reduce(0, { $0 + $1.byteCount }) < VaultLimits.backupBytes - 32 * 1024 * 1024 else { throw VaultError.limit }
             let ids = Dictionary(uniqueKeysWithValues: resources.map { ($0.id, UUID()) })
@@ -409,6 +507,7 @@ public final class VaultRepository {
                 copy.captured = resource.captured; copy.duration = resource.duration
                 copy.latitude = resource.latitude; copy.longitude = resource.longitude
                 copy.favorite = resource.favorite; copy.album = resource.album; copy.storageVersion = 2
+                copy.albums = resource.albums; copy.tags = resource.tags
                 copy.deletedAt = includingDeleted ? resource.deletedAt : nil
                 copy.companionID = resource.companionID.flatMap { ids[$0] }; copy.companionType = resource.companionType
                 copy.thumbnailID = resource.thumbnailID.flatMap { ids[$0] }
@@ -429,6 +528,15 @@ public final class VaultRepository {
             }
         }
         next.cloudPreferences = policies
+        let selectedNames = Set(roots.flatMap(\.albumNames))
+        var albumPreferences = next.albumPreferences ?? [:]
+        for (name, preference) in source.manifest?.albumPreferences ?? [:] where selectedNames.contains(name) {
+            if albumPreferences[name] == nil {
+                albumPreferences[name] = AlbumPreference(pinned: preference.pinned, coverID: preference.coverID.flatMap { mapping[$0] })
+            }
+        }
+        next.albumPreferences = albumPreferences
+        cleanAlbumCovers(&next)
         try policies.validate(items: next.items)
         for url in try fm.contentsOfDirectory(at: stage, includingPropertiesForKeys: nil) {
             try Task.checkCancellation()
@@ -470,6 +578,7 @@ public final class VaultRepository {
     private func assetURL(_ id: UUID) -> URL { root.appendingPathComponent(id.uuidString + ".enc") }
     private static func context(_ header: VaultHeader, _ item: String) -> String { "Calc84/v\(header.version)/\(header.id.uuidString)/\(item)" }
     private func persist(_ next: VaultManifest, key: SymmetricKey, header: VaultHeader) throws {
+        try LibraryOrganization.validate(next)
         let encoded = try JSONEncoder().encode(next)
         guard encoded.count + 28 <= VaultLimits.manifestBytes else { throw VaultError.limit }
         try Self.write(VaultCrypto.seal(encoded, key: key, context: Self.context(header, "manifest")), to: root.appendingPathComponent("index.enc"))
@@ -489,6 +598,7 @@ public final class VaultRepository {
                   && (item.duration.map { $0.isFinite && $0 >= 0 } ?? true)
               }) else { throw VaultError.invalidBackup }
         try result.cloudPreferences?.validate(items: result.items)
+        try LibraryOrganization.validate(result)
         guard result.items.reduce(0, { $0 + $1.byteCount }) < VaultLimits.backupBytes else { throw VaultError.limit }
         return result
     }

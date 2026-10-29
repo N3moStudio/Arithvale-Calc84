@@ -1,4 +1,22 @@
-# Arithen · 0.9.0 design
+# Arithen · 0.10.0 design
+
+## Library tools
+
+Keep Clear Glass as the initial layout, all six choices, purple identity and
+existing media-viewer geometry. Add focused native forms/lists to the existing
+navigation, with labels, large touch targets and cancellation/confirmation actions.
+
+- Backups opens Backup Center: three primary actions, per-destination evidence,
+  restore/share help, and secondary folder/history controls.
+- Settings groups Storage and Private Text Search under Library tools.
+- Album cards offer an explicit ellipsis button and context menu for pin/cover
+  customization. Selection opens Albums & Tags with additive/removal actions.
+- Storage uses review lists; duplicate scans never preselect copies for deletion.
+- Video editing has a portrait crop preview, labeled accessible sliders, silent
+  loop preview, Cancel and Use Background. Low Power Mode shows the chosen still.
+- Imports show known size/space estimates before confirmation, or explain why a
+  provider has not supplied an exact size yet.
+
 
 Arithen uses the approved purple Aperture A icon. Purple is the initial glass
 tint. Calculator keys, top controls, library filters/actions/navigation and the

@@ -23,11 +23,12 @@ struct LibraryView: View {
     @State private var photos: [PhotosPickerItem] = []
     @State private var files = false
     @State private var folders = false
+    @State private var importCapacity: ImportCapacityRequest?
     @State private var cloudChoices = false
     @State private var settings = false
     @AppStorage("libraryGlassTint") private var tintValue = GlassTint.plum.rawValue
     private var glassTint: GlassTint { GlassTint(rawValue: tintValue) ?? .plum }
-    private var backgroundVisible: Bool { !settings && !adding && !addingBackup && !showingExports && !albumSheet && !cloudChoices && !photoPicker && !files && !folders && !deletion && !removeReceived && !vault.mediaViewerPresented && !vault.busy && vault.photoImportReview == nil && vault.fileImportReview == nil }
+    private var backgroundVisible: Bool { !settings && !adding && !addingBackup && !showingExports && !albumSheet && !cloudChoices && !photoPicker && !files && !folders && !deletion && !removeReceived && !vault.mediaViewerPresented && !vault.libraryToolPresented && importCapacity == nil && !vault.busy && vault.photoImportReview == nil && vault.fileImportReview == nil }
     @State private var filter = "All"
     @State private var search = ""
     @State private var searching = false
@@ -41,7 +42,6 @@ struct LibraryView: View {
     @State private var selection = Set<UUID>()
     @State private var deletion = false
     @State private var albumSheet = false
-    @State private var albumName = ""
     @State private var exportItems: [VaultItem] = []
     @State private var showingExports = false
     private var style: GalleryStyle { GalleryStyle(rawValue: layout) ?? .initial }
@@ -61,7 +61,7 @@ struct LibraryView: View {
             if searching {
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                    TextField("Search names or albums", text: $search).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField("Search names, albums, tags or text", text: $search).textInputAutocapitalization(.never).autocorrectionDisabled()
                     Button("Clear", systemImage: "xmark.circle.fill") { search = "" }.labelStyle(.iconOnly).frame(width: 44, height: 44)
                 }.padding(.leading, 14).background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 16).padding(.bottom, 8)
@@ -100,7 +100,7 @@ struct LibraryView: View {
                         if visible.isEmpty {
                             ContentUnavailableView(search.isEmpty ? (filter == "Recently Deleted" ? "Nothing Deleted" : "Your memories go here") : "No matches",
                                 systemImage: filter == "Recently Deleted" ? "trash" : "photo.on.rectangle",
-                                description: Text(search.isEmpty ? (filter == "Recently Deleted" ? "Deleted items stay here until you remove them permanently." : "Tap + to add photos, videos, files or a backup.") : "Try another name or album."))
+                                description: Text(search.isEmpty ? (filter == "Recently Deleted" ? "Deleted items stay here until you remove them permanently." : "Tap + to add photos, videos, files or a backup.") : "Try a shorter word or a tag. Turn on Private Text Search in Settings to find words inside photos."))
                         }
                     }
             }
@@ -121,23 +121,34 @@ struct LibraryView: View {
         .sheet(isPresented: $showingExports) { ExportMediaView(items: exportItems).environmentObject(vault) }
         .sheet(isPresented: $albumSheet) { albumEditor }
         .sheet(isPresented: $cloudChoices) { CloudBatchSelectionView(ids: selection).environmentObject(vault) }
+        .sheet(item: $importCapacity) { request in ImportCapacityView(request: request) { importCapacity = nil } }
         .sheet(item: $vault.fileImportReview) { FileImportReviewView(review: $0).environmentObject(vault) }
         .sheet(item: $vault.photoImportReview) { PhotoImportReviewView(review: $0).environmentObject(vault) }
         .photosPicker(isPresented: $photoPicker, selection: $photos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current, photoLibrary: .shared())
         .fileImporter(isPresented: $files, allowedContentTypes: [.item], allowsMultipleSelection: true) {
-            do { vault.importFiles(try $0.get()) } catch { vault.message = error.localizedDescription }
+            do { importCapacity = ImportCapacityRequest(files: try $0.get()) } catch { vault.message = error.localizedDescription }
         }
         .fileImporter(isPresented: $folders, allowedContentTypes: [.folder], allowsMultipleSelection: false) {
-            do { vault.importFiles(try $0.get()) } catch { vault.message = error.localizedDescription }
+            do { importCapacity = ImportCapacityRequest(files: try $0.get()) } catch { vault.message = error.localizedDescription }
         }
-        .onChange(of: photos) { _, value in if !value.isEmpty { vault.importPhotos(value); photos = [] } }
+        .onChange(of: photos) { _, value in if !value.isEmpty { importCapacity = ImportCapacityRequest(photos: value); photos = [] } }
         .onChange(of: search) { _, _ in selection = [] }
         .onChange(of: layout) { _, _ in selecting = false; selection = [] }
         .onReceive(vault.$items) { items in
+            vault.textSearch.prune(items: items)
             content.update(items: items, query: query)
             selection.formIntersection(Set(content.visible.map(\.id)))
         }
-        .onChange(of: query) { _, value in content.update(items: vault.items, query: value) }
+        .task(id: query) {
+            let value = query
+            if !value.search.isEmpty { do { try await Task.sleep(nanoseconds: 150_000_000) } catch { return } }
+            guard !Task.isCancelled else { return }
+            content.update(items: vault.items, query: value)
+        }
+        .onReceive(vault.textSearch.$index) { index in
+            content.update(items: vault.items, query: query, recognizedText: index.enabled ? index.entries : [:])
+        }
+        .task { await vault.refreshLibraryExtras() }
         .confirmationDialog(filter == "Recently Deleted" ? "Permanently Delete Selected Items?" : "Move to Recently Deleted?",
             isPresented: $deletion, titleVisibility: .visible) {
             Button(filter == "Recently Deleted" ? "Delete Permanently" : "Move to Recently Deleted", role: .destructive) {
@@ -304,20 +315,7 @@ struct LibraryView: View {
     }
     private var albumEditor: some View {
         NavigationStack {
-            Form {
-                Section("Album") {
-                    TextField("Album name", text: $albumName)
-                    ForEach(albums, id: \.self) { name in Button(name) { albumName = name } }
-                }
-                Section {
-                    Button("Move Selected Items") {
-                        let chosen = selectedItems; let name = albumName.trimmingCharacters(in: .whitespacesAndNewlines)
-                        Task { await vault.updateMany(chosen, album: name); albumSheet = false; albumName = ""; selection = [] }
-                    }.disabled(albumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vault.busy)
-                    Button("Remove from Album") { Task { await vault.updateMany(selectedItems, album: ""); albumSheet = false; selection = [] } }.disabled(vault.busy)
-                }
-            }.navigationTitle("Move to Album")
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { albumSheet = false } } }
+            AlbumTagEditor(ids: selection) { albumSheet = false; selection = [] }
         }
     }
 }

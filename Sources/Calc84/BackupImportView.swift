@@ -90,6 +90,7 @@ struct BackupImportView: View {
                     if let backup = input.backup {
                         Section {
                             Label(backup.displayName, systemImage: "doc.badge.checkmark").font(.subheadline)
+                            StorageEstimateView(bytes: Int64((try? backup.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0))
                             SecureField("This backup’s recovery key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
                             Button("Preview Contents") { review.prepare(backup, key: key); key = "" }
                                 .buttonStyle(.borderedProminent).disabled(key.isEmpty || review.working || vault.busy || input.working)

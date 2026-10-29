@@ -46,6 +46,17 @@ public actor VaultEngine {
         }
     }
     public func contents(id: UUID) throws -> Data { try repository.contents(of: id) }
+    public func albumPreferences() throws -> [String: AlbumPreference] { try repository.albumPreferences() }
+    public func organize(ids: Set<UUID>, albums: [String], tags: [String], mode: OrganizationMode) throws -> [VaultItem] {
+        try repository.organize(ids: ids, albums: albums, tags: tags, mode: mode); return repository.items
+    }
+    public func setAlbumPreference(_ value: AlbumPreference, name: String) throws -> [String: AlbumPreference] {
+        try repository.setAlbumPreference(value, name: name); return try repository.albumPreferences()
+    }
+    public func searchIndex() throws -> PrivateSearchIndex { try repository.searchIndex() }
+    public func saveSearchIndex(_ value: PrivateSearchIndex) throws { try repository.saveSearchIndex(value) }
+    public func storageReport() throws -> LibraryStorageReport { try repository.storageReport() }
+    public func duplicates() throws -> [DuplicateGroup] { try repository.duplicates() }
     public func materialize(id: UUID, to: URL) throws { try repository.materialize(id: id, to: to) }
     public func verifyImportedCopies(_ ids: [UUID]) throws { try repository.verifyImportedCopies(ids) }
     public func update(id: UUID, favorite: Bool? = nil, album: String? = nil, deleted: Bool? = nil) throws -> [VaultItem] {

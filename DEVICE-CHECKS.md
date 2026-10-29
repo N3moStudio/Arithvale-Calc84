@@ -1,12 +1,43 @@
 # Arithen · phone test guide
-Version 0.9.0 test · Build 13
+Version 0.10.0 test · Build 14
 
-## First: 0.9.0 glass and own-video checks (physical device - NOT RUN here)
+## First: 0.10.0 library tools (physical device — NOT RUN here)
+
+- Update the same container from 0.9.0. Check old album membership, originals,
+  recovery keys, Never Upload choices and Clear Glass/all six layouts.
+- Backup Center: create a Files backup A, test A, create B. B must show untested
+  until B itself passes. Test an older snapshot from another provider; it must not
+  certify the current one. Check per-provider chosen/blocked/unselected counts.
+- Import a second shared backup after setup from both Backup received and Backup
+  Center. Exercise wrong key, corrupt file, low-space, cancellation and Files picker
+  failure; share instructions must stay available. Check working-space estimates.
+- Enable text search with readable English/non-English screenshots. Find an OCR
+  word, combined tag/name/text queries, and a no-match case. Check failed-image
+  retry, pause/resume, new imports, app lock/background, Low Power Mode and heat.
+  Disable indexing: text-only matches must disappear and search.enc must be removed.
+  Confirm the index is absent from cloud/Files recovery and originals are unchanged.
+- Storage: compare totals with stored resources, including Live Photos and deleted
+  items. Preview largest files; scan exact duplicates with different thumbnails and
+  Live Photos with differing motion. Nothing is auto-selected. Cancel removal,
+  restore from Recently Deleted, then explicitly delete only disposable copies.
+- Albums: add one photo to two albums and several tags; count/bytes must not grow.
+  Remove one membership without losing another. Pin/unpin, change a cover, delete
+  its item, and verify fallback. Test export/restore and merging a duplicate backup.
+- Backgrounds: select a segment beyond 30 seconds in the original, change duration,
+  crop and still frame, preview, cancel, save and reopen. Try short/rotated/landscape
+  and iCloud videos. Enable Low Power Mode/Reduce Motion during loading and playing:
+  show the chosen still. Check old 0.9 prepared-loop editing and source re-selection.
+- Lock/background/cancel while OCR, duplicate scans or private-background preparation
+  are active. Check privacy cover, no stale completion and protected temporary cleanup.
+- Test all new screens at largest Dynamic Type, with VoiceOver, light/dark mode,
+  Increase Contrast and Reduce Transparency. Measure battery/frame pacing on a phone.
+
+## Retained 0.9.0 glass checks (use the current version/build)
 
 Record device, OS, installer/container and PASS/FAIL/NOT RUN. Use disposable media.
 
 1. Confirm Arithen and the purple Aperture A icon on the Home Screen and in About.
-   Version is 0.9.0 (13). Update the existing data container: its library, recovery
+   Version is 0.10.0 (14). Update the existing data container: its library, recovery
    key, received backup, cloud choices and chosen gallery layout must survive.
 2. On iOS 26+, inspect calculator keys, top controls, library header/filters,
    floating navigation and viewer Details. They should have native Liquid Glass.
@@ -16,7 +47,7 @@ Record device, OS, installer/container and PASS/FAIL/NOT RUN. Use disposable med
    Transparency, increased contrast and maximum Dynamic Type; labels and touch
    targets must remain usable. Photos themselves must remain unobscured.
 4. In calculator Settings → Glass Tint & Video Background, choose your own short
-   and long videos from Photos. Only the first 30 seconds loop silently; the
+   and long videos from Photos. The chosen section (up to 30 seconds) loops silently; the
    original is unchanged. Check portrait/landscape clips, iCloud download,
    unsupported files, the 256 MB limit, cancellation, replacement and removal.
 5. In Library Settings → Appearance → Library Glass & Video Background, choose

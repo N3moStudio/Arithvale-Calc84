@@ -19,8 +19,10 @@ struct PreparedBackup: Identifiable {
 final class VaultModel: ObservableObject {
     @Published var items: [VaultItem] = []
     @Published var cloudPreferences = CloudPreferences()
+    @Published var albumPreferences: [String: AlbumPreference] = [:]
     @Published var unlocked = false
     @Published var mediaViewerPresented = false
+    @Published var libraryToolPresented = false
     @Published var exists = false
     @Published var busy = false
     @Published var message: String?
@@ -39,6 +41,7 @@ final class VaultModel: ObservableObject {
     private var fileDeletionTask: Task<FileTrashResult, Never>?
     let engine: VaultEngine
     let cloud = CloudBackupModel()
+    let textSearch = LibraryTextSearch()
     private let deviceAccess = DeviceAccess()
     private(set) var generation = UUID()
     private var lockTask: Task<Void, Never>?
@@ -130,12 +133,40 @@ final class VaultModel: ObservableObject {
         setupTask?.cancel(); importTask?.cancel(); automaticBackupTask?.cancel(); fileDeletionTask?.cancel()
         fileImportReview = nil; failedFileAccess = nil
         failedPhotos = []; failedFiles = []; failedImportCount = 0
-        cloud.lock(); cloudPreferences = .init()
-        generation = UUID(); mediaViewerPresented = false; unlocked = false; items = []; status = ""; message = nil; photoImportReview = nil
+        cloud.lock(); textSearch.lock(); cloudPreferences = .init(); albumPreferences = [:]
+        generation = UUID(); mediaViewerPresented = false; libraryToolPresented = false; unlocked = false; items = []; status = ""; message = nil; photoImportReview = nil
         if let pendingBackup { finishBackupExport(pendingBackup, destination: nil) }
         lockTask = Task { await engine.lock(); exists = await engine.exists() }
     }
-    private func changed() { UserDefaults.standard.set(true, forKey: "libraryNeedsBackup"); cloud.changed() }
+    func changed() { UserDefaults.standard.set(true, forKey: "libraryNeedsBackup"); cloud.changed() }
+    func refreshLibraryExtras() async {
+        let ticket = generation
+        do {
+            let preferences = try await engine.albumPreferences()
+            guard unlocked, ticket == generation else { return }
+            albumPreferences = preferences
+            await textSearch.load(vault: self)
+        } catch { if unlocked, ticket == generation { message = error.localizedDescription } }
+    }
+    func organize(ids: Set<UUID>, albums: [String], tags: [String], mode: OrganizationMode) async -> Bool {
+        guard unlocked, !busy else { return false }
+        busy = true; defer { busy = false }; let ticket = generation
+        do {
+            let result = try await engine.organize(ids: ids, albums: albums, tags: tags, mode: mode)
+            let preferences = try await engine.albumPreferences()
+            guard unlocked, ticket == generation else { return false }
+            items = result; albumPreferences = preferences; changed(); scheduleAutomaticBackup(); return true
+        } catch { if ticket == generation { message = error.localizedDescription }; return false }
+    }
+    func setAlbumPreference(_ value: AlbumPreference, name: String) async -> Bool {
+        guard unlocked, !busy else { return false }
+        busy = true; defer { busy = false }; let ticket = generation
+        do {
+            let result = try await engine.setAlbumPreference(value, name: name)
+            guard unlocked, ticket == generation else { return false }
+            albumPreferences = result; changed(); scheduleAutomaticBackup(); return true
+        } catch { if ticket == generation { message = error.localizedDescription }; return false }
+    }
     func cancelImport() { importTask?.cancel(); status = "Cancelling import…" }
     func addFromBackup(root: URL, credential: VaultCredential, selected: Set<UUID>, completion: @escaping (Result<BackupImportResult, Error>) -> Void) {
         guard unlocked, !busy, !selected.isEmpty else { return }
@@ -147,7 +178,9 @@ final class VaultModel: ObservableObject {
                 let result = try await engine.importBackup(from: root, credential: credential, selected: selected)
                 guard ticket == generation else { return }
                 items = result.items; cloudPreferences = try await engine.cloudPreferences()
+                let preferences = try await engine.albumPreferences()
                 guard ticket == generation else { return }
+                albumPreferences = preferences
                 changed(); status = "Added \(result.added) items. Skipped \(result.skipped) exact duplicates."
                 completion(.success(result)); scheduleAutomaticBackup()
             } catch {
@@ -166,9 +199,9 @@ final class VaultModel: ObservableObject {
     private func importStopped(_ error: Error) -> Bool {
         Task.isCancelled || (error as NSError).domain == NSCocoaErrorDomain && (error as NSError).code == NSFileWriteOutOfSpaceError
     }
-    func importFiles(_ selections: [URL]) {
+    func importFiles(_ selections: [URL], accessParent: ImportAccess? = nil) {
         guard unlocked, !busy, !selections.isEmpty else { return }
-        let access = ImportAccess(selections, parent: failedFileAccess)
+        let access = ImportAccess(selections, parent: accessParent ?? failedFileAccess)
         fileImportReview = nil; failedFileAccess = nil
         busy = true; importing = true; progress = 0; let ticket = generation
         failedFiles = []; failedPhotos = []; failedImportCount = 0
@@ -431,7 +464,10 @@ final class VaultModel: ObservableObject {
             status = "Saving encrypted copy…"
             let destination = try await Task.detached(priority: .utility) { try BackupFolder.save(source) }.value
             guard ticket == generation else { return }
-            recordBackup(destination)
+            let digest = try await Task.detached(priority: .utility) { try CloudBackup.hash(source) }.value
+            let libraryID = try await engine.identifier()
+            guard ticket == generation else { return }
+            recordBackup(destination, digest: digest, libraryID: libraryID)
             status = "Backup saved and checked. Check Files for cloud upload status."
         } catch { if ticket == generation {
             message = "Couldn’t save to the connected folder. Use Save Backup to Files, or reconnect the folder.\n\n" + error.localizedDescription
@@ -439,11 +475,13 @@ final class VaultModel: ObservableObject {
         } }
     }
 
-    private func recordBackup(_ destination: URL) {
+    private func recordBackup(_ destination: URL, digest: String, libraryID: UUID) {
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastEncryptedExport")
         UserDefaults.standard.set(false, forKey: "libraryNeedsBackup")
         UserDefaults.standard.set(destination.lastPathComponent, forKey: "lastBackupFilename")
         UserDefaults.standard.set(destination.deletingLastPathComponent().lastPathComponent, forKey: "lastBackupFolder")
+        UserDefaults.standard.set(digest, forKey: "lastBackupDigest")
+        UserDefaults.standard.set(libraryID.uuidString, forKey: "lastBackupLibraryID")
     }
 
     func connectBackupFolder(_ url: URL) {
@@ -512,7 +550,9 @@ final class VaultModel: ObservableObject {
                     try BackupFolder.verifyExport(destination, expected: request.digest)
                 }.value
                 guard request.generation == generation else { return }
-                recordBackup(destination)
+                let libraryID = try await engine.identifier()
+                guard request.generation == generation else { return }
+                recordBackup(destination, digest: request.digest.map { String(format: "%02x", $0) }.joined(), libraryID: libraryID)
                 status = "Backup saved and checked. Keep its recovery key separately."
             } catch { if request.generation == generation {
                 // A provider's save callback is not proof that our read-back succeeded.
@@ -526,6 +566,12 @@ final class VaultModel: ObservableObject {
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastRecoveryTest")
         UserDefaults.standard.set(source + " · " + snapshot + " · Library " + library, forKey: "lastRecoveryTestIdentity")
     }
+    func recordRecoveryEvidence(source: String, snapshotID: String, items: Int) {
+        var records = RecoveryEvidenceStore.load()
+        records.removeAll { $0.matches(source: source, snapshotID: snapshotID) }
+        records.append(RecoveryCheck(source: source, snapshotID: snapshotID, items: items))
+        RecoveryEvidenceStore.save(Array(records.suffix(40)))
+    }
     func verifyBackup(url: URL, recovery: String) async -> Bool {
         guard unlocked, !busy else { return false }
         busy = true; let ticket = generation
@@ -533,11 +579,14 @@ final class VaultModel: ObservableObject {
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         do {
+            let bytes = Int64(try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+            try StoragePreflight.require(bytes: bytes * 2)
             let count = try await engine.verifyBackup(from: url, password: recovery)
             guard ticket == generation else { return false }
             let digest = try await Task.detached(priority: .utility) { try CloudBackup.hash(url) }.value
             guard ticket == generation else { return false }
             recordRecoveryTest(source: "Files", snapshot: url.lastPathComponent + " · SHA-256 " + digest, library: "Contained in the tested archive")
+            recordRecoveryEvidence(source: "Files", snapshotID: digest, items: count)
             status = "Recovery test passed: \(count) items authenticated in a separate temporary library."
             return true
         } catch { if ticket == generation { message = error.localizedDescription }; return false }
