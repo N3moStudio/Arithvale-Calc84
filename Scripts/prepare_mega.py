@@ -32,6 +32,10 @@ for filename, url, expected in inputs:
             if not entry.filename.startswith(prefix) or entry.is_dir():
                 continue
             relative = Path(entry.filename[len(prefix):])
+            # SwiftPM's macOS build driver can mistake CMake build descriptions
+            # for compilable sources when recursively expanding this SDK.
+            if relative.name == "CMakeLists.txt":
+                continue
             if relative.is_absolute() or ".." in relative.parts:
                 raise SystemExit("Unsafe archive member")
             output = target / relative
