@@ -11,7 +11,7 @@ final class ImportFileListTests: XCTestCase {
         try Data([1]).write(to: a); try Data([2]).write(to: b)
         try Data([3]).write(to: root.appendingPathComponent(".hidden"))
         try fm.createSymbolicLink(at: root.appendingPathComponent("link"), withDestinationURL: a)
-        XCTAssertEqual(Set(try ImportFileList.expand([root, a])), [a, b])
+        XCTAssertEqual(Set(try ImportFileList.expand([root, a]).map { $0.resolvingSymlinksInPath() }), Set([a, b].map { $0.resolvingSymlinksInPath() }))
         XCTAssertThrowsError(try ImportFileList.expand([root], limit: 1))
         XCTAssertTrue(try ImportFileList.expand([root.appendingPathComponent("link")]).isEmpty)
     }
