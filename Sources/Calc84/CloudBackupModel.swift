@@ -50,6 +50,7 @@ final class CloudBackupModel: ObservableObject {
     }
     func changed() {
         for provider in CloudProvider.allCases {
+            guard receipts[provider]?.needsBackup != true else { continue }
             var receipt = receipts[provider] ?? .init(); receipt.needsBackup = true
             receipts[provider] = receipt; persist(provider)
         }

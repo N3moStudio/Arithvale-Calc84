@@ -1,5 +1,28 @@
 # Arithen · phone test guide
-Version 0.10.0 test · Build 14
+Version 0.11.0 test · Build 15
+
+## First: 0.11.0 privacy and efficiency (physical device — NOT RUN here)
+
+- Check the library/header and viewer lock buttons, including during an import.
+  They must close private UI, stop playback and leave committed items available
+  after unlocking. Verify large text and small-screen button reachability.
+- Import disposable Photos, Live Photos and Files. Keep originals once, cancel
+  deletion once, then confirm deletion. Only verified imports may be eligible;
+  failed imports, changed source files and unsupported Trash providers must stay.
+- Enable Private Backup Reminders under Backups. Check no-copy/overdue changes,
+  open Backup Center, snooze for a day and save a new backup. Verify no reminder
+  leaks onto the calculator or Lock Screen. Older archive restore stays available.
+- Import a large disposable set, cancel halfway and retry failures. Check item
+  counts, exact source-to-copy matching, search, albums and selection after completion.
+- Compare the prior and current builds on the same phone with the same library:
+  rapid scrolling/search, repeated viewer/settings opens, and a private background.
+  Record memory, frames and energy with Instruments when a Mac is available.
+- Turn Low Power Mode on before entry and while viewing media. Backgrounds must
+  stop; current media remains usable. Automatic backups defer and resume when
+  active, unlocked and power permits. Test manual backup independently.
+- Check screen lock, app switching and leaving the app during indexing or backup.
+  No private background/player may continue after privacy lock. Test recovery and
+  actual provider behavior separately; passing CI is not device acceptance.
 
 ## First: 0.10.0 library tools (physical device — NOT RUN here)
 
@@ -37,7 +60,7 @@ Version 0.10.0 test · Build 14
 Record device, OS, installer/container and PASS/FAIL/NOT RUN. Use disposable media.
 
 1. Confirm Arithen and the purple Aperture A icon on the Home Screen and in About.
-   Version is 0.10.0 (14). Update the existing data container: its library, recovery
+   Version is 0.11.0 (15). Update the existing data container: its library, recovery
    key, received backup, cloud choices and chosen gallery layout must survive.
 2. On iOS 26+, inspect calculator keys, top controls, library header/filters,
    floating navigation and viewer Details. They should have native Liquid Glass.

@@ -446,12 +446,14 @@ private final class MemoryCell: UICollectionViewCell {
         task = Task { [weak self] in
             guard item.thumbnailID != nil || (item.byteCount <= 8 * 1024 * 1024 && UTType(item.contentType)?.conforms(to: .image) == true),
                   let data = try? await engine.contents(id: item.thumbnailID ?? item.id), !Task.isCancelled else { return }
-            let image = await Task.detached(priority: .utility) { () -> UIImage? in
-                guard let source = CGImageSourceCreateWithData(data as CFData, nil), let bitmap = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            let worker = Task.detached(priority: .utility) { () -> UIImage? in
+                guard !Task.isCancelled, let source = CGImageSourceCreateWithData(data as CFData, nil), let bitmap = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                     kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: 420,
                     kCGImageSourceCreateThumbnailWithTransform: true] as CFDictionary) else { return nil }
+                guard !Task.isCancelled else { return nil }
                 return UIImage(cgImage: bitmap)
-            }.value
+            }
+            let image = await withTaskCancellationHandler { await worker.value } onCancel: { worker.cancel() }
             guard !Task.isCancelled, let self, self.itemID == item.id, let image else { return }
             cache.setObject(image, forKey: item.id as NSUUID, cost: (image.cgImage?.bytesPerRow ?? 0) * (image.cgImage?.height ?? 0))
             self.photo.image = image; self.hasThumbnail = true

@@ -126,7 +126,7 @@ final class WallpaperPlayback: ObservableObject {
             install(url, image: image)
         } catch { /* A removed/missing wallpaper falls back to the static gradient. */ }
     }
-    func loadPrivate(_ item: VaultItem, vault: VaultModel, edit: WallpaperEdit) async {
+    func loadPrivate(_ item: VaultItem, vault: VaultModel, edit: WallpaperEdit, prepareMotion: Bool) async {
         clear(); let ticket = request; let generation = vault.generation
         guard vault.unlocked, item.byteCount <= WallpaperPolicy.maximumSourceBytes else { return }
         var original: URL?
@@ -143,6 +143,13 @@ final class WallpaperPlayback: ObservableObject {
             try await vault.engine.materialize(id: item.id, to: file)
             try Task.checkCancellation()
             guard vault.unlocked, vault.generation == generation, request == ticket else { return }
+            if !prepareMotion {
+                let image = try await WallpaperVideo.poster(file, seconds: edit.start + edit.still)
+                try Task.checkCancellation()
+                guard vault.unlocked, vault.generation == generation, request == ticket else { return }
+                poster = image
+                return
+            }
             let movie = try await WallpaperVideo.prepare(file, edit: edit); prepared = movie
             let image = try await WallpaperVideo.poster(movie, seconds: edit.still)
             try Task.checkCancellation()
@@ -225,13 +232,16 @@ struct ArithenWallpaper: View {
         return vault.items.first { $0.id == id && $0.visible && $0.deletedAt == nil && UTType($0.contentType)?.conforms(to: .movie) == true }
     }
     private var active: Bool { scene == .active && visible && (area == .calculator || vault.unlocked) }
-    private var shouldPlay: Bool {
-        WallpaperPolicy.plays(active: active, visible: visible, reduceMotion: reduceMotion || reduceTransparency || contrast == .increased,
+    private var motionAllowed: Bool {
+        WallpaperPolicy.plays(active: true, visible: true, reduceMotion: reduceMotion || reduceTransparency || contrast == .increased,
             lowPower: lowPower, thermallyLimited: thermal == .serious || thermal == .critical)
     }
+    private var shouldPlay: Bool { active && motionAllowed }
     private var loadIdentity: String {
-        guard active, styleValue == WallpaperStyle.video.rawValue else { return "" }
-        if area == .library { return privateItem.map { $0.id.uuidString + vault.generation.uuidString + editData.base64EncodedString() } ?? "" }
+        // A covering sheet pauses playback but retains the prepared loop. Locking
+        // or leaving the active scene still destroys private plaintext resources.
+        guard scene == .active, styleValue == WallpaperStyle.video.rawValue else { return "" }
+        if area == .library { return privateItem.map { $0.id.uuidString + vault.generation.uuidString + editData.base64EncodedString() + String(motionAllowed) } ?? "" }
         return video + editData.base64EncodedString()
     }
     var body: some View {
@@ -255,7 +265,7 @@ struct ArithenWallpaper: View {
             .task(id: loadIdentity) {
                 playback.clear()
                 guard !loadIdentity.isEmpty else { return }
-                if area == .library, let item = privateItem { await playback.loadPrivate(item, vault: vault, edit: edit) }
+                if area == .library, let item = privateItem { await playback.loadPrivate(item, vault: vault, edit: edit, prepareMotion: motionAllowed) }
                 else if area == .calculator { await playback.loadPublic(video, edit: edit) }
                 // Completion must not overwrite a newer power/accessibility decision.
                 // install() uses the permission maintained by the observers below.

@@ -26,9 +26,10 @@ struct LibraryView: View {
     @State private var importCapacity: ImportCapacityRequest?
     @State private var cloudChoices = false
     @State private var settings = false
+    @State private var backupCenter = false
     @AppStorage("libraryGlassTint") private var tintValue = GlassTint.plum.rawValue
     private var glassTint: GlassTint { GlassTint(rawValue: tintValue) ?? .plum }
-    private var backgroundVisible: Bool { !settings && !adding && !addingBackup && !showingExports && !albumSheet && !cloudChoices && !photoPicker && !files && !folders && !deletion && !removeReceived && !vault.mediaViewerPresented && !vault.libraryToolPresented && importCapacity == nil && !vault.busy && vault.photoImportReview == nil && vault.fileImportReview == nil }
+    private var backgroundVisible: Bool { !settings && !backupCenter && !adding && !addingBackup && !showingExports && !albumSheet && !cloudChoices && !photoPicker && !files && !folders && !deletion && !removeReceived && !vault.mediaViewerPresented && !vault.libraryToolPresented && importCapacity == nil && !vault.busy && vault.photoImportReview == nil && vault.fileImportReview == nil }
     @State private var filter = "All"
     @State private var search = ""
     @State private var searching = false
@@ -57,6 +58,7 @@ struct LibraryView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            BackupReminderView { backupCenter = true }
             if shared.entry != nil || shared.working || shared.error != nil { receivedBackup }
             if searching {
                 HStack {
@@ -116,6 +118,9 @@ struct LibraryView: View {
         .preferredColorScheme(style == .nightroom ? .dark : (AppAppearance(rawValue: appearance) ?? .system).scheme)
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $settings) { NavigationStack { VaultSettingsView().environmentObject(vault) } }
+        .sheet(isPresented: $backupCenter) { NavigationStack { BackupSettingsView()
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { backupCenter = false } } }
+        } }
         .sheet(isPresented: $adding, onDismiss: routeAdd) { addSheet }
         .sheet(isPresented: $addingBackup) { NavigationStack { BackupImportView() } }
         .sheet(isPresented: $showingExports) { ExportMediaView(items: exportItems).environmentObject(vault) }
@@ -172,6 +177,9 @@ struct LibraryView: View {
                 .lineLimit(1).minimumScaleFactor(0.7)
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 0)
+            Button("Lock & Return to Calculator", systemImage: "lock.fill") { vault.lock(); close() }
+                .labelStyle(.iconOnly).frame(width: 44, height: 44)
+                .modifier(ArithenGlass(tint: glassTint, shape: Circle()))
             Button(selecting ? "Done" : "Select") {
                 if showingAlbums { tab = "Library"; filter = "All Items" }
                 selecting.toggle(); selection = []

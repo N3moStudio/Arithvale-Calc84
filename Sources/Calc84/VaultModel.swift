@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import Combine
 import CalcCore
 import PhotosUI
 import Photos
@@ -33,6 +34,8 @@ final class VaultModel: ObservableObject {
     private var importTask: Task<Void, Never>?
     private var setupTask: Task<Void, Never>?
     private var automaticBackupTask: Task<Void, Never>?
+    private var automaticBackupPending = false
+    private var lifecycle = Set<AnyCancellable>()
     private var failedPhotos: [PhotosPickerItem] = []
     private var failedFiles: [URL] = []
     @Published var photoImportReview: PhotoImportReview?
@@ -50,6 +53,20 @@ final class VaultModel: ObservableObject {
     init() {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         engine = VaultEngine(root: base.appendingPathComponent("Calc84Library", isDirectory: true))
+        Publishers.CombineLatest3($busy, $photoImportReview, $fileImportReview)
+            .receive(on: RunLoop.main).sink { [weak self] _ in self?.resumeAutomaticBackup() }.store(in: &lifecycle)
+        for name in [Notification.Name.NSProcessInfoPowerStateDidChange, ProcessInfo.thermalStateDidChangeNotification,
+                     UIApplication.didBecomeActiveNotification, UIApplication.willResignActiveNotification] {
+            NotificationCenter.default.publisher(for: name).receive(on: RunLoop.main).sink { [weak self] note in
+                guard let self else { return }
+                if note.name == UIApplication.willResignActiveNotification {
+                    self.automaticBackupTask?.cancel(); self.textSearch.pause()
+                } else {
+                    if !self.allowsOptionalWork { self.textSearch.pause() }
+                    self.resumeAutomaticBackup()
+                }
+            }.store(in: &lifecycle)
+        }
         Task { exists = await engine.exists() }
     }
     /// True means show the library or first-run setup. Wrong codes leave a normal calculator.
@@ -130,6 +147,7 @@ final class VaultModel: ObservableObject {
         } catch { if ticket == generation { message = error.localizedDescription }; return false }
     }
     func lock() {
+        automaticBackupPending = false
         setupTask?.cancel(); importTask?.cancel(); automaticBackupTask?.cancel(); fileDeletionTask?.cancel()
         fileImportReview = nil; failedFileAccess = nil
         failedPhotos = []; failedFiles = []; failedImportCount = 0
@@ -138,7 +156,12 @@ final class VaultModel: ObservableObject {
         if let pendingBackup { finishBackupExport(pendingBackup, destination: nil) }
         lockTask = Task { await engine.lock(); exists = await engine.exists() }
     }
-    func changed() { UserDefaults.standard.set(true, forKey: "libraryNeedsBackup"); cloud.changed() }
+    func changed() {
+        if !UserDefaults.standard.bool(forKey: "libraryNeedsBackup") {
+            UserDefaults.standard.set(true, forKey: "libraryNeedsBackup")
+        }
+        cloud.changed()
+    }
     func refreshLibraryExtras() async {
         let ticket = generation
         do {
@@ -219,6 +242,9 @@ final class VaultModel: ObservableObject {
             var originals: [ImportedFileOriginal] = []
             var failures: [URL] = []
             var errors: [String] = []
+            var latestItems = items
+            var knownIDs = Set(items.map(\.id))
+            var lastPublication = -Double.infinity
             for (position, url) in urls.enumerated() {
                 guard ticket == generation, !Task.isCancelled else { failures += urls.dropFirst(position); break }
                 status = "Importing file \(position + 1) of \(urls.count)…"
@@ -235,14 +261,18 @@ final class VaultModel: ObservableObject {
                     let thumb = await MediaBridge.thumbnail(snapshot, type: type)
                     try Task.checkCancellation()
                     guard ticket == generation else { break }
-                    let before = Set(items.map(\.id))
                     let result = try await engine.add(file: snapshot, name: url.lastPathComponent, contentType: type, details: details, thumbnail: thumb)
                     changed()
                     guard ticket == generation else { break }
-                    if let added = result.first(where: { $0.visible && !before.contains($0.id) }) {
+                    if let added = result.first(where: { $0.visible && !knownIDs.contains($0.id) }) {
                         originals.append(.init(vaultID: added.id, url: url, digest: digest))
+                        knownIDs.insert(added.id)
                     }
-                    items = result
+                    latestItems = result
+                    let now = ProcessInfo.processInfo.systemUptime
+                    if now - lastPublication >= 0.25 {
+                        items = result; lastPublication = now
+                    }
                 } catch {
                     failures.append(url); errors.append(url.lastPathComponent + ": " + error.localizedDescription)
                     if importStopped(error) { failures += urls.dropFirst(position + 1); break }
@@ -251,6 +281,7 @@ final class VaultModel: ObservableObject {
             }
             busy = false; importing = false; importTask = nil
             guard ticket == generation, unlocked else { return }
+            items = latestItems
             failedFiles = failures; failedImportCount = failures.count
             failedFileAccess = failures.isEmpty ? nil : access
             status = "Imported \(originals.count) of \(urls.count). Originals stay where they are."
@@ -303,6 +334,9 @@ final class VaultModel: ObservableObject {
             var originals: [ImportedOriginal] = []
             var failures: [PhotosPickerItem] = []
             var errors: [String] = []
+            var latestItems = items
+            var knownIDs = Set(items.map(\.id))
+            var lastPublication = -Double.infinity
             if PHPhotoLibrary.authorizationStatus(for: .readWrite) == .notDetermined {
                 _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
             }
@@ -317,16 +351,20 @@ final class VaultModel: ObservableObject {
                     let bytes = Int64(try media.url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
                         + Int64(try media.companion?.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
                     try StoragePreflight.require(bytes: bytes * 2)
-                    let existing = Set(items.map(\.id))
                     let result = try await engine.add(file: media.url, name: media.name, contentType: media.type,
                         details: media.details, companion: media.companion,
                         companionType: media.companion == nil ? nil : "com.apple.quicktime-movie", thumbnail: media.thumbnail)
                     changed(); completed += 1
                     guard ticket == generation else { break }
-                    if let source = media.original, let added = result.first(where: { $0.visible && !existing.contains($0.id) }) {
-                        originals.append(ImportedOriginal(vaultID: added.id, source: source))
+                    if let added = result.first(where: { $0.visible && !knownIDs.contains($0.id) }) {
+                        if let source = media.original { originals.append(ImportedOriginal(vaultID: added.id, source: source)) }
+                        knownIDs.insert(added.id)
                     }
-                    items = result
+                    latestItems = result
+                    let now = ProcessInfo.processInfo.systemUptime
+                    if now - lastPublication >= 0.25 {
+                        items = result; lastPublication = now
+                    }
                 } catch {
                     failures.append(selection); errors.append("Item \(position + 1): " + error.localizedDescription)
                     if importStopped(error) { failures += selections.dropFirst(position + 1); break }
@@ -335,6 +373,7 @@ final class VaultModel: ObservableObject {
             }
             busy = false; importing = false; importTask = nil
             guard ticket == generation, unlocked else { return }
+            items = latestItems
             failedPhotos = failures; failedImportCount = failures.count
             status = "Imported \(completed) of \(selections.count). Originals remain in Photos."
             photoImportReview = PhotoImportReview(imported: completed, requested: selections.count, originals: originals,
@@ -398,20 +437,40 @@ final class VaultModel: ObservableObject {
         } catch { if ticket == generation { message = error.localizedDescription }; return false }
     }
     func scheduleAutomaticBackup() {
+        automaticBackupPending = true
+        resumeAutomaticBackup()
+    }
+    private var allowsOptionalWork: Bool {
+        LibraryEfficiency.allowsOptionalWork(active: UIApplication.shared.applicationState == .active,
+            lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled,
+            thermallyLimited: ProcessInfo.processInfo.thermalState == .serious || ProcessInfo.processInfo.thermalState == .critical)
+    }
+    private var readyForAutomaticBackup: Bool {
+        unlocked && !busy && photoImportReview == nil && fileImportReview == nil && allowsOptionalWork
+    }
+    private func resumeAutomaticBackup() {
+        guard automaticBackupPending else { return }
         automaticBackupTask?.cancel()
+        guard readyForAutomaticBackup else { return }
         let ticket = generation
         automaticBackupTask = Task {
             do {
                 try await Task.sleep(nanoseconds: 3_000_000_000)
-                while busy || photoImportReview != nil || fileImportReview != nil { try await Task.sleep(nanoseconds: 500_000_000) }
                 try Task.checkCancellation()
-                guard unlocked, ticket == generation else { return }
-                if UserDefaults.standard.bool(forKey: "automaticFolderBackup"), BackupFolder.configured { await backup() }
+                guard readyForAutomaticBackup, ticket == generation else { return }
+                automaticBackupPending = false
+                if UserDefaults.standard.bool(forKey: "automaticFolderBackup"),
+                   UserDefaults.standard.bool(forKey: "libraryNeedsBackup"), BackupFolder.configured { await backup() }
                 try Task.checkCancellation()
-                if unlocked, ticket == generation {
+                if unlocked, ticket == generation, allowsOptionalWork {
                     cloud.refresh(); cloud.backup(vault: self, automaticOnly: true)
+                } else if unlocked, ticket == generation {
+                    automaticBackupPending = true
                 }
-            } catch { /* A newer change or lock supersedes this request. */ }
+            } catch {
+                // An interruption defers work; a privacy lock discards the request.
+                if unlocked, ticket == generation { automaticBackupPending = true }
+            }
         }
     }
     func finishCloudRestore(_ archive: URL, recovery: String, newRecovery: String, code: String) async throws {

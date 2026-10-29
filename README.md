@@ -4,10 +4,10 @@
 
 <h1 align="center">Arithen</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.10.0 testing · iOS 17+ · SwiftUI · MIT licensed</p>
+<p align="center">0.11.0 testing · iOS 17+ · SwiftUI · MIT licensed</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
-  <a href="Docs/UPDATE-0.10.0.md">What’s new</a> &nbsp;·&nbsp;
+  <a href="Docs/UPDATE-0.11.0.md">What’s new</a> &nbsp;·&nbsp;
   <a href="CHANGELOG.md">Changelog</a> &nbsp;·&nbsp;
   <a href="Docs/CLOUD-BACKUP.md">Cloud choices</a> &nbsp;·&nbsp;
   <a href="Docs/BUILDING.md">Build from source</a>
@@ -27,6 +27,23 @@ control over which memories leave your phone. Previously **Arithvale / Calc 84**
 - **Recover independently.** Save encrypted backups to Files, test recovery, and recover on a computer using the included offline tool.
 
 ## The latest
+
+**0.11.0** adds quick privacy controls and reduces unnecessary library work:
+
+- **One-tap lock:** return to the calculator from the library header or media viewer.
+- **Private backup reminders:** opt in under Settings → Backups. Reminders appear
+  inside the unlocked library, open Backup Center, and can be snoozed until tomorrow.
+- **Large imports:** publish grid updates in batches, reuse search indexes, cancel
+  obsolete thumbnail work, and retry unsuccessful file imports from their review.
+- **Power-aware work:** defer automatic backups in Low Power Mode or high heat,
+  pause text indexing when inactive, and limit speculative photo preparation.
+  Covering the library pauses its background without repeatedly re-encoding it.
+
+Original deletion remains optional and rechecks committed encrypted copies before
+Photos confirmation or supported-provider Trash. Backup formats and keys stay compatible.
+Battery and scrolling improvements still require measurement on an iPhone.
+
+[Read the 0.11.0 update notes →](Docs/UPDATE-0.11.0.md)
 
 **0.10.0** makes the library easier to organize and recover:
 

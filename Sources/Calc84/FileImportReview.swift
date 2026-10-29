@@ -97,6 +97,9 @@ struct FileImportReviewView: View {
                     }
                 }
                 Section {
+                    if vault.failedImportCount > 0 {
+                        Button("Retry Unimported Items") { vault.retryImports() }
+                    }
                     Button("Keep Originals") { dismiss() }
                     if !review.originals.isEmpty {
                         Button("Move \(review.originals.count) Originals to Trash", role: .destructive) { confirming = true }

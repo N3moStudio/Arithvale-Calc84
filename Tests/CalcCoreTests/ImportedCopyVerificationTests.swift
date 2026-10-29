@@ -59,4 +59,13 @@ final class ImportedCopyVerificationTests: XCTestCase {
         XCTAssertTrue(repository.items.contains { $0.id == item.id })
         XCTAssertThrowsError(try repository.verifyImportedCopies([item.id]))
     }
+
+    func testMissingLivePhotoMotionBlocksDeletionEvenWhenStillIsReadable() throws {
+        let primary = try repository.add(data: Data([1]), name: "still", contentType: "public.heic", pending: true)
+        let companion = try repository.add(data: Data([2]), name: "motion", contentType: "public.movie", pending: true)
+        try repository.associate(primary: primary.id, companion: companion.id, thumbnail: nil)
+        try FileManager.default.removeItem(at: repository.root.appendingPathComponent(companion.id.uuidString + ".enc"))
+        XCTAssertEqual(try repository.contents(of: primary.id), Data([1]))
+        XCTAssertThrowsError(try repository.verifyImportedCopies([primary.id]))
+    }
 }

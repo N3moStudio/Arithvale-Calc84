@@ -41,6 +41,10 @@ final class MediaPreviewStore: ObservableObject {
             catch { return }
             guard let self, self.activeID == items[position].id, vault.unlocked else { return }
             for index in indices.dropFirst() {
+                guard LibraryEfficiency.allowsOptionalWork(active: UIApplication.shared.applicationState == .active,
+                    lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                    thermallyLimited: ProcessInfo.processInfo.thermalState == .serious || ProcessInfo.processInfo.thermalState == .critical)
+                else { return }
                 let item = items[index]
                 // Bound speculative disk work and decoded memory. Live Photo motion and
                 // large/video originals are prepared only when they become current.

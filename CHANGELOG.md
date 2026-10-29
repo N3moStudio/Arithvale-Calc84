@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.11.0 · Privacy & Efficiency
+
+**October 29, 2026 · Build 15 · Test build · iOS 17+**
+
+- Add a visible lock shortcut to the library and photo/video viewer.
+- Add optional reminders for changed libraries without a recent Files backup,
+  with a one-day snooze and a direct route to Backup Center. No public notifications.
+- Keep verified-original deletion opt-in; add failed-file retry in the import review
+  and regression coverage for a missing Live Photo companion.
+- Batch grid publication during imports, reuse search/album indexes on query changes,
+  and cancel offscreen thumbnail decoding work.
+- Replace automatic-backup polling with state-triggered scheduling; defer optional
+  work while inactive, in Low Power Mode, or at serious/critical thermal pressure.
+- Pause private text indexing on inactivity or power limits, restrict speculative
+  full-photo preparation, and avoid repeated dirty-receipt writes during imports.
+- Retain paused background loops under covering sheets; prepare only a still image
+  for private backgrounds when motion is disabled. Locking clears private resources.
+- Keep Clear Glass, purple branding, all gallery layouts, existing keys and archive
+  formats. No new guided restore test. Physical-device performance is unmeasured.
+
+[Changes, usage and device checks](Docs/UPDATE-0.11.0.md)
+
 ## 0.10.0 · Library Tools
 
 **October 28, 2026 · Build 14 · Test build · iOS 17+**

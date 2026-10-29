@@ -62,6 +62,9 @@ struct MediaBrowser: View {
                     ToolbarItem(placement: .cancellationAction) { Button("Done", action: close) }
                     ToolbarItem(placement: .principal) { Text("\(position + 1) of \(items.count)").font(.subheadline).foregroundStyle(.secondary) }
                     ToolbarItem(placement: .primaryAction) {
+                        Button("Lock & Return to Calculator", systemImage: "lock.fill") { previews.clear(); vault.lock(); close() }
+                    }
+                    ToolbarItem(placement: .primaryAction) {
                         Button("Share or Save", systemImage: "square.and.arrow.up") { sheet = .export(current) }
                     }
                     ToolbarItemGroup(placement: .bottomBar) {
@@ -84,6 +87,12 @@ struct MediaBrowser: View {
         .onChange(of: position) { _, index in focus(index) }
         .onChange(of: vault.unlocked) { _, unlocked in if !unlocked { sheet = nil; previews.clear() } }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in previews.trimToCurrent() }
+        .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange).receive(on: RunLoop.main)) { _ in
+            if ProcessInfo.processInfo.isLowPowerModeEnabled { previews.trimToCurrent() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ProcessInfo.thermalStateDidChangeNotification).receive(on: RunLoop.main)) { _ in
+            if ProcessInfo.processInfo.thermalState == .serious || ProcessInfo.processInfo.thermalState == .critical { previews.trimToCurrent() }
+        }
         .sheet(item: $sheet) { request in
             switch request {
             case .export(let item): ExportMediaView(items: [item]).environmentObject(vault)

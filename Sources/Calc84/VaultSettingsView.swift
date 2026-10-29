@@ -81,6 +81,7 @@ struct BackupSettingsView: View {
     @AppStorage("lastBackupFilename") private var filename = ""
     @AppStorage("lastBackupFolder") private var savedFolder = ""
     @AppStorage("libraryNeedsBackup") private var needsBackup = true
+    @AppStorage("privateBackupReminders") private var reminders = false
     @AppStorage("lastRecoveryTest") private var lastTest = 0.0
     @AppStorage("lastRecoveryTestIdentity") private var lastTestIdentity = ""
     @State private var sheet: BackupSheet?
@@ -102,6 +103,11 @@ struct BackupSettingsView: View {
                 NavigationLink { RecoveryTestView() } label: { Label("Test Backup", systemImage: "checkmark.shield").frame(minHeight: 44) }.disabled(vault.busy)
             } footer: { Text("Choose a location outside \(AppBrand.name) / LiveContainer. No folder connection is required for this save.") }
             BackupCoverageView()
+            Section {
+                Toggle("Private Backup Reminders", isOn: $reminders)
+            } footer: {
+                Text("Show a reminder inside the unlocked library when changes need a Files backup and the last saved copy is at least a week old, or no copy has been saved. Snooze it until tomorrow. No Lock Screen notifications.")
+            }
             Section {
                 NavigationLink { SharedBackupGuide() } label: { Label("How to Import from Files", systemImage: "square.and.arrow.down") }
                 Text("Files → Share → LiveContainer → Arithen. Unlock the library, then tap Backup received or Import Backup above. You can add another backup any time.")

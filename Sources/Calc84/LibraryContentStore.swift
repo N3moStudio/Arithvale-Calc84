@@ -26,18 +26,26 @@ final class LibraryContentStore: ObservableObject {
 
     func update(items: [VaultItem], query: LibraryQuery, recognizedText: [UUID: String]? = nil) {
         let textChanged = recognizedText.map { $0 != self.recognizedText } ?? false
-        guard self.items != items || self.query != query || textChanged else { return }
+        let itemsChanged = self.items != items
+        guard itemsChanged || self.query != query || textChanged else { return }
         let text = recognizedText ?? self.recognizedText
-        let ids = Set(items.map(\.id))
-        documents = documents.filter { ids.contains($0.key) }
-        for item in items where indexedItems[item.id] != item || text[item.id] != self.recognizedText[item.id] {
-            documents[item.id] = LibraryOrganization.searchDocument(item, recognizedText: text[item.id] ?? "")
+        if itemsChanged || textChanged {
+            if itemsChanged {
+                let ids = Set(items.map(\.id))
+                documents = documents.filter { ids.contains($0.key) }
+            }
+            for item in items where indexedItems[item.id] != item || text[item.id] != self.recognizedText[item.id] {
+                documents[item.id] = LibraryOrganization.searchDocument(item, recognizedText: text[item.id] ?? "")
+            }
+            if itemsChanged { indexedItems = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) }) }
+            self.recognizedText = text
         }
-        indexedItems = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
-        self.recognizedText = text
-        self.items = items; self.query = query
-        albumItems = items.filter { $0.visible && $0.deletedAt == nil }
-        albums = Array(Set(albumItems.flatMap(\.albumNames))).sorted()
+        if itemsChanged {
+            self.items = items
+            albumItems = items.filter { $0.visible && $0.deletedAt == nil }
+            albums = Array(Set(albumItems.flatMap(\.albumNames))).sorted()
+        }
+        self.query = query
         let terms = LibraryOrganization.searchTerms(query.search)
         visible = items.filter { item in
             guard item.visible, (query.filter == "Recently Deleted" ? item.deletedAt != nil : item.deletedAt == nil) else { return false }
