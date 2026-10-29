@@ -1,0 +1,31 @@
+name: Build Arithen IPA
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          brew install xtool-org/tap/xtool
+          python3 -m venv .build/ci-python
+          .build/ci-python/bin/pip install -r Scripts/recovery-requirements.txt
+          python3 Scripts/prepare_mega.py
+      - name: Test and build unsigned IPA
+        run: python3 Scripts/verify_release.py --ipa --python "$PWD/.build/ci-python/bin/python"
+      - name: Upload IPA and verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arithen-IPA-${{ github.sha }}
+          path: |
+            Releases/
+            .build/verification/
+          include-hidden-files: true
+          if-no-files-found: error
