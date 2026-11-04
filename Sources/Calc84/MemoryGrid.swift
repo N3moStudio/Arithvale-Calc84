@@ -21,13 +21,16 @@ struct MemoryGrid: UIViewControllerRepresentable {
     let action: (String, VaultItem) -> Void
     var viewerVault: VaultModel? = nil
     var contentRevision: UUID? = nil
-    func makeUIViewController(context: Context) -> MemoryGridController { MemoryGridController(self) }
-    func updateUIViewController(_ controller: MemoryGridController, context: Context) { controller.update(self) }
+    var beginSelection: ((VaultItem) -> Void)? = nil
+    var theme: ArithenTheme = .bloom
+    func makeUIViewController(context: Context) -> MemoryGridController { MemoryGridController(self, typeSize: context.environment.dynamicTypeSize) }
+    func updateUIViewController(_ controller: MemoryGridController, context: Context) { controller.update(self, typeSize: context.environment.dynamicTypeSize) }
     static func dismantleUIViewController(_ controller: MemoryGridController, coordinator: ()) { controller.tearDown() }
 }
 
 final class MemoryGridController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegate {
     private var model: MemoryGrid
+    private var typeSize: DynamicTypeSize
     private lazy var layout = UICollectionViewCompositionalLayout { [weak self] _, environment in
         self?.makeSection(environment)
     }
@@ -41,7 +44,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
     private var restoredVisibility = true
     private var dragSelection: GridDragSelection?
     private var mediaHost: MediaViewerController?
-    init(_ model: MemoryGrid) { self.model = model; super.init(nibName: nil, bundle: nil) }
+    init(_ model: MemoryGrid, typeSize: DynamicTypeSize) { self.model = model; self.typeSize = typeSize; super.init(nibName: nil, bundle: nil) }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     deinit { NotificationCenter.default.removeObserver(self) }
     override func viewDidLoad() {
@@ -64,6 +67,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
             self.model.setSelection(selection)
         }
         configureDragSelection()
+        grid.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(holdToSelect(_:))))
         month.textColor = .white; month.backgroundColor = .darkGray
         month.font = .preferredFont(forTextStyle: .headline)
         month.adjustsFontForContentSizeCategory = true
@@ -122,20 +126,22 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         images.removeAllObjects()
         for cell in grid.visibleCells.compactMap({ $0 as? MemoryCell }) { cell.clear() }
     }
-    func update(_ next: MemoryGrid) {
+    func update(_ next: MemoryGrid, typeSize: DynamicTypeSize) {
+        let typeChanged = self.typeSize != typeSize; self.typeSize = typeSize
         let newContent: Bool
         if let previous = model.contentRevision, let revision = next.contentRevision { newContent = previous != revision }
         else { newContent = model.sections != next.sections }
-        let newLayout = model.columns != next.columns || model.style != next.style || model.grouping != next.grouping
+        let newLayout = typeChanged || model.columns != next.columns || model.style != next.style || model.grouping != next.grouping
         let reset = model.identity != next.identity
         let selectionChanged = model.selection != next.selection || model.selecting != next.selecting
+        let themeChanged = model.theme != next.theme
         let anchorPath = (newContent || newLayout) ? grid.indexPathsForVisibleItems.sorted().first : nil
         let anchor = anchorPath.flatMap { item(at: $0)?.id }
         let relativeTop = anchorPath.flatMap { layout.layoutAttributesForItem(at: $0)?.frame.minY }.map { $0 - grid.contentOffset.y }
         if newContent || newLayout || reset { dragSelection?.cancel() }
         model = next
         guard isViewLoaded else { return }
-        let bottom: CGFloat = model.style == .clearGlass && !model.selecting ? 88 : 8
+        let bottom: CGFloat = model.grouping == "Snaps" ? 0 : model.style == .clearGlass && !model.selecting ? 88 : 8
         if grid.contentInset.bottom != bottom { grid.contentInset.bottom = bottom }
         if newContent { configureDragSelection() }
         else { dragSelection?.update(selection: model.selection, enabled: model.selecting && !model.busy) }
@@ -154,7 +160,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
             if newLayout && !reset && view.window != nil && mediaHost == nil && !UIAccessibility.isReduceMotionEnabled {
                 UIView.transition(with: grid, duration: 0.15, options: [.transitionCrossDissolve, .allowUserInteraction, .beginFromCurrentState], animations: change)
             } else { UIView.performWithoutAnimation(change) }
-        } else if selectionChanged {
+        } else if selectionChanged || themeChanged {
             refreshSelection(model.selection)
         }
         if newContent || newLayout || reset { updateDate(show: false) }
@@ -218,7 +224,12 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "photo", for: path) as! MemoryCell
         if let item = item(at: path) {
             cell.configure(item, engine: model.engine, cache: images)
+            cell.configureTypography(typeSize)
             cell.contentView.layer.cornerRadius = model.style == .nightroom ? 12 : model.style == .timeline ? 12 : 0
+            cell.accessibilityCustomActions = model.beginSelection == nil ? nil : [UIAccessibilityCustomAction(name: "Select Snap", actionHandler: { [weak self] _ in
+                guard let self, !self.model.busy else { return false }
+                self.model.beginSelection?(item); return true
+            })]
             cell.setSelection((dragSelection?.selection ?? model.selection).contains(item.id), selecting: model.selecting)
         }
         return cell
@@ -228,7 +239,8 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
     }
     private func makeSection(_ environment: NSCollectionLayoutEnvironment) -> NSCollectionLayoutSection {
         let style = model.style
-        let inset = CGFloat(style.inset), gap = CGFloat(style.gap)
+        let inset: CGFloat = model.grouping == "Snaps" ? 0 : CGFloat(style.inset)
+        let gap: CGFloat = model.grouping == "Snaps" ? 1 : CGFloat(style.gap)
         let available = max(1, environment.container.effectiveContentSize.width - inset * 2)
         let group: NSCollectionLayoutGroup
         if style == .timeline {
@@ -244,18 +256,18 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
             group.interItemSpacing = .fixed(0)
         } else {
             let count = max(2, model.columns)
-            let height = (available - CGFloat(count - 1) * gap) / CGFloat(count) / style.aspectRatio
+            let height = (available - CGFloat(count - 1) * gap) / CGFloat(count) / (model.grouping == "Snaps" ? 0.62 : style.aspectRatio)
             let item = NSCollectionLayoutItem(layoutSize: .init(widthDimension: .fractionalWidth(1 / CGFloat(count)), heightDimension: .fractionalHeight(1)))
             group = .horizontal(layoutSize: .init(widthDimension: .fractionalWidth(1), heightDimension: .absolute(height)), repeatingSubitem: item, count: count)
             group.interItemSpacing = .fixed(gap)
         }
         let section = NSCollectionLayoutSection(group: group)
         section.interGroupSpacing = gap
-        section.contentInsets = .init(top: 0, leading: inset, bottom: style == .timeline ? 18 : 12, trailing: inset)
+        section.contentInsets = .init(top: 0, leading: inset, bottom: model.grouping == "Snaps" ? 1 : style == .timeline ? 18 : 12, trailing: inset)
         let height = UIFont.preferredFont(forTextStyle: style == .contactSheet ? .subheadline : .headline).lineHeight + 24
         let header = NSCollectionLayoutBoundarySupplementaryItem(layoutSize: .init(widthDimension: .fractionalWidth(1), heightDimension: .absolute(height)), elementKind: UICollectionView.elementKindSectionHeader, alignment: .top)
         header.pinToVisibleBounds = style == .contactSheet || style == .photoLibrary
-        section.boundarySupplementaryItems = [header]
+        section.boundarySupplementaryItems = model.grouping == "Snaps" ? [] : [header]
         return section
     }
     func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at path: IndexPath) -> UICollectionReusableView {
@@ -268,21 +280,11 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         (cell as? MemoryCell)?.clear()
     }
-    func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt path: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
-        guard !model.selecting, let item = item(at: path) else { return nil }
-        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
-            let actions: [(String, String, String)] = item.deletedAt == nil
-                ? [("Open", "arrow.up.left.and.arrow.down.right", "open"),
-                   (item.favorite == true ? "Remove Favorite" : "Favorite", "heart", "favorite"),
-                   ("Save or Share", "square.and.arrow.up", "export"), ("Move to Album", "rectangle.stack", "album"),
-                   ("Move to Recently Deleted", "trash", "delete")]
-                : [("Restore", "arrow.uturn.backward", "restore")]
-            return UIMenu(children: actions.map { title, symbol, key in
-                UIAction(title: title, image: UIImage(systemName: symbol), attributes: key == "delete" ? .destructive : []) { _ in
-                    if key == "open" { self?.open(item) } else { self?.model.action(key, item) }
-                }
-            })
-        }
+    @objc private func holdToSelect(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began, !model.selecting, !model.busy,
+              let path = grid.indexPathForItem(at: gesture.location(in: grid)), let item = item(at: path) else { return }
+        model.beginSelection?(item)
+        if model.beginSelection != nil { UISelectionFeedbackGenerator().selectionChanged() }
     }
     func scrollViewDidScroll(_ scrollView: UIScrollView) { updateDate(show: scrollView.isDragging || scrollView.isDecelerating || scrubber.isDragging) }
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) { hideMonth?.cancel(); updateDate(show: true) }
@@ -322,7 +324,7 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         guard !model.sections.isEmpty else { return }
         let next = max(0, min(model.sections.count - 1, currentSection + delta))
         let path = IndexPath(item: 0, section: next)
-        if let header = layout.layoutAttributesForSupplementaryView(ofKind: UICollectionView.elementKindSectionHeader, at: path) {
+        if let header = layout.layoutAttributesForSupplementaryView(ofKind: UICollectionView.elementKindSectionHeader, at: path) ?? layout.layoutAttributesForItem(at: path) {
             let maxY = max(0, grid.contentSize.height - grid.bounds.height)
             grid.setContentOffset(CGPoint(x: 0, y: min(maxY, header.frame.minY)), animated: false)
             updateDate(show: true); scheduleHide()
@@ -414,7 +416,7 @@ private final class MemoryCell: UICollectionViewCell {
         super.init(frame: frame)
         contentView.backgroundColor = .secondarySystemBackground; contentView.clipsToBounds = true
         photo.contentMode = .scaleAspectFill; photo.clipsToBounds = true
-        duration.font = .preferredFont(forTextStyle: .caption1); duration.adjustsFontForContentSizeCategory = true; duration.textColor = .white
+        duration.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: UIFont(descriptor: UIFont.systemFont(ofSize: 11, weight: .semibold).fontDescriptor.withDesign(.rounded)!, size: 11)); duration.adjustsFontForContentSizeCategory = true; duration.textColor = .white
         duration.layer.shadowColor = UIColor.black.cgColor; duration.layer.shadowOpacity = 1; duration.layer.shadowRadius = 3; duration.layer.shadowOffset = .zero
         favorite.image = UIImage(systemName: "heart.fill"); favorite.tintColor = .white
         favorite.layer.shadowColor = UIColor.black.cgColor; favorite.layer.shadowOpacity = 1; favorite.layer.shadowRadius = 3
@@ -428,7 +430,11 @@ private final class MemoryCell: UICollectionViewCell {
         let height = ceil(duration.font.lineHeight) + 8
         duration.frame = CGRect(x: 6, y: max(0, bounds.height - height - 6), width: max(0, bounds.width - 12), height: height)
         favorite.frame = CGRect(x: 7, y: 7, width: 17, height: 17)
-        check.frame = CGRect(x: bounds.width - 32, y: 6, width: 26, height: 26)
+        check.frame = CGRect(x: bounds.width - 32, y: max(6, bounds.height - 36), width: 26, height: 26)
+    }
+    func configureTypography(_ size: DynamicTypeSize) {
+        let font = UIFont.preferredFont(forTextStyle: .caption1, compatibleWith: UITraitCollection(preferredContentSizeCategory: size.nativeCategory))
+        duration.font = UIFont(descriptor: font.fontDescriptor.withDesign(.rounded) ?? font.fontDescriptor, size: max(11, font.pointSize))
     }
     func configure(_ item: VaultItem, engine: VaultEngine, cache: NSCache<NSUUID, UIImage>) {
         clear(); itemID = item.id
@@ -460,11 +466,10 @@ private final class MemoryCell: UICollectionViewCell {
         }
     }
     func setSelection(_ selected: Bool, selecting: Bool) {
-        if let previous = selectionState, previous.selected == selected, previous.selecting == selecting { return }
         selectionState = (selected, selecting)
         check.isHidden = !selecting
         check.image = UIImage(systemName: selected ? "checkmark.circle.fill" : "circle")
-        check.tintColor = selected ? .systemBlue : .white
+        check.tintColor = selected ? ArithenPalette.ui(.accent) : .white
         photo.alpha = selected ? 0.7 : 1
         accessibilityTraits = selected ? [.button, .selected] : [.button]
         accessibilityHint = selecting ? (selected ? "Double-tap to deselect." : "Double-tap to select.") : "Double-tap to open."

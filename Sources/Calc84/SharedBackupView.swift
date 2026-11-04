@@ -86,11 +86,11 @@ struct SharedBackupSection: View {
                     .disabled(vault.busy || input.working || shared.working)
                     .accessibilityIdentifier("backup.useReceived")
                 Text("Received, not yet authenticated. Enter its original recovery key to restore or test it.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
             } else if !shared.working {
-                Text("No shared backup received yet.").font(.footnote).foregroundStyle(.secondary)
+                Text("No shared backup received yet.").font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
             }
-            if let error = shared.error { Text(error).font(.footnote).foregroundStyle(.secondary) }
+            if let error = shared.error { Text(error).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)) }
             if shared.entry != nil || shared.error != nil {
                 Button("Remove Received Copy", role: .destructive) { shared.discard() }
                     .disabled(vault.busy || input.working || shared.working)
@@ -103,7 +103,7 @@ struct SharedBackupSection: View {
 
 struct SharedBackupGuide: View {
     var body: some View {
-        List {
+        ThemedList {
             Section("In Files") {
                 Text("1. Open Apple’s Files app yourself and find your .c84backup file. Download it first if it has a cloud icon.")
                 Text("2. Touch and hold the backup file, then tap Share. Share one file, not the folder or an iCloud collaboration link.")

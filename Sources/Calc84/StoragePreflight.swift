@@ -33,7 +33,7 @@ struct StorageEstimateView: View {
                 if available < needed { Text("Free up space before continuing.").fontWeight(.semibold) }
             }
             Text("Includes temporary encrypted copies and working space. Space is checked again when the operation starts.")
-        }.font(.footnote).foregroundStyle(.secondary)
+        }.font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
             .task { available = try? StoragePreflight.available() }
     }
 }

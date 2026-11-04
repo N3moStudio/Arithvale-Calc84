@@ -2,85 +2,122 @@
 import SwiftUI
 import CalcCore
 
-enum AppAppearance: String, CaseIterable {
-    case system, light, dark
-    var title: String { rawValue.capitalized }
-    var scheme: ColorScheme? { self == .system ? nil : self == .dark ? .dark : .light }
+private struct ThemeKey: EnvironmentKey { static let defaultValue = ArithenTheme.bloom }
+private struct CompactAppliedKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var arithenTheme: ArithenTheme { get { self[ThemeKey.self] } set { self[ThemeKey.self] = newValue } }
+    var arithenCompactApplied: Bool { get { self[CompactAppliedKey.self] } set { self[CompactAppliedKey.self] = newValue } }
 }
-
-enum CalculatorAccent: String, CaseIterable {
-    case blue, mint, lilac, amber
-    var color: Color {
+extension DynamicTypeSize {
+    var nativeCategory: UIContentSizeCategory {
         switch self {
-        case .blue: Color(red: 0.384, green: 0.624, blue: 0.914)
-        case .mint: Color(red: 0.482, green: 0.792, blue: 0.710)
-        case .lilac: Color(red: 0.702, green: 0.604, blue: 0.878)
-        case .amber: Color(red: 0.957, green: 0.714, blue: 0.341)
+        case .xSmall: .extraSmall
+        case .small: .small
+        case .medium: .medium
+        case .large: .large
+        case .xLarge: .extraLarge
+        case .xxLarge: .extraExtraLarge
+        case .xxxLarge: .extraExtraExtraLarge
+        case .accessibility1: .accessibilityMedium
+        case .accessibility2: .accessibilityLarge
+        case .accessibility3: .accessibilityExtraLarge
+        case .accessibility4: .accessibilityExtraExtraLarge
+        case .accessibility5: .accessibilityExtraExtraExtraLarge
+        @unknown default: .large
         }
     }
 }
-
-/// Glass belongs to controls. Content remains opaque and fully legible.
-struct FloatingLibraryBar: ViewModifier {
-    @AppStorage("libraryGlassTint") private var tint = GlassTint.plum.rawValue
+enum ArithenPalette {
+    static let themeKey = "arithen.theme.v1"
+    static let surfaceKey = "arithen.surface.v1"
+    static var theme: ArithenTheme { .init(storedValue: UserDefaults.standard.string(forKey: themeKey)) }
+    static func ui(_ ink: ArithenTheme.Ink, theme: ArithenTheme = theme) -> UIColor {
+        UIColor { traits in
+            let hex = theme.hex(ink, dark: theme.isDark(systemDark: traits.userInterfaceStyle == .dark))
+            return UIColor(red: CGFloat((hex >> 16) & 255) / 255, green: CGFloat((hex >> 8) & 255) / 255, blue: CGFloat(hex & 255) / 255, alpha: 1)
+        }
+    }
+    static func color(_ ink: ArithenTheme.Ink, theme: ArithenTheme = theme) -> Color { Color(uiColor: ui(ink, theme: theme)) }
+}
+/// No theme-dependent identity: calculations, navigation, imports and zoom survive.
+/// Presented roots inherit the marker, so compact sizing is applied exactly once.
+struct AppearanceRoot: ViewModifier {
+    @AppStorage(ArithenPalette.themeKey) private var storedTheme = ArithenTheme.defaultStyle.rawValue
+    @Environment(\.dynamicTypeSize) private var size
+    @Environment(\.arithenCompactApplied) private var compactApplied
+    private var theme: ArithenTheme { .init(storedValue: storedTheme) }
+    private var compact: DynamicTypeSize {
+        guard !compactApplied, !size.isAccessibilitySize else { return size }
+        let sizes: [DynamicTypeSize] = [.xSmall, .small, .medium, .large, .xLarge, .xxLarge, .xxxLarge]
+        return sizes[CompactTypography.category(sizes.firstIndex(of: size) ?? 3, accessibility: false)]
+    }
     func body(content: Content) -> some View {
-        content.modifier(ArithenGlass(tint: GlassTint(rawValue: tint) ?? .plum, shape: Capsule(), interactive: false))
+        content.fontDesign(.rounded).dynamicTypeSize(compact)
+            .environment(\.arithenCompactApplied, true).environment(\.arithenTheme, theme)
+            .tint(ArithenPalette.color(.accent, theme: theme))
+            .foregroundStyle(ArithenPalette.color(.text, theme: theme))
+            .preferredColorScheme(theme.colorMode == "system" ? nil : theme.colorMode == "dark" ? .dark : .light)
     }
 }
+struct SettingsScreen: ViewModifier {
+    @Environment(\.arithenTheme) private var theme
+    func body(content: Content) -> some View {
+        content.scrollContentBackground(.hidden).background(ArithenPalette.color(.canvas, theme: theme))
+            .listStyle(.insetGrouped).listRowSpacing(theme == .afterhours ? 6 : 0)
+            .listSectionSpacing(theme == .porcelain ? 28 : 24).environment(\.defaultMinListRowHeight, 56)
+            .toolbarBackground(ArithenPalette.color(.surface, theme: theme), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+    }
+}
+extension View {
+    func settingsScreen() -> some View { modifier(SettingsScreen()) }
+    func settingsRows() -> some View { listRowBackground(ArithenPalette.color(.surface)) }
+}
+/// Only app-owned lists/forms are themed; system pickers and share sheets stay native.
+struct ThemedList<Content: View>: View {
+    @Environment(\.arithenTheme) private var theme
+    @ViewBuilder var content: () -> Content
+    var body: some View { List { content().listRowBackground(ArithenPalette.color(theme == .porcelain ? .canvas : .surface, theme: theme)).listRowSeparatorTint(ArithenPalette.color(.text, theme: theme).opacity(0.10)) }.settingsScreen() }
+}
+struct ThemedForm<Content: View>: View {
+    @Environment(\.arithenTheme) private var theme
+    @ViewBuilder var content: () -> Content
+    var body: some View { Form { content().listRowBackground(ArithenPalette.color(theme == .porcelain ? .canvas : .surface, theme: theme)).listRowSeparatorTint(ArithenPalette.color(.text, theme: theme).opacity(0.10)) }.settingsScreen() }
+}
 
+struct FloatingLibraryBar: ViewModifier {
+    func body(content: Content) -> some View { content.modifier(ArithenGlass(tint: .clear, shape: Capsule(), interactive: false)) }
+}
 struct AppearanceSettingsView: View {
-    @AppStorage("galleryStyle") private var style = GalleryStyle.initial.rawValue
-    @AppStorage("appAppearance") private var appearance = AppAppearance.system.rawValue
-    @AppStorage("calculatorAppearance") private var calculatorAppearance = AppAppearance.dark.rawValue
-    @AppStorage("calculatorAccent") private var accent = CalculatorAccent.lilac.rawValue
-    @AppStorage("libraryDateSource") private var dateSource = LibraryDateSource.captured.rawValue
-    @AppStorage("libraryNewestFirst") private var newestFirst = true
+    @AppStorage(ArithenPalette.themeKey) private var theme = ArithenTheme.defaultStyle.rawValue
+    @AppStorage(ArithenPalette.surfaceKey) private var surface = ThemeSurface.theme.rawValue
     var body: some View {
         List {
-            Section {
-                NavigationLink("Library Glass & Video Background") { SurfaceAppearanceSettings(area: .library) }
-                NavigationLink("Calculator Glass & Video Background") { SurfaceAppearanceSettings(area: .calculator) }
-            }
-            Section("Library layout") {
-                ForEach(GalleryStyle.allCases, id: \.rawValue) { option in
-                    Button { style = option.rawValue } label: {
+            Section("Theme") {
+                ForEach(ArithenTheme.allCases) { choice in
+                    Button { theme = choice.rawValue } label: {
                         HStack(spacing: 14) {
-                            Image(systemName: symbol(option)).font(.title2).frame(width: 30)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(option.title).font(.body.weight(.medium)).foregroundStyle(.primary)
-                                Text(option.subtitle).font(.footnote).foregroundStyle(.secondary)
+                            RoundedRectangle(cornerRadius: 13).fill(ArithenPalette.color(.canvas, theme: choice))
+                                .overlay { Circle().fill(ArithenPalette.color(.accent, theme: choice)).padding(14) }
+                                .frame(width: 52, height: 52)
+                                .overlay { RoundedRectangle(cornerRadius: 13).stroke(.primary.opacity(0.12), lineWidth: 1) }
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(choice.title).font(.body.weight(.semibold))
+                                Text(choice.detail).font(.subheadline).foregroundStyle(ArithenPalette.color(.muted))
                             }
-                            Spacer(minLength: 0)
-                            if style == option.rawValue { Image(systemName: "checkmark").fontWeight(.semibold) }
-                        }.padding(.vertical, 6).frame(minHeight: 44)
-                    }.accessibilityAddTraits(style == option.rawValue ? .isSelected : [])
+                            Spacer(minLength: 4)
+                            if ArithenTheme(storedValue: theme) == choice { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                        }.frame(minHeight: 60).contentShape(Rectangle())
+                    }.buttonStyle(.plain).accessibilityAddTraits(ArithenTheme(storedValue: theme) == choice ? .isSelected : [])
                 }
-            }
-            Section {
-                Picker("Appearance", selection: $appearance) {
-                    ForEach(AppAppearance.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+            }.settingsRows()
+            Section("Surfaces") {
+                Picker("Surfaces", selection: $surface) {
+                    ForEach(ThemeSurface.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
                 }
-                Picker("Dates", selection: $dateSource) {
-                    ForEach(LibraryDateSource.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
-                }
-                Toggle("Newest first", isOn: $newestFirst)
-            } header: { Text("Library") } footer: { Text("Nightroom always uses a dark background. Each layout keeps its own photo size.") }
-            Section("Calculator") {
-                Picker("Appearance", selection: $calculatorAppearance) {
-                    ForEach(AppAppearance.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
-                }
-            }
-        }.navigationTitle("Appearance").navigationBarTitleDisplayMode(.inline)
-    }
-    private func symbol(_ style: GalleryStyle) -> String {
-        switch style {
-        case .clearGlass: "square.on.square"
-        case .photoLibrary: "square.grid.3x3"
-        case .nightroom: "moon"
-        case .albumsFirst: "rectangle.stack"
-        case .timeline: "calendar"
-        case .contactSheet: "square.grid.4x3.fill"
-        }
+                Button("Reset Appearance") { theme = ArithenTheme.defaultStyle.rawValue; surface = ThemeSurface.theme.rawValue }
+            }.settingsRows()
+        }.settingsScreen().navigationTitle("Appearance").navigationBarTitleDisplayMode(.inline)
     }
 }
 #endif

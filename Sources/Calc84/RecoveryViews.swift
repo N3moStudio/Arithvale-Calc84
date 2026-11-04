@@ -10,16 +10,18 @@ struct ChangeCodeView: View {
     @State private var new = ""
     @State private var confirmation = ""
     var body: some View {
-        Form {
+        ThemedForm {
+            Section { Label("Change Calculator Code", systemImage: "lock.rotation").font(.title3.bold()) }.listRowBackground(Color.clear)
             Section("Current Code") { SecureField("Current calculator code", text: $old).keyboardType(.numberPad) }
             Section("New Code") {
                 SecureField("6–12 digits", text: $new).keyboardType(.numberPad)
                 SecureField("Repeat new code", text: $confirmation).keyboardType(.numberPad)
             }
             Section {
-                Button("Change Code") { Task { if await vault.changeCode(old: old, new: new) { dismiss() } } }
+                Button("Save New Code") { Task { if await vault.changeCode(old: old, new: new) { dismiss() } } }
+                    .buttonStyle(ImportButtonStyle())
                     .disabled(vault.busy || !VaultCode.valid(new) || new != confirmation || old.isEmpty)
-            } footer: { Text("160160 is for first-time setup only. Your recovery key and existing backups will not change.") }
+            } footer: { Text("Your photos and backups stay unchanged.") }
         }.navigationTitle("Change Code")
             .onDisappear { old = ""; new = ""; confirmation = "" }
     }
@@ -30,7 +32,7 @@ struct RecoveryTestView: View {
     @State private var secret = ""
     @State private var passed = false
     var body: some View {
-        Form {
+        ThemedForm {
             SharedBackupSection(input: backupInput)
             BackupInputSection(input: backupInput, enabled: !vault.busy)
             Section {

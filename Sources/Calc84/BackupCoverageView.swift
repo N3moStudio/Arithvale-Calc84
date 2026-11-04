@@ -21,12 +21,12 @@ struct BackupCoverageView: View {
                 if lastExport > 0, savedLibrary == libraryID?.uuidString {
                     Text(needsBackup ? "Library changes need a new backup" : "Current library saved; file copy checked")
                     Text(filename).font(.caption).textSelection(.enabled)
-                    Text("Saved \(Date(timeIntervalSince1970: lastExport).formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary)
+                    Text("Saved \(Date(timeIntervalSince1970: lastExport).formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
                     recovery(source: "Files", snapshotID: digest)
                 } else {
-                    Text("Create a backup of this library to start tracking it here.").foregroundStyle(.secondary)
+                    Text("Create a backup of this library to start tracking it here.").foregroundStyle(ArithenPalette.color(.muted))
                 }
-                Text("Files contains all library items, including Recently Deleted. Check Files itself for iCloud upload completion.").font(.caption).foregroundStyle(.secondary)
+                Text("Files contains all library items, including Recently Deleted. Check Files itself for iCloud upload completion.").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
             }.padding(.vertical, 6)
             ForEach(CloudProvider.allCases) { provider in
                 providerRow(provider)
@@ -47,17 +47,17 @@ struct BackupCoverageView: View {
             HStack {
                 Label(provider.title, systemImage: "icloud").font(.headline)
                 Spacer()
-                Text(policy.mode == .automatic ? "Automatic" : "Manual").font(.caption).foregroundStyle(.secondary)
+                Text(policy.mode == .automatic ? "Automatic" : "Manual").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
             }
-            if !cloud.connected.contains(provider) { Text("Not connected").foregroundStyle(.secondary) }
+            if !cloud.connected.contains(provider) { Text("Not connected").foregroundStyle(ArithenPalette.color(.muted)) }
             else if cloud.running && cloud.activeProvider == provider {
                 if let progress = cloud.progress { ProgressView(value: progress) } else { ProgressView() }
                 Text(cloud.phase).font(.footnote)
-            } else if eligible.isEmpty { Text("No items chosen for this provider").foregroundStyle(.secondary) }
+            } else if eligible.isEmpty { Text("No items chosen for this provider").foregroundStyle(ArithenPalette.color(.muted)) }
             else { Text(pending == 0 ? "\(eligible.count) chosen items in a current backup" : "\(pending) chosen items need a current backup") }
-            Text("\(blocked) Never Upload · \(max(0, active.count - eligible.count - blocked)) not selected").font(.caption).foregroundStyle(.secondary)
+            Text("\(blocked) Never Upload · \(max(0, active.count - eligible.count - blocked)) not selected").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
             if sameLibrary, let saved = receipt?.saved {
-                Text("Last completed \(saved.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary)
+                Text("Last completed \(saved.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
                 recovery(source: provider.title, snapshotID: receipt?.snapshotID?.uuidString)
             }
             HStack {
@@ -75,7 +75,7 @@ struct BackupCoverageView: View {
                 .font(.caption)
         } else {
             Label("Recovery not yet tested for this exact backup", systemImage: "questionmark.circle")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(ArithenPalette.color(.muted))
         }
     }
 }

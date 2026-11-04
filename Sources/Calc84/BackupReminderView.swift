@@ -25,7 +25,7 @@ struct BackupReminderView: View {
                         Label {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Time for a backup").font(.subheadline.weight(.semibold))
-                                Text("Library changes need a new Files backup.").font(.caption).foregroundStyle(.secondary)
+                                Text("Library changes need a new Files backup.").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
                             }
                         } icon: { Image(systemName: "externaldrive.badge.exclamationmark") }
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)

@@ -29,12 +29,12 @@ struct ExportMediaView: View {
     private var allMedia: Bool { items.allSatisfy { UTType($0.contentType)?.conforms(to: .image) == true || UTType($0.contentType)?.conforms(to: .movie) == true } }
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 Section {
                     Label("\(items.count) selected", systemImage: "square.and.arrow.up").font(.headline)
                     Text("These actions create ordinary, unencrypted copies. Original files can include GPS location and other metadata.")
                     Text("Saving to Photos preserves the stored capture date. Photos can still list it under Recently Added.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
                 }
                 Section {
                     Button("Save to Photos", systemImage: "photo.badge.arrow.down") { start(mode: "photos") }.disabled(!allMedia)
@@ -42,14 +42,14 @@ struct ExportMediaView: View {
                     Button("Share / AirDrop Originals", systemImage: "square.and.arrow.up") { start(mode: "share") }
                     Button("Share Photo Copies without Metadata", systemImage: "location.slash") { start(mode: "privatePhotos") }
                         .disabled(!items.allSatisfy { UTType($0.contentType)?.conforms(to: .image) == true })
-                    Text("Photo copies are new JPEGs up to 4096 pixels, with location and original metadata omitted. Live Photos become stills. Visible details in the picture remain. Originals stay unchanged.").font(.footnote).foregroundStyle(.secondary)
+                    Text("Photo copies are new JPEGs up to 4096 pixels, with location and original metadata omitted. Live Photos become stills. Visible details in the picture remain. Originals stay unchanged.").font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
                 }.disabled(working || vault.busy)
                 if working { Section { ProgressView("Preparing originals…") } }
                 if !result.isEmpty { Section { Label(result, systemImage: "checkmark.circle") } }
                 if items.contains(where: { $0.companionID != nil }) {
                     Section {
                         Text("Save to Photos recreates a Live Photo. Files and Share export both its image and video; the receiving app decides whether to pair them.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                            .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
                     }
                 }
             }.navigationTitle("Save or Share").navigationBarTitleDisplayMode(.inline)

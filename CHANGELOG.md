@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.12.1 · Focused UI polish
+
+**October 30, 2026 · Build 17 · Local test build · iOS 17+**
+
+- Give accessibility-sized library headings room to wrap, keep filter labels reachable, and center wrapping dock/action labels.
+- Use singular labels for one snap/item/file and format large counts consistently.
+- Show processing, ready, and attention states for received files instead of always saying “Files received.”
+- Respect Reduce Motion in viewer-button press feedback while retaining native paging, zoom, dismissal, and navigation motion.
+- See Docs/POLISH-2026-10-30.md for skill routing, scope, and validation limits. This local test IPA includes the polish changes absent from 0.12.0 build 16.
+
+## 0.12.0 · Compact library and shared imports
+
+**October 29, 2026 · Build 16 · Local test build · iOS 17+**
+
+- Replace legacy appearance controls with eight complete themes and Theme default / Solid / Liquid Glass surfaces. Default and resets use Bloom; preserve independent surface overrides, accessibility sizes, branding, keys, and data.
+- Use rounded compact text, smaller calculator numerals, a four-column portrait grid, Snaps counts, Photos / Videos / Favs filters, and a floating three-tab dock.
+- Long-press selection with Share, Add to Album, and Delete; Cancel or an empty selection exits. Recently Deleted retains Restore and permanent-delete confirmation.
+- Use full-screen media with quick lock and top-right options; swipe up for metadata, with a VoiceOver action alternative.
+- Merge Files / Folder into Import from Files, with encrypted pending shares and an explicit Import action. Simplify shared backup addition to recovery key + Import; keep the independent backup test in Backup Center.
+- Remove the pre-import review; keep runtime storage checks and concise, verified-original deletion choices after Photos import.
+- Move About to its own settings entry, put Photo Indexing in Privacy & Access, and keep recovery/storage help in Backups. Indexing defaults on, honors a saved opt-out, and runs after imports finish with power/privacy gates.
+- Local test IPA requested for Downloads. No GitHub release, website deployment, or Elsepin edits. Regression evidence and outstanding device checks are recorded in Docs/UI-REDESIGN.md and the generated release kit.
+
+
 ## 0.11.0 · Privacy & Efficiency
 
 **October 29, 2026 · Build 15 · Test build · iOS 17+**

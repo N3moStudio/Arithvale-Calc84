@@ -11,25 +11,23 @@ struct LibraryView: View {
     @EnvironmentObject private var vault: VaultModel
     @EnvironmentObject private var cloud: CloudBackupModel
     @EnvironmentObject private var shared: SharedBackupModel
+    @EnvironmentObject private var sharedFiles: SharedFilesModel
     @Environment(\.dynamicTypeSize) private var textSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var navigationMotion
     @StateObject private var content = LibraryContentStore()
-    @AppStorage("galleryStyle") private var layout = GalleryStyle.initial.rawValue
-    @AppStorage("appAppearance") private var appearance = AppAppearance.system.rawValue
+    @Environment(\.arithenTheme) private var theme
     @AppStorage("libraryDateSource") private var dateSource = LibraryDateSource.captured.rawValue
     @AppStorage("libraryNewestFirst") private var newestFirst = true
     let close: () -> Void
     @State private var photos: [PhotosPickerItem] = []
     @State private var files = false
-    @State private var folders = false
-    @State private var importCapacity: ImportCapacityRequest?
     @State private var cloudChoices = false
     @State private var settings = false
     @State private var backupCenter = false
     @AppStorage("libraryGlassTint") private var tintValue = GlassTint.plum.rawValue
-    private var glassTint: GlassTint { GlassTint(rawValue: tintValue) ?? .plum }
-    private var backgroundVisible: Bool { !settings && !backupCenter && !adding && !addingBackup && !showingExports && !albumSheet && !cloudChoices && !photoPicker && !files && !folders && !deletion && !removeReceived && !vault.mediaViewerPresented && !vault.libraryToolPresented && importCapacity == nil && !vault.busy && vault.photoImportReview == nil && vault.fileImportReview == nil }
+    private var glassTint: GlassTint { .clear }
+
     @State private var filter = "All"
     @State private var search = ""
     @State private var searching = false
@@ -45,8 +43,8 @@ struct LibraryView: View {
     @State private var albumSheet = false
     @State private var exportItems: [VaultItem] = []
     @State private var showingExports = false
-    private var style: GalleryStyle { GalleryStyle(rawValue: layout) ?? .initial }
-    private var showingAlbums: Bool { tab == "Albums" || (style == .albumsFirst && tab == "Library" && filter == "All") }
+    private var style: GalleryStyle { .clearGlass }
+    private var showingAlbums: Bool { tab == "Albums" }
     private var albums: [String] { content.albums }
     private var visible: [VaultItem] { content.visible }
     private var sections: [LibrarySection] { content.sections }
@@ -60,12 +58,13 @@ struct LibraryView: View {
             header
             BackupReminderView { backupCenter = true }
             if shared.entry != nil || shared.working || shared.error != nil { receivedBackup }
+            if sharedFiles.hasPending { receivedFiles }
             if searching {
                 HStack {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    Image(systemName: "magnifyingglass").foregroundStyle(ArithenPalette.color(.muted))
                     TextField("Search names, albums, tags or text", text: $search).textInputAutocapitalization(.never).autocorrectionDisabled()
                     Button("Clear", systemImage: "xmark.circle.fill") { search = "" }.labelStyle(.iconOnly).frame(width: 44, height: 44)
-                }.padding(.leading, 14).background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                }.padding(.leading, 14).background(ArithenPalette.color(.surface), in: RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 16).padding(.bottom, 8)
             }
             if !showingAlbums { filters }
@@ -78,7 +77,7 @@ struct LibraryView: View {
                     if vault.importing { Button("Cancel") { vault.cancelImport() }.frame(minHeight: 44) }
                     if vault.cloud.running { Button("Pause") { vault.cloud.pause() }.frame(minHeight: 44) }
                 }
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(12).background(Color(uiColor: .secondarySystemBackground))
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(12).background(ArithenPalette.color(.surface))
             }
             if vault.failedImportCount > 0 && !vault.busy {
                 Button("Retry \(vault.failedImportCount) Unimported Items") { vault.retryImports() }.frame(minHeight: 44)
@@ -90,11 +89,11 @@ struct LibraryView: View {
                     if style == .albumsFirst && value == "All" { filter = "All Items" }
                 }
             } else {
-                MemoryGrid(sections: sections, engine: vault.engine, columns: textSize.isAccessibilitySize ? 2 : style.columns,
-                    style: style == .albumsFirst ? .photoLibrary : style, grouping: "Months", selection: selection, selecting: selecting,
-                    busy: vault.busy, setSelection: { selection = $0 },
+                MemoryGrid(sections: sections, engine: vault.engine, columns: textSize.isAccessibilitySize ? 2 : 4,
+                    style: style == .albumsFirst ? .photoLibrary : style, grouping: "Snaps", selection: selection, selecting: selecting,
+                    busy: vault.busy, setSelection: { selection = $0; selecting = !$0.isEmpty },
                     identity: filter + "|" + search + "|" + dateSource + "|" + String(newestFirst), open: open, action: itemAction,
-                    viewerVault: vault, contentRevision: content.revision)
+                    viewerVault: vault, contentRevision: content.revision, beginSelection: { item in selection = [item.id]; selecting = true }, theme: theme)
                     .opacity(visible.isEmpty ? 0 : 1)
                     .overlay {
                         // Keep the presentation owner alive if unfavoriting the
@@ -102,20 +101,18 @@ struct LibraryView: View {
                         if visible.isEmpty {
                             ContentUnavailableView(search.isEmpty ? (filter == "Recently Deleted" ? "Nothing Deleted" : "Your memories go here") : "No matches",
                                 systemImage: filter == "Recently Deleted" ? "trash" : "photo.on.rectangle",
-                                description: Text(search.isEmpty ? (filter == "Recently Deleted" ? "Deleted items stay here until you remove them permanently." : "Tap + to add photos, videos, files or a backup.") : "Try a shorter word or a tag. Turn on Private Text Search in Settings to find words inside photos."))
+                                description: Text(search.isEmpty ? (filter == "Recently Deleted" ? "Deleted items stay here until you remove them permanently." : "Tap + to add photos, videos, files or a backup.") : "Try a shorter word or a tag. Photo Indexing in Privacy & Access finds words inside photos."))
                         }
                     }
             }
-            if selecting { actionBar.modifier(FloatingLibraryBar()).padding(.horizontal, 8).padding(.bottom, 4) }
-            else if style != .clearGlass { navigationBar.padding(6).modifier(FloatingLibraryBar()).padding(.horizontal, 12).padding(.bottom, 6) }
         }
-        .overlay(alignment: .bottom) {
-            if style == .clearGlass && !selecting {
-                navigationBar.padding(6).modifier(FloatingLibraryBar()).padding(.horizontal, 20).padding(.bottom, 8)
-            }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Group {
+                if selecting { actionBar }
+                else { navigationBar.padding(5) }
+            }.modifier(FloatingLibraryBar()).padding(.horizontal, textSize.isAccessibilitySize ? 14 : 30).padding(.vertical, 8)
         }
-        .background { ArithenWallpaper(area: .library, visible: backgroundVisible) }
-        .preferredColorScheme(style == .nightroom ? .dark : (AppAppearance(rawValue: appearance) ?? .system).scheme)
+        .background(ArithenPalette.color(.canvas, theme: theme).ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $settings) { NavigationStack { VaultSettingsView().environmentObject(vault) } }
         .sheet(isPresented: $backupCenter) { NavigationStack { BackupSettingsView()
@@ -126,19 +123,24 @@ struct LibraryView: View {
         .sheet(isPresented: $showingExports) { ExportMediaView(items: exportItems).environmentObject(vault) }
         .sheet(isPresented: $albumSheet) { albumEditor }
         .sheet(isPresented: $cloudChoices) { CloudBatchSelectionView(ids: selection).environmentObject(vault) }
-        .sheet(item: $importCapacity) { request in ImportCapacityView(request: request) { importCapacity = nil } }
+        .sheet(isPresented: $files) { NavigationStack { SharedFilesImportView() } }
         .sheet(item: $vault.fileImportReview) { FileImportReviewView(review: $0).environmentObject(vault) }
-        .sheet(item: $vault.photoImportReview) { PhotoImportReviewView(review: $0).environmentObject(vault) }
+        .accessibilityHidden(vault.photoImportReview != nil)
+        .allowsHitTesting(vault.photoImportReview == nil)
+        .overlay {
+            if let review = vault.photoImportReview {
+                ZStack {
+                    Color.black.opacity(0.35).ignoresSafeArea().onTapGesture { }
+                    ScrollView { PhotoImportReviewView(review: review) { vault.photoImportReview = nil }
+                        .frame(maxWidth: .infinity).padding(24) }
+                        .scrollBounceBehavior(.basedOnSize).defaultScrollAnchor(.center)
+                }
+            }
+        }
         .photosPicker(isPresented: $photoPicker, selection: $photos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current, photoLibrary: .shared())
-        .fileImporter(isPresented: $files, allowedContentTypes: [.item], allowsMultipleSelection: true) {
-            do { importCapacity = ImportCapacityRequest(files: try $0.get()) } catch { vault.message = error.localizedDescription }
-        }
-        .fileImporter(isPresented: $folders, allowedContentTypes: [.folder], allowsMultipleSelection: false) {
-            do { importCapacity = ImportCapacityRequest(files: try $0.get()) } catch { vault.message = error.localizedDescription }
-        }
-        .onChange(of: photos) { _, value in if !value.isEmpty { importCapacity = ImportCapacityRequest(photos: value); photos = [] } }
+        .onChange(of: photos) { _, value in if !value.isEmpty { vault.importPhotos(value); photos = [] } }
+        .onChange(of: selection) { _, value in if value.isEmpty { selecting = false } }
         .onChange(of: search) { _, _ in selection = [] }
-        .onChange(of: layout) { _, _ in selecting = false; selection = [] }
         .onReceive(vault.$items) { items in
             vault.textSearch.prune(items: items)
             content.update(items: items, query: query)
@@ -170,29 +172,49 @@ struct LibraryView: View {
         } message: { Text(vault.message ?? "") }
     }
     private var header: some View {
-        ArithenGlassGroup {
-        HStack(spacing: 6) {
-            Text(selecting ? "\(selection.count) selected" : showingAlbums ? "Albums" : searching ? "Search" : style == .timeline ? "Your days" : "Library")
-                .font(style == .contactSheet ? .title2.bold() : .largeTitle.bold())
-                .lineLimit(1).minimumScaleFactor(0.7)
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 0)
-            Button("Lock & Return to Calculator", systemImage: "lock.fill") { vault.lock(); close() }
-                .labelStyle(.iconOnly).frame(width: 44, height: 44)
-                .modifier(ArithenGlass(tint: glassTint, shape: Circle()))
-            Button(selecting ? "Done" : "Select") {
-                if showingAlbums { tab = "Library"; filter = "All Items" }
-                selecting.toggle(); selection = []
-            }.font(.subheadline.weight(.semibold)).frame(minWidth: 56, minHeight: 44)
-                .modifier(ArithenGlass(tint: glassTint, shape: Capsule())).disabled(vault.busy)
-            Button("Add to Library", systemImage: "plus") { adding = true }
-                .labelStyle(.iconOnly).font(.title3).frame(width: 44, height: 44)
-                .modifier(ArithenGlass(tint: glassTint, shape: Circle(), prominent: true)).disabled(vault.busy)
-            Button("Settings", systemImage: "gearshape") { settings = true }
-                .labelStyle(.iconOnly).font(.title3).frame(width: 44, height: 44)
-                .modifier(ArithenGlass(tint: glassTint, shape: Circle()))
-        }
-        }.padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 12)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Button("Lock & Return to Calculator", systemImage: "lock.fill") { vault.lock(); close() }
+                    .labelStyle(.iconOnly).frame(width: 44, height: 44)
+                if !textSize.isAccessibilitySize { headerTitle }
+                Spacer(minLength: 0)
+                if selecting {
+                    Button("Cancel") { selection = []; selecting = false }
+                        .font(.body.weight(.semibold)).fixedSize(horizontal: true, vertical: false).frame(minHeight: 44)
+                } else {
+                    Button("Add to Library", systemImage: "plus") { adding = true }
+                        .labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(vault.busy)
+                    Button("Settings", systemImage: "gearshape") { settings = true }
+                        .labelStyle(.iconOnly).frame(width: 44, height: 44)
+                }
+            }
+            // Give large text its own row instead of shrinking it beside the controls.
+            if textSize.isAccessibilitySize { headerTitle.padding(.horizontal, 2) }
+        }.padding(.horizontal, 12).padding(.vertical, 8)
+    }
+    private var headerTitle: some View {
+        Text(selecting ? "\(selection.count.formatted()) \(selection.count == 1 ? "Snap Selected" : "Snaps Selected")" : showingAlbums ? "Albums" : searching ? "Search" : "Library")
+            .font(.title2.bold()).monospacedDigit()
+            .lineLimit(textSize.isAccessibilitySize ? nil : 1)
+            .minimumScaleFactor(textSize.isAccessibilitySize ? 1 : 0.75)
+            .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
+    }
+    private var receivedFiles: some View {
+        Button { files = true } label: {
+            HStack(spacing: 12) {
+                if sharedFiles.working { ProgressView().frame(width: 28) }
+                else { Image(systemName: sharedFiles.error == nil ? "doc.on.doc" : "exclamationmark.circle").font(.title2).frame(width: 28) }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(sharedFiles.working ? "Preparing files…" : sharedFiles.error != nil ? "Files need attention" : "\(sharedFiles.entries.count.formatted()) \(sharedFiles.entries.count == 1 ? "file received" : "files received")")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(ArithenPalette.color(.text))
+                    Text(sharedFiles.working ? "Your received copies are being processed" : sharedFiles.error != nil ? "Review the import" : "Ready to import into your library")
+                        .font(.caption).foregroundStyle(ArithenPalette.color(.muted))
+                }.multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+            }.frame(minHeight: 44).padding(14)
+                .background(ArithenPalette.color(.surface), in: RoundedRectangle(cornerRadius: 14))
+        }.buttonStyle(.plain).padding(.horizontal, 14).padding(.bottom, 8)
     }
     private var receivedBackup: some View {
         HStack(spacing: 6) {
@@ -201,36 +223,61 @@ struct LibraryView: View {
                     Image(systemName: "doc.badge.arrow.up").font(.title2)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(shared.working ? "Receiving backup…" : shared.error != nil ? "Review received backup" : "Backup received")
-                            .font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                        Text("Review & add to your library").font(.caption).foregroundStyle(.secondary)
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(ArithenPalette.color(.text))
+                        Text("Import into your library").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right").font(.caption.weight(.semibold))
                 }.frame(minHeight: 44)
             }.disabled(shared.working || vault.busy)
             Button("Remove Received Copy", systemImage: "xmark") { removeReceived = true }
-                .labelStyle(.iconOnly).frame(width: 44, height: 44).foregroundStyle(.secondary)
+                .labelStyle(.iconOnly).frame(width: 44, height: 44).foregroundStyle(ArithenPalette.color(.muted))
                 .disabled(shared.working || vault.busy)
         }.padding(.leading, 14).padding(.vertical, 7)
-            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: style == .contactSheet ? 9 : 14))
+            .background(ArithenPalette.color(.surface), in: RoundedRectangle(cornerRadius: style == .contactSheet ? 9 : 14))
             .padding(.horizontal, 14).padding(.bottom, 8)
     }
     private var filters: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            ArithenGlassGroup {
-            HStack(spacing: 8) {
-                ForEach(["All", "Photos", "Videos", "Favorites"], id: \.self) { value in
-                    let active = filter == value || (value == "All" && filter == "All Items")
-                    Button { filter = style == .albumsFirst && value == "All" ? "All Items" : value; selection = [] } label: {
-                        Text(value).font(.subheadline.weight(active ? .semibold : .regular))
-                            .foregroundStyle(active ? Color.primary : Color.secondary)
-                            .padding(.horizontal, 15).frame(minHeight: 44)
-                            .modifier(ArithenGlass(tint: glassTint, shape: Capsule(), prominent: active))
-                    }.accessibilityAddTraits(active ? .isSelected : [])
+        Group {
+            if textSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 0) {
+                    snapCount
+                    ScrollView(.horizontal) { filterButtons.fixedSize(horizontal: true, vertical: false) }
+                        .scrollIndicators(.hidden)
                 }
-            }.padding(.horizontal, 14)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { snapCount; Spacer(minLength: 0); filterButtons }
+                    VStack(alignment: .leading, spacing: 0) { snapCount; filterButtons }
+                }
             }
-        }.padding(.bottom, 8)
+        }.padding(.horizontal, 14).padding(.vertical, 4)
+            .overlay(alignment: .bottom) { Rectangle().fill(ArithenPalette.color(.text).opacity(0.12)).frame(height: 0.5) }
+    }
+    private var snapCount: some View {
+        Button { filter = "All"; selection = [] } label: {
+            Text("\(visible.count.formatted()) \(visible.count == 1 ? "Snap" : "Snaps")").font(.subheadline.weight(.semibold)).monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
+        }.buttonStyle(.plain).frame(minHeight: 44).accessibilityHint("Show all snaps. More actions change sorting.")
+            .contextMenu {
+                Picker("Sort by", selection: $dateSource) {
+                    ForEach(LibraryDateSource.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+                }
+                Toggle("Newest First", isOn: $newestFirst)
+            }
+    }
+    private var filterButtons: some View {
+        HStack(spacing: 12) {
+            ForEach(["Photos", "Videos", "Favorites"], id: \.self) { value in
+                Button { filter = filter == value ? "All" : value; selection = [] } label: {
+                    Text(value == "Favorites" ? "Favs" : value).font(.subheadline.weight(filter == value ? .bold : .medium))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(ArithenPalette.color(filter == value ? .accent : .muted))
+                        .frame(minHeight: 44)
+                        .overlay(alignment: .bottom) { if filter == value { Capsule().fill(.tint).frame(height: 2) } }
+                }.accessibilityAddTraits(filter == value ? .isSelected : [])
+            }
+        }
     }
     private var navigationBar: some View {
         HStack(spacing: 4) {
@@ -238,10 +285,10 @@ struct LibraryView: View {
                 tab = "Library"; filter = style == .albumsFirst ? "All Items" : "All"; searching = false; search = ""
             }
             navButton("Albums", symbol: "rectangle.stack", active: showingAlbums) {
-                tab = "Albums"; searching = false; search = ""
+                tab = "Albums"; searching = false; search = ""; selection = []; selecting = false
             }
             navButton("Search", symbol: "magnifyingglass", active: searching) {
-                tab = "Search"; searching = true; filter = "All Items"
+                tab = "Search"; searching = true; filter = "All Items"; selection = []; selecting = false
             }
             if style == .contactSheet {
                 navButton("Add", symbol: "plus", active: false) { adding = true }
@@ -253,11 +300,12 @@ struct LibraryView: View {
             VStack(spacing: 3) {
                 Image(systemName: symbol).font(.system(size: 21, weight: active ? .semibold : .regular))
                 Text(title).font(.caption2.weight(active ? .semibold : .regular))
+                    .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
             }.frame(maxWidth: .infinity, minHeight: 48)
-                .foregroundStyle(active ? Color.primary : Color.secondary)
+                .foregroundStyle(ArithenPalette.color(active ? .accent : .muted, theme: theme))
                 .background {
                     if active && style == .clearGlass {
-                        Capsule().fill(Color.primary.opacity(0.09))
+                        Capsule().fill(ArithenPalette.color(.accent, theme: theme).opacity(0.1))
                             .matchedGeometryEffect(id: "library-navigation-selection", in: navigationMotion)
                     }
                 }
@@ -265,12 +313,11 @@ struct LibraryView: View {
     }
     private var addSheet: some View {
         NavigationStack {
-            List {
+            ThemedList {
                 Button { pendingAdd = "photos"; adding = false } label: {
                     Label("Photos & Videos", systemImage: "photo.on.rectangle").frame(minHeight: 44)
                 }
-                Button { pendingAdd = "files"; adding = false } label: { Label("Files", systemImage: "doc").frame(minHeight: 44) }
-                Button { pendingAdd = "folder"; adding = false } label: { Label("A Folder", systemImage: "folder").frame(minHeight: 44) }
+                Button { pendingAdd = "files"; adding = false } label: { Label("Import from Files", systemImage: "folder").frame(minHeight: 44) }
                 Button { pendingAdd = "backup"; adding = false } label: { Label("From a Backup", systemImage: "externaldrive.badge.plus").frame(minHeight: 44) }
             }.navigationTitle("Add to Library").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { adding = false } } }
@@ -281,32 +328,32 @@ struct LibraryView: View {
         switch pendingAdd {
         case "photos": photoPicker = true
         case "files": files = true
-        case "folder": folders = true
         case "backup": addingBackup = true
         default: break
         }
         pendingAdd = nil
     }
     private var actionBar: some View {
-        HStack(spacing: 12) {
-            if selecting {
-                Menu {
-                    Button("Select All") { selection = Set(visible.map(\.id)) }
-                    Button("Deselect All") { selection = [] }
-                } label: { Label("Selection", systemImage: "checkmark.circle").labelStyle(.iconOnly).frame(width: 44, height: 44) }
-                if filter == "Recently Deleted" {
-                    Button("Restore", systemImage: "arrow.uturn.backward") { Task { await vault.updateMany(selectedItems, deleted: false); selection = [] } }
-                        .disabled(selection.isEmpty)
-                } else {
-                    Button("Save / Share", systemImage: "square.and.arrow.up") { exportItems = selectedItems; showingExports = true }.disabled(selection.isEmpty)
-                    Spacer(minLength: 0)
-                    Button("Cloud Choices", systemImage: "icloud") { cloudChoices = true }.labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(selection.isEmpty)
-                    Button("Album", systemImage: "rectangle.stack.badge.plus") { albumSheet = true }.labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(selection.isEmpty)
+        HStack(spacing: 4) {
+            if filter == "Recently Deleted" {
+                Button("Restore", systemImage: "arrow.uturn.backward") { Task { await vault.updateMany(selectedItems, deleted: false); selection = [] } }
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            } else {
+                Button { exportItems = selectedItems; showingExports = true } label: {
+                    VStack(spacing: 4) { Image(systemName: "square.and.arrow.up"); Text("Share").font(.caption) }
+                        .frame(maxWidth: .infinity, minHeight: 48)
                 }
-                Spacer(minLength: 0)
-                Button("Delete", systemImage: "trash") { deletion = true }.labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(selection.isEmpty)
+                Button { albumSheet = true } label: {
+                    VStack(spacing: 4) { Image(systemName: "rectangle.stack.badge.plus"); Text("Add to Album").font(.caption) }
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                }
             }
-        }.font(.subheadline).padding(.horizontal, 20).padding(.vertical, 6).disabled(vault.busy)
+            Button(role: .destructive) { deletion = true } label: {
+                VStack(spacing: 4) { Image(systemName: "trash"); Text("Delete").font(.caption) }
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+        }.multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+            .padding(6).disabled(vault.busy || selection.isEmpty)
     }
     private func open(_ item: VaultItem) {
         if selecting { if !selection.insert(item.id).inserted { selection.remove(item.id) } }

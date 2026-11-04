@@ -37,10 +37,16 @@ struct AlbumLibraryView: View {
                     }
                 }
             }.padding(.horizontal, 15)
-            HStack {
-                Button { open("Files") } label: { Label("Files", systemImage: "doc").frame(maxWidth: .infinity, minHeight: 48) }
-                Button { open("Recently Deleted") } label: { Label("Recently Deleted", systemImage: "trash").frame(maxWidth: .infinity, minHeight: 48) }
-            }.font(.subheadline).padding(15)
+            Button { open("Recently Deleted") } label: {
+                HStack(spacing: 13) {
+                    Image(systemName: "trash").font(.title3).frame(width: 38, height: 38)
+                        .background(ArithenPalette.color(.accent).opacity(0.1), in: RoundedRectangle(cornerRadius: 11))
+                    Text("Recently Deleted").font(.body.weight(.medium))
+                    Spacer()
+                    Text(vault.items.filter { $0.visible && $0.deletedAt != nil }.count.formatted()).foregroundStyle(ArithenPalette.color(.muted))
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(ArithenPalette.color(.muted))
+                }.padding(16).background(ArithenPalette.color(.surface), in: RoundedRectangle(cornerRadius: 20))
+            }.buttonStyle(.plain).padding(15)
             Color.clear.frame(height: 90)
         }
         .sheet(item: $editing) { album in NavigationStack {
@@ -61,16 +67,16 @@ struct AlbumLibraryView: View {
                         ForEach(0..<4) { index in
                             Group {
                                 if values.indices.contains(index) { LibraryThumbnail(item: values[index], engine: engine) }
-                                else { Color(uiColor: .secondarySystemBackground).overlay { if index == 0 { Image(systemName: "photo").foregroundStyle(.tertiary) } } }
+                                else { ArithenPalette.color(.surface).overlay { if index == 0 { Image(systemName: "photo").foregroundStyle(.tertiary) } } }
                             }.frame(width: side, height: (geometry.size.height - 1) / 2).clipped()
                         }
                     }
                     }
                 }.aspectRatio(1.18, contentMode: .fit).clipShape(RoundedRectangle(cornerRadius: 13))
-                Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(2)
-                Text("\(values.count) items").font(.caption).foregroundStyle(.secondary)
+                Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(ArithenPalette.color(.text)).lineLimit(2)
+                Text("\(values.count.formatted()) \(values.count == 1 ? "item" : "items")").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
             }
-        }.buttonStyle(.plain).accessibilityElement(children: .ignore).accessibilityLabel("\(name), \(values.count) items")
+        }.buttonStyle(.plain).accessibilityElement(children: .ignore).accessibilityLabel("\(name), \(values.count.formatted()) \(values.count == 1 ? "item" : "items")")
     }
 }
 
@@ -82,7 +88,7 @@ struct LibraryThumbnail: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color(uiColor: .secondarySystemBackground)
+                ArithenPalette.color(.surface)
                 if let image { Image(uiImage: image).resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped() }
                 else { Image(systemName: "photo").foregroundStyle(.tertiary) }
             }

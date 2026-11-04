@@ -54,7 +54,12 @@ final class VaultModel: ObservableObject {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         engine = VaultEngine(root: base.appendingPathComponent("Calc84Library", isDirectory: true))
         Publishers.CombineLatest3($busy, $photoImportReview, $fileImportReview)
-            .receive(on: RunLoop.main).sink { [weak self] _ in self?.resumeAutomaticBackup() }.store(in: &lifecycle)
+            .receive(on: RunLoop.main).sink { [weak self] _ in
+                guard let self else { return }
+                if self.busy { self.textSearch.pause() }
+                else { self.textSearch.resumeWhenIdle(vault: self) }
+                self.resumeAutomaticBackup()
+            }.store(in: &lifecycle)
         for name in [Notification.Name.NSProcessInfoPowerStateDidChange, ProcessInfo.thermalStateDidChangeNotification,
                      UIApplication.didBecomeActiveNotification, UIApplication.willResignActiveNotification] {
             NotificationCenter.default.publisher(for: name).receive(on: RunLoop.main).sink { [weak self] note in
@@ -63,6 +68,7 @@ final class VaultModel: ObservableObject {
                     self.automaticBackupTask?.cancel(); self.textSearch.pause()
                 } else {
                     if !self.allowsOptionalWork { self.textSearch.pause() }
+                    self.textSearch.resumeWhenIdle(vault: self)
                     self.resumeAutomaticBackup()
                 }
             }.store(in: &lifecycle)
@@ -209,7 +215,7 @@ final class VaultModel: ObservableObject {
             } catch {
                 if ticket == generation {
                     status = ""
-                    if !Task.isCancelled { completion(.failure(error)) }
+                    completion(.failure(error))
                 }
             }
         }
@@ -222,13 +228,15 @@ final class VaultModel: ObservableObject {
     private func importStopped(_ error: Error) -> Bool {
         Task.isCancelled || (error as NSError).domain == NSCocoaErrorDomain && (error as NSError).code == NSFileWriteOutOfSpaceError
     }
-    func importFiles(_ selections: [URL], accessParent: ImportAccess? = nil) {
+    func importFiles(_ selections: [URL], accessParent: ImportAccess? = nil, receivedCopies: Bool = false, completion: ((Set<URL>) -> Void)? = nil) {
         guard unlocked, !busy, !selections.isEmpty else { return }
         let access = ImportAccess(selections, parent: accessParent ?? failedFileAccess)
         fileImportReview = nil; failedFileAccess = nil
         busy = true; importing = true; progress = 0; let ticket = generation
         failedFiles = []; failedPhotos = []; failedImportCount = 0
         importTask = Task {
+            var committed = Set<URL>()
+            defer { completion?(committed) }
             let urls: [URL]
             do {
                 status = "Reading selected files…"
@@ -266,6 +274,7 @@ final class VaultModel: ObservableObject {
                     guard ticket == generation else { break }
                     if let added = result.first(where: { $0.visible && !knownIDs.contains($0.id) }) {
                         originals.append(.init(vaultID: added.id, url: url, digest: digest))
+                        committed.insert(url)
                         knownIDs.insert(added.id)
                     }
                     latestItems = result
@@ -285,8 +294,9 @@ final class VaultModel: ObservableObject {
             failedFiles = failures; failedImportCount = failures.count
             failedFileAccess = failures.isEmpty ? nil : access
             status = "Imported \(originals.count) of \(urls.count). Originals stay where they are."
-            fileImportReview = FileImportReview(imported: originals.count, requested: urls.count, originals: originals, access: access,
-                detail: urls.isEmpty ? "No regular files were found. Hidden files, links, and app packages are skipped." : errors.prefix(3).joined(separator: "\n"))
+            if !receivedCopies { fileImportReview = FileImportReview(imported: originals.count, requested: urls.count, originals: originals, access: access,
+                detail: urls.isEmpty ? "No regular files were found. Hidden files, links, and app packages are skipped." : errors.prefix(3).joined(separator: "\n")) }
+            else { failedFiles = []; failedFileAccess = nil; failedImportCount = 0 }
             if !originals.isEmpty { scheduleAutomaticBackup() }
         }
     }

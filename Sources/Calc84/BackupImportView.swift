@@ -69,52 +69,30 @@ struct BackupImportView: View {
                 } description: {
                     Text("\(result.added) items added · \(result.skipped) exact duplicates skipped\nYour current recovery key stays the same.")
                 } actions: { Button("View Library") { dismiss() }.buttonStyle(.borderedProminent) }
-            } else if review.credential != nil {
-                preview
             } else {
-                Form {
+                ThemedForm {
                     Section {
-                        if let entry = shared.entry {
-                            Label(entry.displayName, systemImage: "doc.badge.arrow.up").font(.subheadline)
-                            Button("Use Received Backup") { usedReceipt = entry.url; input.prepare(entry.url, displayName: entry.displayName) }
-                                .disabled(input.working || review.working || vault.busy)
-                            Button("Remove Received Copy", role: .destructive) { removeReceived = true }
-                                .disabled(input.working || review.working || vault.busy)
-                        } else {
-                            NavigationLink { SharedBackupGuide() } label: { Label("Receive Backup from Files", systemImage: "square.and.arrow.down") }
-                            Text("In Files, share the backup to LiveContainer, choose Arithen, then unlock your library.").font(.footnote).foregroundStyle(.secondary)
+                        Text("In Files, share the backup to LiveContainer, choose Arithen, then unlock the library.").foregroundStyle(ArithenPalette.color(.muted))
+                        if let entry = shared.entry { Label(entry.displayName, systemImage: "doc.badge.arrow.up").font(.subheadline) }
+                        SecureField("Backup recovery key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        Button("Import") {
+                            if let backup = input.backup { review.prepare(backup, key: key); key = "" }
+                        }.buttonStyle(ImportButtonStyle())
+                            .disabled(input.backup == nil || key.isEmpty || shared.working || input.working || review.working || vault.busy)
+                        if shared.working || input.working { ProgressView("Receiving backup…") }
+                        if review.working || vault.importing {
+                            OperationProgressView(title: "Importing Backup", detail: vault.importing ? vault.status : review.phase)
                         }
-                        if shared.working { ProgressView("Receiving backup…") }
-                        if let error = shared.error { Text(error).font(.footnote).foregroundStyle(.secondary) }
-                    } header: { Text("Shared backup") }
-                    if let backup = input.backup {
-                        Section {
-                            Label(backup.displayName, systemImage: "doc.badge.checkmark").font(.subheadline)
-                            StorageEstimateView(bytes: Int64((try? backup.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0))
-                            SecureField("This backup’s recovery key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
-                            Button("Preview Contents") { review.prepare(backup, key: key); key = "" }
-                                .buttonStyle(.borderedProminent).disabled(key.isEmpty || review.working || vault.busy || input.working)
-                            if review.working { OperationProgressView(title: "Checking Backup", detail: review.phase) }
-                            if let error = review.error { Text(error).foregroundStyle(.secondary) }
-                        } footer: { Text("Choose what to add before anything changes. Your current library stays in place.") }
+                        if let error = shared.error ?? input.error ?? review.error { Text(error).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)) }
                     }
-                    Section {
-                        DisclosureGroup("Choose a File or Folder Instead") {
-                            Button("Choose Backup File") { usedReceipt = nil; input.choose(.file) }
-                            Button("Choose Backup Folder") { usedReceipt = nil; input.choose(.folder) }
-                            ForEach(input.entries, id: \.self) { url in
-                                Button(url.lastPathComponent) { input.prepare(url) }
-                            }
-                            if input.working { OperationProgressView(title: "Preparing Backup", detail: "Making an encrypted working copy. The original stays in Files.") }
-                            if let error = input.error { Text(error).font(.footnote) }
-                            if let notice = input.notice { Text(notice).font(.footnote) }
-                        }.disabled(review.working || input.working || vault.busy)
-                        NavigationLink("Just Test This Backup") { RecoveryTestView() }.disabled(review.working || vault.busy)
+                    if shared.entry != nil {
+                        Section { Button("Remove Received Copy", role: .destructive) { removeReceived = true }
+                            .disabled(input.working || review.working || vault.busy) }
                     }
                 }
             }
         }
-        .navigationTitle(review.credential == nil ? "Add from Backup" : "Choose What to Add")
+        .navigationTitle("Add from Backup")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .cancellationAction) {
             Button(vault.importing ? "Cancel Import" : "Close") {
@@ -122,54 +100,39 @@ struct BackupImportView: View {
             }
         } }
         .interactiveDismissDisabled(vault.importing)
-        .backupPicker(input)
         .task {
             if input.backup == nil, let entry = shared.entry {
                 usedReceipt = entry.url; input.prepare(entry.url, displayName: entry.displayName)
             }
         }
-        .onChange(of: review.items) { _, values in selected = Set(values.map(\.id)) }
+        .onChange(of: shared.entry?.url) { _, _ in receiveBackup() }
+        .onChange(of: review.working) { _, working in
+            if !working, let credential = review.credential {
+                let ids = Set(review.items.map(\.id))
+                guard !ids.isEmpty else { importError = "This backup has no active items to import."; review.clear(); return }
+                vault.addFromBackup(root: review.root, credential: credential, selected: ids) { value in
+                    switch value {
+                    case .success(let added):
+                        result = added
+                        if shared.entry?.url == usedReceipt { shared.discard() }
+                        review.clear()
+                    case .failure(let error): importError = error.localizedDescription; review.clear()
+                    }
+                }
+            }
+        }
         .onChange(of: vault.unlocked) { _, unlocked in if !unlocked { review.clear(); key = ""; dismiss() } }
         .onDisappear { key = ""; if vault.importing { vault.cancelImport() }; review.clear() }
         .confirmationDialog("Remove received copy?", isPresented: $removeReceived, titleVisibility: .visible) {
-            Button("Remove Received Copy", role: .destructive) { shared.discard() }
+            Button("Remove Received Copy", role: .destructive) { input.clearSelection(); usedReceipt = nil; shared.discard() }
         } message: { Text("The original in Files is unchanged. You can share another backup after removing this received copy.") }
         .alert("Couldn’t Add Backup", isPresented: Binding(get: { importError != nil }, set: { if !$0 { importError = nil } })) {
             Button("Close", role: .cancel) { importError = nil }
         } message: { Text(importError ?? "") }
     }
-    private var preview: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("\(selected.count) selected").font(.subheadline)
-                Spacer()
-                Button(selected.count == review.items.count ? "Deselect All" : "Select All") {
-                    selected = selected.count == review.items.count ? [] : Set(review.items.map(\.id))
-                }.frame(minHeight: 44)
-            }.padding(.horizontal)
-            MemoryGrid(sections: LibraryPresentation.sections(review.items, source: .captured, newestFirst: true), engine: review.engine,
-                columns: 3, style: .photoLibrary, grouping: "Months", selection: selected, selecting: true, busy: vault.busy,
-                setSelection: { selected = $0 }, identity: "backup-review", open: { item in
-                    if !selected.insert(item.id).inserted { selected.remove(item.id) }
-                }, action: { _, _ in })
-            VStack(spacing: 12) {
-                if vault.importing { OperationProgressView(title: "Importing Selected Items", detail: vault.status) }
-                Button("Add \(selected.count) Items") {
-                    guard let credential = review.credential else { return }
-                    vault.addFromBackup(root: review.root, credential: credential, selected: selected) { value in
-                        switch value {
-                        case .success(let added):
-                            result = added
-                            if shared.entry?.url == usedReceipt { shared.discard() }
-                            review.clear()
-                        case .failure(let error): importError = error.localizedDescription
-                        }
-                    }
-                }.buttonStyle(.borderedProminent).controlSize(.large).disabled(selected.isEmpty || vault.busy)
-                Text("Exact duplicates are skipped. Added items use your current library’s encryption. Cloud exclusions are kept.")
-                    .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            }.padding()
-        }
+    private func receiveBackup() {
+        guard !input.working, !review.working, !vault.busy, let entry = shared.entry else { return }
+        usedReceipt = entry.url; input.prepare(entry.url, displayName: entry.displayName)
     }
 }
 #endif

@@ -79,20 +79,20 @@ struct FileImportReviewView: View {
     @State private var confirming = false
     var body: some View {
         NavigationStack {
-            List {
+            ThemedList {
                 Section {
                     Label("\(review.imported) files imported", systemImage: "checkmark.shield").font(.headline)
                     Text("Encrypted copies were saved and checked. Keep the originals, or allow \(AppBrand.name) to move the successfully imported files to Trash.")
                     if review.imported < review.requested {
                         Text("\(review.requested - review.imported) were not imported. Those originals will stay.")
                     }
-                    if let detail = review.detail { Text(detail).font(.footnote).foregroundStyle(.secondary) }
+                    if let detail = review.detail { Text(detail).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)) }
                 }
                 Section("Originals eligible for Trash · \(review.originals.count)") {
                     ForEach(review.originals, id: \.vaultID) { original in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(original.url.lastPathComponent)
-                            Text(original.url.deletingLastPathComponent().lastPathComponent).font(.caption).foregroundStyle(.secondary)
+                            Text(original.url.deletingLastPathComponent().lastPathComponent).font(.caption).foregroundStyle(ArithenPalette.color(.muted))
                         }
                     }
                 }

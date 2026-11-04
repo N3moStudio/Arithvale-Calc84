@@ -9,7 +9,7 @@ struct NewRecoveryKeySection: View {
             Text(setup.recovery).font(.body.monospaced()).textSelection(.enabled)
                 .accessibilityIdentifier("setup.newRecoveryKey")
             Text("Use this new key for every backup you make from this library. A source backup’s old key only opens the old backup. Save this separately; it cannot be shown again after setup.")
-                .font(.footnote).foregroundStyle(.secondary)
+                .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
             Toggle("I Saved My New Key Somewhere Safe", isOn: $setup.saved)
                 .accessibilityIdentifier("setup.savedRecoveryKey")
             TextField("Confirm the last 8 characters", text: $setup.confirmation)

@@ -36,53 +36,29 @@ struct MediaBrowser: View {
         return vault.items.first(where: { $0.id == items[position].id })
     }
     var body: some View {
-        NavigationStack {
+        ZStack(alignment: .top) {
+            Color.black.ignoresSafeArea()
             if let current {
-                VStack(spacing: 0) {
-                    MediaPager(items: items, navigation: $navigation, previews: previews, reduceMotion: reduceMotion)
-                    Button { sheet = .details(current) } label: {
-                        VStack(spacing: 4) {
-                            Capsule().fill(.secondary).frame(width: 30, height: 4)
-                            Text("Details").font(.caption)
-                        }.frame(width: 104).frame(minHeight: 44)
-                            .modifier(ArithenGlass(tint: glassTint, shape: Capsule()))
-                    }
-                    .padding(.vertical, 4)
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-                    .accessibilityHint("Opens file information. You can also swipe up on this handle.")
-                    .simultaneousGesture(DragGesture(minimumDistance: 12).onEnded { value in
-                        guard value.translation.height < -20,
-                              abs(value.translation.height) > abs(value.translation.width) * 1.5 else { return }
-                        sheet = .details(current)
-                    })
-                }
-                .background(Color.black)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Done", action: close) }
-                    ToolbarItem(placement: .principal) { Text("\(position + 1) of \(items.count)").font(.subheadline).foregroundStyle(.secondary) }
-                    ToolbarItem(placement: .primaryAction) {
-                        Button("Lock & Return to Calculator", systemImage: "lock.fill") { previews.clear(); vault.lock(); close() }
-                    }
-                    ToolbarItem(placement: .primaryAction) {
-                        Button("Share or Save", systemImage: "square.and.arrow.up") { sheet = .export(current) }
-                    }
-                    ToolbarItemGroup(placement: .bottomBar) {
-                        Button("Previous", systemImage: "chevron.left") { navigation.request(navigation.requested - 1) }.disabled(navigation.requested == 0)
-                        Spacer()
-                        Button(current.favorite == true ? "Unfavorite" : "Favorite", systemImage: current.favorite == true ? "heart.fill" : "heart") {
+                MediaPager(items: items, navigation: $navigation, previews: previews, reduceMotion: reduceMotion,
+                           showDetails: { sheet = .details(current) })
+                    .ignoresSafeArea()
+                    .accessibilityAction(named: "Show Photo Info") { sheet = .details(current) }
+                    .accessibilityAction(named: "Next Snap") { navigation.request(navigation.requested + 1) }
+                    .accessibilityAction(named: "Previous Snap") { navigation.request(navigation.requested - 1) }
+                HStack {
+                    Button("Close", systemImage: "chevron.down", action: close).labelStyle(.iconOnly)
+                    Spacer()
+                    Button("Lock & Return to Calculator", systemImage: "lock.fill") { previews.clear(); vault.lock(); close() }.labelStyle(.iconOnly)
+                    Menu {
+                        Button("Share", systemImage: "square.and.arrow.up") { sheet = .export(current) }
+                        Button(current.favorite == true ? "Remove from Favs" : "Add to Favs", systemImage: "heart") {
                             vault.update(current, favorite: current.favorite != true)
                         }.disabled(vault.busy)
-                        Spacer()
-                        Button("Details", systemImage: "info.circle") { sheet = .details(current) }
-                            .accessibilityHint("You can also swipe up on the Details handle below the image.")
-                        Spacer()
-                        Button("Next", systemImage: "chevron.right") { navigation.request(navigation.requested + 1) }.disabled(navigation.requested + 1 >= items.count)
-                    }
-                }
+                    } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }
+                        .accessibilityLabel("Snap Options")
+                }.buttonStyle(MediaOverlayButtonStyle()).padding(.horizontal, 14).padding(.top, 6)
             }
         }
-        .tint(glassTint == .clear ? .primary : glassTint.color)
         .onAppear { focus(position) }
         .onChange(of: position) { _, index in focus(index) }
         .onChange(of: vault.unlocked) { _, unlocked in if !unlocked { sheet = nil; previews.clear() } }
@@ -109,17 +85,32 @@ struct MediaBrowser: View {
     }
 }
 
+private struct MediaOverlayButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(.system(size: 19, weight: .semibold, design: .rounded))
+            .foregroundStyle(ArithenPalette.color(.text)).frame(width: 44, height: 44)
+            .modifier(ArithenGlass(tint: .clear, shape: Circle()))
+            .opacity(configuration.isPressed ? 0.72 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.94 : 1)
+    }
+}
+
 /// Native interactive paging keeps the outgoing page visible throughout a swipe.
 private struct MediaPager: UIViewControllerRepresentable {
     let items: [VaultItem]
     @Binding var navigation: MediaPagingState
     @ObservedObject var previews: MediaPreviewStore
     let reduceMotion: Bool
+    let showDetails: () -> Void
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIViewController(context: Context) -> UIPageViewController {
         let page = UIPageViewController(transitionStyle: .scroll, navigationOrientation: .horizontal)
         page.dataSource = context.coordinator; page.delegate = context.coordinator
         page.view.backgroundColor = .black
+        let swipe = UISwipeGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.swipeUp(_:)))
+        swipe.direction = .up; swipe.delegate = context.coordinator
+        page.view.addGestureRecognizer(swipe)
         if let initial = context.coordinator.controller(navigation.visible) { page.setViewControllers([initial], direction: .forward, animated: false) }
         return page
     }
@@ -132,7 +123,7 @@ private struct MediaPager: UIViewControllerRepresentable {
         coordinator.alive = false
         page.dataSource = nil; page.delegate = nil; coordinator.controllers.removeAll()
     }
-    final class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
+    final class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate, UIGestureRecognizerDelegate {
         var parent: MediaPager
         var controllers: [Int: MediaPageHost] = [:]
         var transitioning = false
@@ -140,6 +131,14 @@ private struct MediaPager: UIViewControllerRepresentable {
         var interactionRevision: UInt64 = 0
         var operation: UInt64 = 0
         init(_ parent: MediaPager) { self.parent = parent }
+        @objc func swipeUp(_ gesture: UISwipeGestureRecognizer) {
+            guard alive, !transitioning, parent.previews.zoomedID == nil else { return }
+            parent.showDetails()
+        }
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            alive && !transitioning && parent.previews.zoomedID == nil
+        }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
         func reconcile(_ page: UIPageViewController) {
             guard alive, !transitioning,
                   let old = (page.viewControllers?.first as? MediaPageHost)?.index, old != parent.navigation.requested,
@@ -253,7 +252,7 @@ private struct MediaDetailsView: View {
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 Section("File") {
                     Text(item.name).textSelection(.enabled)
                     LabeledContent("Type", value: UTType(item.contentType)?.localizedDescription ?? item.contentType)

@@ -37,8 +37,10 @@ final class LibraryTextSearch: ObservableObject {
     private let worker = TextRecognitionWorker()
     private var task: Task<Void, Never>?
     private var request = UUID()
+    private var loaded = false
+    private static let enabledKey = "arithen.photoIndexing.enabled.v1"
     func lock() {
-        task?.cancel(); request = UUID(); index = .init(); running = false; error = nil
+        task?.cancel(); request = UUID(); loaded = false; index = .init(); running = false; error = nil
         status = "Text search is off. Names, albums, and tags still work."
     }
     func pause() { task?.cancel() }
@@ -52,8 +54,14 @@ final class LibraryTextSearch: ObservableObject {
         do {
             let result = try await vault.engine.searchIndex()
             guard request == ticket, vault.unlocked, vault.generation == generation else { return }
-            index = result
-            status = result.enabled ? "\(result.entries.count) photos checked. New photos can be indexed below." : "Text search is off. Names, albums, and tags still work."
+            var current = result
+            // Old archives never contain this rebuildable index. A saved opt-out
+            // is separate from index deletion, so it survives relaunches.
+            current.enabled = UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true
+            if !current.enabled { current.entries = [:] }
+            index = current; loaded = true
+            resumeWhenIdle(vault: vault)
+            status = current.enabled ? "\(result.entries.count) photos checked. New photos are indexed after import." : "Text search is off. Names, albums, and tags still work."
         } catch {
             if request == ticket, vault.unlocked, vault.generation == generation {
                 self.error = "The search index couldn’t be read. Turn text search off to clear it, then enable it to rebuild. Your original photos are unchanged."
@@ -64,6 +72,15 @@ final class LibraryTextSearch: ObservableObject {
         start(vault: vault, enabled: enabled)
     }
     func scan(vault: VaultModel) { start(vault: vault, enabled: true) }
+    func resumeWhenIdle(vault: VaultModel) {
+        guard loaded, index.enabled, !running, vault.unlocked, !vault.busy,
+              vault.photoImportReview == nil, vault.fileImportReview == nil,
+              UIApplication.shared.applicationState == .active,
+              !ProcessInfo.processInfo.isLowPowerModeEnabled,
+              ProcessInfo.processInfo.thermalState != .serious, ProcessInfo.processInfo.thermalState != .critical,
+              vault.items.contains(where: { $0.visible && $0.deletedAt == nil && UTType($0.contentType)?.conforms(to: .image) == true && index.entries[$0.id] == nil }) else { return }
+        start(vault: vault, enabled: true)
+    }
     private func start(vault: VaultModel, enabled: Bool) {
         guard vault.unlocked, !vault.busy else { return }
         let previous = task; previous?.cancel()
@@ -79,7 +96,8 @@ final class LibraryTextSearch: ObservableObject {
                 next.enabled = enabled; next.prune(items: vault.items)
                 try await vault.engine.saveSearchIndex(next)
                 guard ticket == request, vault.unlocked, generation == vault.generation else { return }
-                index = next
+                index = next; loaded = true
+                UserDefaults.standard.set(enabled, forKey: Self.enabledKey)
                 guard enabled else { status = "Text search is off. Its saved index has been removed."; return }
                 let photos = vault.items.filter { $0.visible && $0.deletedAt == nil && UTType($0.contentType)?.conforms(to: .image) == true && next.entries[$0.id] == nil }
                 var failed = 0, pending = 0
@@ -102,6 +120,7 @@ final class LibraryTextSearch: ObservableObject {
                         try Task.checkCancellation()
                         let text = try await worker.recognize(file)
                         guard ticket == request, vault.unlocked, generation == vault.generation else { return }
+                        guard !vault.busy else { throw CancellationError() }
                         next.entries[item.id] = text; pending += 1
                         if pending >= 10 {
                             try await vault.engine.saveSearchIndex(next)
@@ -133,12 +152,12 @@ struct PrivateSearchSettings: View {
     @EnvironmentObject private var vault: VaultModel
     @ObservedObject var search: LibraryTextSearch
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
-                Toggle("Search Text in Photos", isOn: Binding(get: { search.index.enabled }, set: { search.setEnabled($0, vault: vault) }))
+                Toggle("Photo Indexing", isOn: Binding(get: { search.index.enabled }, set: { search.setEnabled($0, vault: vault) }))
                     .disabled(vault.busy)
                 Text("Read words in photos and screenshots on this phone. The saved search index is encrypted and only available while your library is unlocked.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
             }
             Section {
                 if search.running {
@@ -149,13 +168,13 @@ struct PrivateSearchSettings: View {
                     if search.index.enabled { Button("Index New Photos") { search.scan(vault: vault) }.disabled(vault.busy) }
                 }
                 if let error = search.error {
-                    Text(error).foregroundStyle(.secondary)
+                    Text(error).foregroundStyle(ArithenPalette.color(.muted))
                     if !search.index.enabled { Button("Clear Damaged Index") { search.setEnabled(false, vault: vault) }.disabled(vault.busy) }
                 }
             } footer: {
-                Text("Indexing stops when you leave the app, lock the library, enable Low Power Mode, or the phone gets hot. New imports need another indexing run. Recognition can miss text; try a shorter word. This local index is rebuilt after a restore and is never sent to MEGA or Blomp.")
+                Text("Indexing stops when you leave the app, lock the library, enable Low Power Mode, or the phone gets hot. New photos are indexed automatically after imports finish. Recognition can miss text; try a shorter word. This local index is rebuilt after a restore and is never sent to MEGA or Blomp.")
             }
-        }.navigationTitle("Private Text Search").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle("Photo Indexing").navigationBarTitleDisplayMode(.inline)
             .task { await search.load(vault: vault) }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in search.pause() }
     }

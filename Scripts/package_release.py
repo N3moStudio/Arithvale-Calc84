@@ -51,16 +51,16 @@ def main():
         # Swift can encode short enum labels as instruction immediates rather
         # than contiguous strings. Layout availability/defaults have core tests;
         # inspect longer UI literals here and bind their source to the report.
-        for prompt in ('Choose Backup File', 'Choose Backup Folder', 'Tap the backup filename here to select it.', 'Original capture date unavailable.', 'Receive Backup from Files', 'Use Received Backup', 'Preview Contents', 'Add from Backup', 'Save Your New Recovery Key', 'Add Backup to Setup', 'Create Library from Backups'):
+        for prompt in ('Choose Backup File', 'Choose Backup Folder', 'Tap the backup filename here to select it.', 'Original capture date unavailable.', 'Receive Backup from Files', 'Use Received Backup', 'Add from Backup', 'Save Your New Recovery Key', 'Add Backup to Setup', 'Create Library from Backups'):
             assert prompt.encode() in binary, 'Missing expected recovery/viewer UI: '+prompt
-        for prompt in ('Opens file information. You can also swipe up on this handle.', 'Importing Selected Items'):
+        for prompt in ('Importing Backup',):
             assert prompt.encode() in binary, 'Missing expected motion/progress UI: '+prompt
-        for prompt in ('Glass Tint & Video Background', 'Stops in Low Power Mode', 'Calculator Appearance', 'Choose a Library Video'):
+        for prompt in ('Reset Appearance', 'arithen.surface.v1', 'Import from Files'):
             assert prompt.encode() in binary, 'Missing expected appearance UI: '+prompt
         for prompt in ('Your backup copies', 'Recovery not yet tested for this exact backup',
-                       'Search Text in Photos', 'Index New Photos', 'Find Exact Duplicates',
-                       'Tags, separated by commas', 'Edit Loop, Crop & Still Frame', 'Still frame within loop'):
-            assert prompt.encode() in binary, 'Missing expected library-tools UI: '+prompt
+                       'Photo Indexing', 'Index New Photos', 'Find Exact Duplicates',
+                       'Tags, separated by commas', 'In Files, share the files to LiveContainer, choose Arithen, then unlock the library.'):
+            assert prompt.encode() in binary, 'Missing expected library UI: '+prompt
         assert binary[:4]==bytes.fromhex('cffaedfe') and int.from_bytes(binary[4:8],'little')==0x0100000C
         commands=struct.unpack_from('<I',binary,16)[0]; position=32; min_version=None; sdk=None
         for _ in range(commands):

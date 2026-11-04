@@ -1,4 +1,9 @@
 # Arithen · phone test guide
+
+## Unreleased redesign
+
+Use the current checklist in [UI-REDESIGN.md](Docs/UI-REDESIGN.md#iphone--livecontainer-acceptance-still-required). New UI and LiveContainer intake need physical-device validation; older checklists below describe released builds.
+
 Version 0.11.0 test · Build 15
 
 ## First: 0.11.0 privacy and efficiency (physical device — NOT RUN here)

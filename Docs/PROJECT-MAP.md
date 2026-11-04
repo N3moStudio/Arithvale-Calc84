@@ -1,5 +1,23 @@
 # Arithen source map
 
+## 0.12.1 polish
+
+`LibraryView`, `SharedFilesImportView`, `PhotoImportReview`, `AlbumLibraryView`, and the button style in `MediaBrowser` contain the focused label, receipt-state, large-text, and Reduce Motion refinements described in [the October 30 polish notes](POLISH-2026-10-30.md). Data and backup code are unchanged from 0.12.0.
+
+## Current 0.12.0 UI
+
+| Area | Files | Responsibility |
+| --- | --- | --- |
+| Themes and typography | `CalcCore/ArithenTheme`, `Calc84/Appearance`, `ArithenGlass` | Eight palettes, Bloom default, Abyss migration, one root compact step, themed forms, persistent surface override |
+| Library and selection | `LibraryView`, `MemoryGrid`, `GridDragSelection`, `AlbumLibraryView` | Four portrait columns, count/filters/dock, hold-to-select, batch actions, Recently Deleted |
+| Viewer | `MediaBrowser`, `MediaViewerController` | Full-viewport pager, top options, upward info gesture, zoom-aware gesture gating, privacy lock |
+| Shared ordinary files | `CalcCore/SharedFileInbox`, `SharedFilesImportView`, `Calc84App`, `VaultModel` | Encrypted queue and metadata, device Keychain key, scope retention, explicit import, committed-only queue removal |
+| Shared backups | `SharedBackupView`, `BackupImportView` | Existing authenticated backup format; received copy + recovery key + Import; no picker on Add from Backup |
+| Settings and indexing | `VaultSettingsView`, `RecoveryViews`, `LibraryTextSearch` | About separately; code update and automatic on-device Photo Indexing; storage/recovery remain in Backups |
+| Regression checks | `ThemeAndInboxTests`, existing `CalcCoreTests`, `Scripts/test_recovery.py` | Theme migration/accessibility policy, encrypted inbox retry/tampering, archive compatibility |
+
+See [UI redesign](UI-REDESIGN.md) and [new-chat handoff](NEW-CHAT-HANDOFF.md). The sections below describe historical releases; their old layout/tint/background defaults no longer describe the current UI. Legacy appearance types/assets remain for compatibility, but have no public settings entry.
+
 ## 0.10.0 library tools
 
 | Area | Files | Notes |

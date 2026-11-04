@@ -24,16 +24,18 @@ struct ArithenGlass<S: InsettableShape>: ViewModifier {
     var interactive = true
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
+    @AppStorage(ArithenPalette.surfaceKey) private var surface = ThemeSurface.theme.rawValue
+    @Environment(\.arithenTheme) private var theme
     func body(content: Content) -> some View {
-        if reduceTransparency || contrast == .increased {
-            content.background(Color(uiColor: .secondarySystemBackground), in: shape)
-                .overlay(shape.strokeBorder(Color.primary.opacity(0.35), lineWidth: 1).allowsHitTesting(false))
+        if surface != ThemeSurface.glass.rawValue || reduceTransparency || contrast == .increased {
+            content.background(ArithenPalette.color(prominent ? .accent : .surface, theme: theme), in: shape)
+                .overlay(shape.strokeBorder(ArithenPalette.color(.text, theme: theme).opacity(contrast == .increased ? 0.4 : 0.12), lineWidth: 1).allowsHitTesting(false))
         } else if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.tint(tint == .clear ? nil : prominent ? tint.color.opacity(0.65) : tint.glassColor).interactive(interactive), in: shape)
+            content.glassEffect(.regular.tint(ArithenPalette.color(.accent, theme: theme).opacity(prominent ? 0.45 : 0.08)).interactive(interactive), in: shape)
         } else {
             content.background {
                 shape.fill(.regularMaterial)
-                    .overlay(shape.fill(tint == .clear ? .clear : tint.color.opacity(prominent ? 0.25 : 0.08)))
+                    .overlay(shape.fill(ArithenPalette.color(.accent, theme: theme).opacity(prominent ? 0.25 : 0.04)))
             }
                 .overlay(shape.strokeBorder(.white.opacity(0.25), lineWidth: 0.8).allowsHitTesting(false))
                 .shadow(color: .black.opacity(0.08), radius: 6, y: 2)

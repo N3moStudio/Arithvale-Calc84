@@ -111,7 +111,7 @@ struct BackupInputSection: View {
                 Label(backup.displayName, systemImage: "doc.badge.checkmark")
                     .font(.subheadline).textSelection(.enabled)
                 Text("Backup selected. Enter its original recovery key below.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
                 StorageEstimateView(bytes: Int64((try? backup.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0))
             }
             if let folder = input.folder {
@@ -119,7 +119,7 @@ struct BackupInputSection: View {
                 Text("Tap the backup filename here to select it.").font(.footnote)
                 if input.entries.isEmpty && !input.working {
                     Text("No files found. Choose the folder containing your backup, or download it in Files first.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ArithenPalette.color(.muted))
                 }
                 ForEach(input.entries, id: \.self) { url in
                     Button { input.prepare(url) } label: {
@@ -129,8 +129,8 @@ struct BackupInputSection: View {
                 }
             }
             if input.working { ProgressView("Preparing backup…") }
-            if let error = input.error { Text(error).foregroundStyle(.secondary).accessibilityIdentifier("backup.error") }
-            if let notice = input.notice { Text(notice).font(.footnote).foregroundStyle(.secondary).accessibilityIdentifier("backup.pickerNotice") }
+            if let error = input.error { Text(error).foregroundStyle(ArithenPalette.color(.muted)).accessibilityIdentifier("backup.error") }
+            if let notice = input.notice { Text(notice).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)).accessibilityIdentifier("backup.pickerNotice") }
         } header: { Text("Encrypted Backup") } footer: {
             VStack(alignment: .leading, spacing: 8) {
                 Text("File: tap the backup itself. Folder: open the folder containing it, tap Open, then tap the filename in the list above. Opening a folder alone does not select a backup.")

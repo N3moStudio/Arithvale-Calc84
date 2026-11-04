@@ -40,7 +40,7 @@ struct WallpaperEditor: View {
     private var imageIdentity: String { "\(edit.start)|\(edit.still)|\(source?.path ?? "")" }
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 Section {
                     if let poster {
                         CroppedWallpaper(image: poster, player: previewing && previewAllowed ? playback.player : nil, edit: edit)

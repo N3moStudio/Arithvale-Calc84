@@ -5,7 +5,7 @@ import CalcCore
 struct AboutView: View {
     @EnvironmentObject private var vault: VaultModel
     var body: some View {
-        List {
+        ThemedList {
             Section { ArithenIdentity() }
             Section("Storage") {
                 LabeledContent("Originals and resources", value: ByteCountFormatter.string(fromByteCount: vault.items.reduce(0) { $0 + Int64($1.byteCount) }, countStyle: .file))

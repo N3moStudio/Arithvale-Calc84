@@ -16,52 +16,34 @@ struct PhotoImportReview: Identifiable {
     var keptCount: Int { imported - originals.count }
 }
 
+/// A compact completion card; deletion still verifies the committed originals and
+/// asks Photos for system confirmation. Failed imports are never deletion targets.
 struct PhotoImportReviewView: View {
     @EnvironmentObject private var vault: VaultModel
-    @Environment(\.dismiss) private var dismiss
     let review: PhotoImportReview
+    let close: () -> Void
     @State private var error: String?
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Image(systemName: "checkmark.shield").font(.largeTitle).accessibilityHidden(true)
-                    Text("\(review.imported) imported").font(.largeTitle.bold())
-                    Text("Your encrypted copies were saved and checked. Keep the originals in Photos, or delete the imported originals you no longer want there.")
-                        .foregroundStyle(.secondary)
-                    if review.imported < review.requested {
-                        Text("\(review.requested - review.imported) weren’t imported. Those originals will stay in Photos.").fontWeight(.semibold)
-                    }
-                    if let importError = review.importError { Text(importError).font(.footnote).foregroundStyle(.secondary) }
-                    if review.keptCount > 0 {
-                        Text("\(review.keptCount) imported items can’t be removed here. Photos access may be limited, or they contain edits or extra resources. Their originals will stay.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                    if review.originalCount > 0 {
-                        Text("Deletion also syncs through iCloud Photos when enabled. Originals may remain in Photos → Recently Deleted; this app does not empty it.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                        Text("Before making the vault your only copy, save and test an external backup.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                    if vault.busy { HStack { ProgressView(); Text("Checking copies…").font(.subheadline) } }
-                    if let error { Text(error).font(.footnote).foregroundStyle(.red).accessibilityLabel("Deletion not completed. " + error) }
-                    if vault.failedImportCount > 0 {
-                        Button("Retry Unimported Items") { vault.retryImports() }.frame(minHeight: 44)
-                    }
-                    Button("Keep Originals") { dismiss() }
-                        .buttonStyle(.borderedProminent).tint(.primary).frame(maxWidth: .infinity)
-                    if review.originalCount > 0 {
-                        Button("Allow Deleting \(review.originalCount) Originals from Photos", role: .destructive) {
-                            Task { error = await vault.deleteImportedOriginals(review) }
-                        }.frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
+        VStack(spacing: 20) {
+            Text("\(review.imported.formatted()) \(review.imported == 1 ? "Snap Imported" : "Snaps Imported")").font(.title2.bold()).multilineTextAlignment(.center)
+            if review.imported < review.requested {
+                Text("\(review.requested - review.imported) couldn’t be imported. Their originals are unchanged.").font(.subheadline).foregroundStyle(ArithenPalette.color(.muted))
             }
-            .navigationTitle("Import Complete").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.disabled(vault.busy) } }
-            .disabled(vault.busy)
-        }
-        .interactiveDismissDisabled(vault.busy)
+            if let importError = review.importError { Text(importError).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)) }
+            if review.originalCount > 0 {
+                Text("Delete \(review.originalCount.formatted()) verified \(review.originalCount == 1 ? "original" : "originals") from Photos?").font(.body).multilineTextAlignment(.center)
+                Text("Deletion also syncs with iCloud Photos. Originals go to Recently Deleted.").font(.footnote).foregroundStyle(ArithenPalette.color(.muted)).multilineTextAlignment(.center)
+                Button("Delete Originals", role: .destructive) {
+                    Task { error = await vault.deleteImportedOriginals(review) }
+                }.buttonStyle(ImportButtonStyle())
+            }
+            if vault.busy { ProgressView("Checking copies…") }
+            if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+            Button(review.originalCount > 0 ? "Keep Originals" : "Done", action: close)
+                .font(.headline).frame(maxWidth: .infinity, minHeight: 44)
+        }.padding(24).frame(maxWidth: 360)
+            .background(ArithenPalette.color(.surface), in: RoundedRectangle(cornerRadius: 26))
+            .disabled(vault.busy).accessibilityAddTraits(.isModal)
     }
 }
 #endif

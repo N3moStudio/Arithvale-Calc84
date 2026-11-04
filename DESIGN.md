@@ -1,5 +1,8 @@
 # Arithen · 0.10.0 design
 
+> **Current design:** [Unreleased compact library redesign](Docs/UI-REDESIGN.md). Bloom is the default; library colors follow the selected theme. Theme and Surfaces replace all former layout/tint/video-background options. The older design history below is retained for context, not as the current UI specification.
+
+
 ## Library tools
 
 Keep Clear Glass as the initial layout, all six choices, purple identity and

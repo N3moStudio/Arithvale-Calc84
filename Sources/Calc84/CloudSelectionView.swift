@@ -23,7 +23,7 @@ struct CloudPolicySection: View {
             NavigationLink("Never Upload · \(policy.blocked.count)") {
                 CloudSelectionView(provider: provider, blocking: true)
             }
-            Text("\(policy.itemIDs(in: vault.items).count) eligible items").foregroundStyle(.secondary)
+            Text("\(policy.itemIDs(in: vault.items).count) eligible items").foregroundStyle(ArithenPalette.color(.muted))
         } header: { Text("What goes to " + provider.title) } footer: {
             Text("Manual: choose items, then tap Back Up. Automatic: back up all eligible items after changes while open and unlocked. Never Upload overrides either mode. Blocks apply to these library items, not separate copies imported later. Recently Deleted is excluded. Older cloud backups are not erased. Files backups still contain the full library.")
         }.disabled(vault.busy)
@@ -45,7 +45,7 @@ struct CloudSelectionView: View {
     var body: some View {
         VStack(spacing: 12) {
             Text(blocking ? "Checked items will never be included in future \(provider.title) uploads unless you unblock them." : "Check the items to include in \(provider.title) backups. New imports stay unselected.")
-                .font(.subheadline).foregroundStyle(.secondary).padding(.horizontal)
+                .font(.subheadline).foregroundStyle(ArithenPalette.color(.muted)).padding(.horizontal)
             HStack {
                 Text("\(selection.count) selected").font(.headline)
                 Spacer()
@@ -65,7 +65,7 @@ struct CloudSelectionView: View {
                         if !selection.insert(item.id).inserted { selection.remove(item.id) }
                     }, action: { _, _ in })
             }
-            Text("Tap or drag across items. Changes take effect when you tap Save.").font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
+            Text("Tap or drag across items. Changes take effect when you tap Save.").font(.footnote).foregroundStyle(ArithenPalette.color(.muted)).padding(.horizontal)
         }
         .navigationTitle(blocking ? "Never Upload" : "Choose Items").navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -96,7 +96,7 @@ struct CloudBatchSelectionView: View {
     @State private var status = ""
     var body: some View {
         NavigationStack {
-            List {
+            ThemedList {
                 Section { Text("\(ids.count) selected items").font(.headline) }
                 ForEach(CloudProvider.allCases) { provider in
                     Section(provider.title) {

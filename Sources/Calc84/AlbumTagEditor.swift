@@ -15,13 +15,13 @@ struct AlbumTagEditor: View {
     private var albumsToApply: [String] { LibraryOrganization.names(chosen.sorted() + [newAlbum]) }
     private var tagsToApply: [String] { LibraryOrganization.names(tags.components(separatedBy: ","), limit: 64) }
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
                 Picker("Action", selection: $mode) {
                     Text("Add").tag(OrganizationMode.add)
                     Text("Remove").tag(OrganizationMode.remove)
                 }.pickerStyle(.segmented)
-                Text("\(ids.count) selected. A photo can be in several albums without another copy.").font(.footnote).foregroundStyle(.secondary)
+                Text("\(ids.count) selected. A photo can be in several albums without another copy.").font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
             }
             Section("Albums") {
                 TextField(mode == .add ? "New album name" : "Album name", text: $newAlbum)
@@ -30,7 +30,7 @@ struct AlbumTagEditor: View {
                         VStack(alignment: .leading) {
                             Text(name)
                             Text("\(selected.filter { $0.albumNames.contains(name) }.count) selected items already here")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(.caption).foregroundStyle(ArithenPalette.color(.muted))
                         }
                     }
                 }
@@ -38,7 +38,7 @@ struct AlbumTagEditor: View {
             Section {
                 TextField("Tags, separated by commas", text: $tags).textInputAutocapitalization(.never)
                 let existing = Set(selected.flatMap { $0.tags ?? [] }).sorted()
-                if !existing.isEmpty { Text("Current: " + existing.joined(separator: ", ")).font(.footnote).foregroundStyle(.secondary) }
+                if !existing.isEmpty { Text("Current: " + existing.joined(separator: ", ")).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)) }
             } header: { Text("Tags") } footer: { Text("For example: travel, receipt, school. Albums and tags stay inside encrypted backups. Up to 24 albums and 32 tags per item.") }
         }.navigationTitle("Albums & Tags").navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -66,7 +66,7 @@ struct AlbumCustomizationView: View {
     }
     private var items: [VaultItem] { vault.items.filter { $0.visible && $0.deletedAt == nil && $0.albumNames.contains(name) } }
     var body: some View {
-        Form {
+        ThemedForm {
             Section { Toggle("Pin Album", isOn: $pinned) }
             Section {
                 Button { cover = nil } label: {
@@ -76,7 +76,7 @@ struct AlbumCustomizationView: View {
                     Button { cover = item.id } label: {
                         HStack {
                             LibraryThumbnail(item: item, engine: vault.engine).frame(width: 64, height: 64).clipShape(RoundedRectangle(cornerRadius: 8))
-                            Text(item.name).foregroundStyle(.primary).lineLimit(2)
+                            Text(item.name).foregroundStyle(ArithenPalette.color(.text)).lineLimit(2)
                             Spacer()
                             if cover == item.id { Image(systemName: "checkmark") }
                         }

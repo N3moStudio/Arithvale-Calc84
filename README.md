@@ -4,10 +4,10 @@
 
 <h1 align="center">Arithen</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.11.0 testing · iOS 17+ · SwiftUI · MIT licensed</p>
+<p align="center">0.12.1 testing · iOS 17+ · SwiftUI · MIT licensed</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
-  <a href="Docs/UPDATE-0.11.0.md">What’s new</a> &nbsp;·&nbsp;
+  <a href="Docs/POLISH-2026-10-30.md">What’s new</a> &nbsp;·&nbsp;
   <a href="CHANGELOG.md">Changelog</a> &nbsp;·&nbsp;
   <a href="Docs/CLOUD-BACKUP.md">Cloud choices</a> &nbsp;·&nbsp;
   <a href="Docs/BUILDING.md">Build from source</a>
@@ -17,92 +17,37 @@ Arithen is a working calculator with an encrypted library for photos, videos,
 Live Photos, and files. It keeps the everyday calculator familiar and gives you
 control over which memories leave your phone. Previously **Arithvale / Calc 84**, by **N3mo Studio**.
 
-## Make it yours
+## Current design
 
-- **Calculate naturally.** A familiar keypad with glass keys, purple accents, clear and backspace controls, and optional scientific functions.
-- **Make the glass yours.** Choose separate glass tints and your own video backgrounds for the calculator and library. Movement stops in Low Power Mode and with Reduce Motion.
-- **Keep your memories.** Choose Clear Glass, Photo Library, Nightroom, Albums First, Timeline, or Contact Sheet. Search, favorite, and drag across items to select them.
-- **Choose your cloud copies.** Select items separately for MEGA and Blomp, or enable automatic backup for a provider. A provider’s Never Upload list takes priority.
-- **Import, then decide.** Import Photos, files, or folders. Keep the originals, or explicitly approve moving verified originals to Photos Recently Deleted or the file provider’s Trash.
-- **Recover independently.** Save encrypted backups to Files, test recovery, and recover on a computer using the included offline tool.
+The current local test IPA is **0.12.1, build 17**. It includes the compact library redesign plus improved large-text layouts, accurate received-file states, count labels, and Reduce Motion behavior. It is not a public GitHub release. Update the existing installation to retain its library and calculator code.
 
-## The latest
+- **Compact calculator.** Familiar button positions, smaller rounded numerals, and the same calculation and unlock behavior.
+- **Eight complete themes.** Glacier, Afterhours, Porcelain, Ion, Ember, Bloom, Blueprint, and Titanium. **Bloom** is the default. Theme and Surfaces are the only appearance choices; the library follows the theme too.
+- **Simple library.** Four portrait columns, a Snaps count, Photos / Videos / Favs filters, and a floating Library / Albums / Search dock. Hold a snap to select; Share, Add to Album, or Delete. Cancel or deselect everything to leave selection.
+- **Full-screen viewing.** Photos fill the available viewer, with quick lock and an options menu at the top. Share and Favorite are in that menu; swipe up for details. Photos retain their own colors and aspect ratio.
+- **Direct imports.** Photos & Videos starts importing after the system selection. Import from Files and From a Backup receive shares through LiveContainer, then enable Import. No pre-import Review Import screen or backup picker alternatives on the add screen.
+- **Photo Indexing.** On-device text search defaults on and starts after imports finish. Turn it off in Privacy & Access. Its encrypted index stays local; Low Power Mode, heat, inactivity, and other library operations pause work.
+- **Your cloud choices remain.** MEGA and Blomp keep separate manual selections and Never Upload lists. Manage those under Cloud Copies.
 
-**0.11.0** adds quick privacy controls and reduces unnecessary library work:
+### Appearance
 
-- **One-tap lock:** return to the calculator from the library header or media viewer.
-- **Private backup reminders:** opt in under Settings → Backups. Reminders appear
-  inside the unlocked library, open Backup Center, and can be snoozed until tomorrow.
-- **Large imports:** publish grid updates in batches, reuse search indexes, cancel
-  obsolete thumbnail work, and retry unsuccessful file imports from their review.
-- **Power-aware work:** defer automatic backups in Low Power Mode or high heat,
-  pause text indexing when inactive, and limit speculative photo preparation.
-  Covering the library pauses its background without repeatedly re-encoding it.
+The same theme styles calculator, library, settings, and app-owned sheets. Surfaces offers **Theme default**, **Solid (no glass)**, or **Liquid Glass**. All themes default to Solid. Explicit surface choices survive theme changes. Reset Appearance returns to Bloom and Theme default. Native glass requires iOS 26; older versions use material, and accessibility contrast/transparency settings use opaque surfaces.
 
-Original deletion remains optional and rechecks committed encrypted copies before
-Photos confirmation or supported-provider Trash. Backup formats and keys stay compatible.
-Battery and scrolling improvements still require measurement on an iPhone.
+Text is rounded and one standard Dynamic Type step smaller, with xSmall as the floor. Accessibility categories and touch targets are retained. Legacy tint, layout, video-background, font, and color-mode choices no longer control the UI; stored assets are not deleted. Arithen’s name, icon, bundle identity, library, and keys stay unchanged.
 
-[Read the 0.11.0 update notes →](Docs/UPDATE-0.11.0.md)
+### Import from Files
 
-**0.10.0** makes the library easier to organize and recover:
+In Files, share to LiveContainer, choose Arithen, then unlock the library. Open **+ → Import from Files**, or **+ → From a Backup**, and tap **Import** when the received copy is ready. Backups also require their original recovery key. The host must actually deliver a file URL; a cloud collaboration link is not a file.
 
-- **Backup Center:** create, import and test from one place. See separate Files,
-  MEGA and Blomp coverage; recovery checks belong to the exact tested snapshot.
-- **Private Text Search:** opt in to reading words inside photos/screenshots on
-  the phone. The local search index is encrypted and never uploaded.
-- **Storage:** review large files and exact duplicates, see encrypted storage
-  usage, and check working-space estimates before importing/restoring.
-- **Albums & Tags:** put one photo in multiple albums without extra copies,
-  add tags, pin albums and choose covers.
-- **Background editor:** choose the loop section, crop position and Low Power
-  Mode still frame independently for the calculator and library.
+Received regular files wait encrypted with a separate device-only inbox key. Failed imports keep their received copies for retry. Removing a received copy never removes the original in Files. After Photos import, a compact completion card offers optional deletion of eligible verified originals, with Photos confirmation.
 
-[Read the 0.10.0 update notes →](Docs/UPDATE-0.10.0.md)
+Backups are authenticated before addition, exact duplicates are skipped, and imported resources use the destination library’s existing encryption. Source cloud exclusions are preserved. A new library created during setup gets its own recovery key; importing into an existing library does not rotate its key.
 
-The **0.9.0** design remains: Arithen’s approved purple Aperture A icon and glass on
-calculator keys, library controls, filters, and the viewer’s Details handle.
-Native Liquid Glass is available on iOS 26+; iOS 17–25 uses translucent material.
-Reduce Transparency and increased contrast use opaque controls.
+### Settings
 
-Open the calculator’s **top-right Settings → Glass Tint & Video Background**,
-or the library’s **Settings → Appearance → Library Glass & Video Background**.
-Choose Plum, Neutral, Blue, Mint, Rose, or Amber. Your own video can become a silent,
-reduced-size loop of up to 30 seconds; the source stays unchanged. Library
-backgrounds come from already-encrypted library videos. Settings for these two
-areas stay separate, and backgrounds stop playing when covered or inactive.
+**Backups**, **Cloud Copies**, **Privacy & Access**, **Appearance**, and **About**. Photo Indexing and Change Calculator Code are under Privacy & Access. Storage and recovery-key help remain under Backups. Quick lock remains available in the library and viewer.
 
-The gallery/viewer improvements from **0.8.0** remain: native zoom transitions on
-iOS 18+, settled-page tracking, a dedicated Details handle, cached gallery
-sections, and scroll-position preservation when changing layouts. Physical-device
-checks are still required for glass appearance, playback, battery use, and gestures.
-
-The **0.7.0** recovery improvements remain: every new library gets a fresh recovery key, including setup from
-existing Files or cloud backups. Use each source’s old key to read it, save and
-confirm the new destination key, then create the library. Future backups use
-that new key, even when they contain the same photos. Existing libraries and
-old archives keep their keys; later imports do not rotate the destination key.
-
-All six approved gallery designs remain available. **Clear Glass opens
-first**; choose another under **Settings → Appearance** and it stays selected.
-The calculator keeps circular keys, a shared backspace/AC capsule, and the familiar
-number arrangement. Purple is the default glass tint.
-
-Settings starts with **Backups**, **Cloud Copies**, **Privacy & Access**, and
-**Appearance**, followed by **Storage** and **Private Text Search** under Library
-tools. Version and build are visible there.
-
-Shared backups appear on the unlocked library as **Backup received**. Tap it,
-or **+ → From a Backup**, enter the original recovery key, preview the contents,
-and choose items to add. Exact original-content duplicates are skipped; Live
-Photo motion counts too. Added items are encrypted using the current library’s
-key. Its existing items and identity stay in place. Source cloud exclusions are
-carried over; source upload selections never opt items into a new provider.
-
-Use **Files → Share → LiveContainer → Arithen** to receive a backup. The Files
-picker remains an optional route; its reported host-specific issue is not claimed
-fixed by this update. After a successful addition the received copy is cleared,
-leaving the original backup in Files available to share again.
+[Design and compatibility notes](Docs/UI-REDESIGN.md) · [New-chat handoff](Docs/NEW-CHAT-HANDOFF.md)
 
 Your existing library identity and recovery key stay compatible. The IPA contains
 the app, not anyone’s photos, recovery key, or cloud credentials.

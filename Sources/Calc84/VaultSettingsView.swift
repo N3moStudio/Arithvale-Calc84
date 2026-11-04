@@ -5,20 +5,18 @@ import CalcCore
 struct VaultSettingsView: View {
     @EnvironmentObject private var vault: VaultModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.arithenTheme) private var theme
+    @AppStorage(ArithenPalette.surfaceKey) private var surface = ThemeSurface.theme.rawValue
     var body: some View {
-        List {
+        ThemedList {
             Section {
                 NavigationLink { BackupSettingsView() } label: { settingsRow("Backups", detail: "Save, add or check a copy", symbol: "externaldrive") }
                 NavigationLink { CloudBackupView() } label: { settingsRow("Cloud Copies", detail: "Choose what leaves this device", symbol: "icloud") }
-                NavigationLink { PrivacyAccessView() } label: { settingsRow("Privacy & Access", detail: "Calculator code and recovery key", symbol: "lock") }
-                NavigationLink { AppearanceSettingsView() } label: { settingsRow("Appearance", detail: "Layout, colors and display", symbol: "paintpalette") }
-            }
-            Section("Library tools") {
-                NavigationLink { LibraryStorageView() } label: { settingsRow("Storage", detail: "Space, large items and duplicates", symbol: "internaldrive") }
-                NavigationLink { PrivateSearchSettings(search: vault.textSearch) } label: { settingsRow("Private Text Search", detail: "Find words inside photos", symbol: "text.magnifyingglass") }
+                NavigationLink { PrivacyAccessView() } label: { settingsRow("Privacy & Access", detail: "Code and photo indexing", symbol: "lock") }
+                NavigationLink { AppearanceSettingsView() } label: { settingsRow("Appearance", detail: theme.title + " · " + (ThemeSurface(rawValue: surface) ?? .theme).title, symbol: "paintpalette") }
             }
             Section {
-                NavigationLink { AboutView() } label: { LabeledContent(AppBrand.name, value: AppBrand.version).font(.footnote).foregroundStyle(.secondary) }
+                NavigationLink { AboutView() } label: { settingsRow("About", detail: AppBrand.name + " " + AppBrand.version, symbol: "info.circle") }
                 Button("Lock & Return to Calculator", systemImage: "lock.fill") { vault.lock(); dismiss() }
             }
         }.navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
@@ -29,33 +27,35 @@ struct VaultSettingsView: View {
     }
     private func settingsRow(_ title: String, detail: String, symbol: String) -> some View {
         HStack(spacing: 14) {
-            Image(systemName: symbol).font(.title2).frame(width: 28).foregroundStyle(.tint)
+            Image(systemName: symbol).font(.system(size: 18, weight: .semibold)).foregroundStyle(.tint)
+                .frame(width: 38, height: 38).background(ArithenPalette.color(.accent).opacity(0.10), in: RoundedRectangle(cornerRadius: 11))
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.body.weight(.medium))
-                Text(detail).font(.footnote).foregroundStyle(.secondary)
+                Text(detail).font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
             }
-        }.padding(.vertical, 9)
+        }.padding(.vertical, 5)
     }
 }
 
 struct PrivacyAccessView: View {
+    @EnvironmentObject private var vault: VaultModel
     var body: some View {
-        List {
+        ThemedList {
             Section {
                 NavigationLink("Change Calculator Code") { ChangeCodeView() }
-                NavigationLink("Recovery Key") { RecoveryKeyHelpView() }
+                NavigationLink("Photo Indexing") { PrivateSearchSettings(search: vault.textSearch) }
             }
             Section("Private storage") {
                 Text("Your library stays encrypted in private app storage. Save an external backup before removing the app or its data container.")
                 Text("Exported originals are ordinary photos and videos. They may contain location information.")
             }
-            Section { NavigationLink("About & Privacy") { AboutView() } }
+
         }.navigationTitle("Privacy & Access").navigationBarTitleDisplayMode(.inline)
     }
 }
 struct RecoveryKeyHelpView: View {
     var body: some View {
-        List {
+        ThemedList {
             Section("Keep your key") {
                 Text("Use the recovery key saved during this library’s setup. Starting a new library from a backup in version 0.7.0 or later gives it a new key. Earlier restored libraries keep their original key. Updates do not change existing keys.")
                 Text("The app does not keep a viewable copy of your recovery key. The old key for a source backup cannot open a newer library created with a different key.")
@@ -89,7 +89,7 @@ struct BackupSettingsView: View {
     @State private var picked: BackupSelection?
     @State private var preparation: Task<Void, Never>?
     var body: some View {
-        List {
+        ThemedList {
             Section {
                 Button {
                     preparation = Task {
@@ -102,6 +102,7 @@ struct BackupSettingsView: View {
                 NavigationLink { BackupImportView() } label: { Label("Import Backup", systemImage: "externaldrive.badge.plus").frame(minHeight: 44) }.disabled(vault.busy)
                 NavigationLink { RecoveryTestView() } label: { Label("Test Backup", systemImage: "checkmark.shield").frame(minHeight: 44) }.disabled(vault.busy)
             } footer: { Text("Choose a location outside \(AppBrand.name) / LiveContainer. No folder connection is required for this save.") }
+            Section { NavigationLink("Storage") { LibraryStorageView() } }
             BackupCoverageView()
             Section {
                 Toggle("Private Backup Reminders", isOn: $reminders)
@@ -111,7 +112,7 @@ struct BackupSettingsView: View {
             Section {
                 NavigationLink { SharedBackupGuide() } label: { Label("How to Import from Files", systemImage: "square.and.arrow.down") }
                 Text("Files → Share → LiveContainer → Arithen. Unlock the library, then tap Backup received or Import Backup above. You can add another backup any time.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
                 StorageEstimateView(bytes: vault.items.reduce(Int64(0)) { $0 + Int64($1.byteCount) }, copies: 2)
             }
             if vault.busy || !vault.status.isEmpty {
@@ -121,19 +122,19 @@ struct BackupSettingsView: View {
                         Text(vault.status.isEmpty ? "Working…" : vault.status).font(.subheadline)
                     }
                     if let message = vault.message {
-                        Text(message).font(.footnote).foregroundStyle(.secondary)
+                        Text(message).font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
                     }
                 }
             }
             Section {
-                NavigationLink("Last Saved Copy") { List {
+                NavigationLink("Last Saved Copy") { ThemedList {
                 if lastExport > 0 {
                     LabeledContent("Saved") { Text(Date(timeIntervalSince1970: lastExport), format: .dateTime.month().day().hour().minute()) }
                     if !savedFolder.isEmpty { LabeledContent("Folder", value: savedFolder) }
                     Text(filename).font(.footnote).textSelection(.enabled)
                     if needsBackup { Label("New changes need another backup", systemImage: "exclamationmark.circle") }
-                    Text("Find this filename in Files. A successful save does not confirm cloud upload.").font(.footnote).foregroundStyle(.secondary)
-                } else { Text("No backup has been saved and checked yet.").foregroundStyle(.secondary) }
+                    Text("Find this filename in Files. A successful save does not confirm cloud upload.").font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
+                } else { Text("No backup has been saved and checked yet.").foregroundStyle(ArithenPalette.color(.muted)) }
                 }.navigationTitle("Last Saved Copy") }
             }
             Section {
@@ -143,7 +144,7 @@ struct BackupSettingsView: View {
                 }
                 NavigationLink("Recovery Key") { RecoveryKeyHelpView() }
                 NavigationLink("Restore after reinstalling") {
-                    List {
+                    ThemedList {
                         Text("1. Before deleting anything, save a backup outside the app and test that exact file. Wait for your Files provider to finish uploading.")
                         Text("2. In a fresh installation, enter 160160 and hold =. Choose Start from Existing Backups, or share a backup from Files to this app.")
                         Text("3. Select the .c84backup file, enter its old recovery key, and tap Add Backup to Setup. Save and confirm the new recovery key, choose a calculator code, then create the library.")
@@ -154,7 +155,7 @@ struct BackupSettingsView: View {
                 }
             } header: { Text("Check & restore") } footer: { Text("A recovery test checks the file you select, not all your backups. A screenshot of the key does not contain your photos.") }
             Section {
-                NavigationLink("Connected Folder") { List {
+                NavigationLink("Connected Folder") { ThemedList {
                 LabeledContent("Connected folder", value: folderName)
                 Button(BackupFolder.configured ? "Reconnect or Change Folder" : "Connect Backup Folder", systemImage: "folder.badge.plus") { sheet = .folder }
                     .disabled(vault.busy)

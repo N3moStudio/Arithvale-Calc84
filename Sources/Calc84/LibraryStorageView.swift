@@ -17,7 +17,7 @@ struct LibraryStorageView: View {
     private func bytes(_ item: VaultItem) -> Int64 { report?.bytes(for: item) ?? Int64(item.byteCount) }
     private func size(_ value: Int64) -> String { ByteCountFormatter.string(fromByteCount: value, countStyle: .file) }
     var body: some View {
-        List {
+        ThemedList {
             Section("On this phone") {
                 if let report {
                     LabeledContent("Encrypted library", value: size(report.encryptedBytes))
@@ -45,7 +45,7 @@ struct LibraryStorageView: View {
                     Button(scanned ? "Scan Again for Exact Duplicates" : "Find Exact Duplicates", systemImage: "square.on.square") { findDuplicates() }.disabled(vault.busy)
                 }
                 if scanned {
-                    if groups.isEmpty { Text("No exact duplicates found.").foregroundStyle(.secondary) }
+                    if groups.isEmpty { Text("No exact duplicates found.").foregroundStyle(ArithenPalette.color(.muted)) }
                     ForEach(Array(groups.enumerated()), id: \.element.id) { number, group in
                         NavigationLink("Group \(number + 1) · \(group.ids.count) copies") {
                             StorageItemsView(title: "Duplicate Copies", items: active.filter { group.ids.contains($0.id) }, bytes: report?.resourceBytes ?? [:])
@@ -57,7 +57,7 @@ struct LibraryStorageView: View {
                 StorageEstimateView(bytes: vault.items.reduce(Int64(0)) { $0 + Int64($1.byteCount) }, copies: 2)
                 NavigationLink("Open Backup Center") { BackupSettingsView() }
             }
-            if let error { Section { Text(error).foregroundStyle(.secondary); Button("Retry Measurement") { Task { await refresh() } } } }
+            if let error { Section { Text(error).foregroundStyle(ArithenPalette.color(.muted)); Button("Retry Measurement") { Task { await refresh() } } } }
         }.navigationTitle("Storage").navigationBarTitleDisplayMode(.inline)
             .task { await refresh() }
             .onChange(of: vault.items) { _, _ in scanned = false; groups = []; Task { await refresh() } }
@@ -109,9 +109,9 @@ private struct StorageItemsView: View {
         [item.id, item.companionID, item.thumbnailID].compactMap { $0 }.reduce(0) { $0 + (bytes[$1] ?? 0) }
     }
     var body: some View {
-        List {
+        ThemedList {
             Section {
-                Text("Choose the copies you want to remove. Tap a preview to inspect it first.").font(.footnote).foregroundStyle(.secondary)
+                Text("Choose the copies you want to remove. Tap a preview to inspect it first.").font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
                 ForEach(current) { item in
                     HStack(spacing: 12) {
                         Button { preview = item } label: {
@@ -120,8 +120,8 @@ private struct StorageItemsView: View {
                         Toggle(isOn: Binding(get: { selected.contains(item.id) }, set: { if $0 { selected.insert(item.id) } else { selected.remove(item.id) } })) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(item.name).lineLimit(2)
-                                Text(ByteCountFormatter.string(fromByteCount: storedBytes(item), countStyle: .file)).font(.caption).foregroundStyle(.secondary)
-                                if !item.albumNames.isEmpty { Text(item.albumNames.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary) }
+                                Text(ByteCountFormatter.string(fromByteCount: storedBytes(item), countStyle: .file)).font(.caption).foregroundStyle(ArithenPalette.color(.muted))
+                                if !item.albumNames.isEmpty { Text(item.albumNames.joined(separator: ", ")).font(.caption).foregroundStyle(ArithenPalette.color(.muted)) }
                             }
                         }
                     }

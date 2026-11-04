@@ -13,7 +13,7 @@ struct OperationProgressView: View {
                 Text(title).font(.subheadline.weight(.semibold))
             }
             if let progress { ProgressView(value: min(1, max(0, progress))) }
-            if !detail.isEmpty { Text(detail).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+            if !detail.isEmpty { Text(detail).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)).fixedSize(horizontal: false, vertical: true) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)

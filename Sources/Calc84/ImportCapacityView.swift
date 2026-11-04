@@ -31,7 +31,7 @@ struct ImportCapacityView: View {
     }
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 Section {
                     Label("Review Your Import", systemImage: "square.and.arrow.down").font(.headline)
                     if preparing { ProgressView("Checking selected files…") }
@@ -44,7 +44,7 @@ struct ImportCapacityView: View {
                         if let available { Text(ByteCountFormatter.string(fromByteCount: available, countStyle: .file) + " available on this phone") }
                     }
                 } footer: { Text("Originals stay where they are. After a verified import, you can separately choose whether to move supported originals to Trash or Recently Deleted.") }
-                if let error { Section { Text(error).foregroundStyle(.secondary) } }
+                if let error { Section { Text(error).foregroundStyle(ArithenPalette.color(.muted)) } }
             }.navigationTitle("Import").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: close) }

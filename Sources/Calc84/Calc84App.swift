@@ -1,17 +1,30 @@
 #if os(iOS)
 import SwiftUI
 import UIKit
+import CalcCore
 
 @main
 struct ArithenApp: App {
     @UIApplicationDelegateAdaptor(PrivacyDelegate.self) private var delegate
     @StateObject private var vault = VaultModel()
     @StateObject private var sharedBackup = SharedBackupModel()
+    @StateObject private var sharedFiles = SharedFilesModel()
     var body: some Scene {
         WindowGroup {
             CalculatorView().environmentObject(vault).environmentObject(vault.cloud)
-                .environmentObject(sharedBackup)
-                .onOpenURL { sharedBackup.receive($0) }
+                .environmentObject(sharedBackup).environmentObject(sharedFiles)
+                .modifier(AppearanceRoot())
+                .onOpenURL { url in
+                    // Inspect off-main and retain the provider scope through routing.
+                    let access = BackupSelection(url)
+                    Task {
+                        let isBackup = await Task.detached {
+                            ["c84backup", "calc84backup"].contains(url.pathExtension.lowercased()) || (try? BackupFileProbe.validate(url)) != nil
+                        }.value
+                        if isBackup { sharedBackup.receive(url) } else { sharedFiles.receive(url) }
+                        withExtendedLifetime(access) {}
+                    }
+                }
         }
     }
 }

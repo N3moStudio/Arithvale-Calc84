@@ -42,7 +42,7 @@ private struct AccessView: View {
         setup.clear(); password = ""; code = ""; confirmation = ""; backups = []
     }
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
                 VStack(alignment: .leading, spacing: 14) {
                     Image(systemName: "lock.square.stack").font(.system(size: 40, weight: .medium))
@@ -50,7 +50,7 @@ private struct AccessView: View {
                     Text(creating ? "A space of your own." : "Recover access.").font(.largeTitle.bold())
                     Text(creating ? "Your calculator code opens this phone. Your recovery key brings your files back on another."
                          : "Use your recovery key, or the password from the original version 0.1. Your existing files won’t be replaced.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ArithenPalette.color(.muted))
                 }.padding(.vertical, 12)
             }
             if !vault.exists {
@@ -62,7 +62,7 @@ private struct AccessView: View {
                     } label: { Label("Restore from Cloud", systemImage: "icloud.and.arrow.down") }
                         .disabled(vault.busy || !backups.isEmpty || backupInput.backup != nil || backupInput.working)
                     if !backups.isEmpty {
-                        Text("Remove the queued backups to switch to cloud setup.").font(.footnote).foregroundStyle(.secondary)
+                        Text("Remove the queued backups to switch to cloud setup.").font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
                     }
                 }
             }
@@ -95,7 +95,7 @@ private struct AccessView: View {
                         }
                         StorageEstimateView(bytes: backups.reduce(Int64(0)) { $0 + Int64((try? $1.backup.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }, copies: 2)
                         Text("You can choose another backup above, with its own old key, or finish setup now. In LiveContainer, finish setup before leaving to share another backup; then use + → From a Backup. All additions use the new library’s key.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                            .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
                     }
                 }
             }
@@ -125,11 +125,11 @@ private struct AccessView: View {
                         if vault.busy { ProgressView() } else { Image(systemName: "arrow.right") }
                     }.frame(minHeight: 44)
                 }.disabled(!canContinue)
-                if vault.busy && !vault.status.isEmpty { Text(vault.status).font(.footnote).foregroundStyle(.secondary) }
+                if vault.busy && !vault.status.isEmpty { Text(vault.status).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)) }
             }
         }
         .backupPicker(backupInput)
-        .safeAreaInset(edge: .bottom) { Text(AppBrand.name + " " + AppBrand.version).font(.caption).foregroundStyle(.secondary).padding(6).frame(maxWidth: .infinity).background(.bar) }
+        .safeAreaInset(edge: .bottom) { Text(AppBrand.name + " " + AppBrand.version).font(.caption).foregroundStyle(ArithenPalette.color(.muted)).padding(6).frame(maxWidth: .infinity).background(.bar) }
         .navigationTitle(creating ? "Welcome" : "Recovery").navigationBarTitleDisplayMode(.inline)
         .interactiveDismissDisabled(vault.busy)
         .toolbar { ToolbarItem(placement: .cancellationAction) {

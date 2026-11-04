@@ -29,7 +29,7 @@ struct SurfaceAppearanceSettings: View {
     }
     private var selectedTint: GlassTint { GlassTint(rawValue: tint) ?? .plum }
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
                 ArithenGlassGroup {
                     HStack(spacing: 14) {
@@ -140,7 +140,7 @@ struct LibraryWallpaperPicker: View {
         vault.items.filter { $0.visible && $0.deletedAt == nil && UTType($0.contentType)?.conforms(to: .movie) == true }
     }
     var body: some View {
-        List {
+        ThemedList {
             Section {
                 Text("Import your video using Library → + → Photos & Videos, then choose it here. Pick the section to loop, position the crop and choose a still frame. Originals stay unchanged.")
                     .font(.footnote).foregroundStyle(.secondary)

@@ -6,7 +6,7 @@
 2. Enter **160160**, then **hold = for about 0.6 seconds**.
 3. Save the generated recovery key somewhere separate from this app. Confirm its last eight characters.
 4. Choose a personal **6–12 digit calculator code**. Enter that code and hold = to return to the library.
-5. Tap **+ → Photos & Videos**, **Files**, or **A Folder**. Review the space estimate, then tap **Import** with a few disposable samples.
+5. Tap **+ → Photos & Videos**, or **Import from Files**. For Files, share the source to LiveContainer → Arithen first, unlock, then tap **Import**. Try disposable samples first.
 
 The calculator Help screen contains only calculator help. If you forget the code,
 enter 160160 and hold = to reach the locked recovery form. Your original recovery
@@ -29,8 +29,8 @@ Open **Settings → Cloud Copies**, choose a provider, and
 configure **Manual selection** or **Automatic · all eligible**. Add exclusions in
 **Never Upload**. Sign in, then Back Up to the provider. See [the cloud guide](Docs/CLOUD-BACKUP.md).
 
-You can also tap **Select**, drag across gallery items, and open the cloud button
-to add, remove, block, or unblock that selection for a provider.
+Cloud selection and exclusions live in **Settings → Cloud Copies → provider**.
+Long-press gallery items for Share, Add to Album, or Delete.
 
 ## Keep or remove originals
 
@@ -91,7 +91,7 @@ saved during setup. Old archives continue to require their own original key.
 
 Download the backup in Files, then Share → LiveContainer → Arithen. Unlock the
 library and tap **Backup received**, or **+ → From a Backup**. Use the original
-key for that backup, tap **Preview Contents**, select items, then **Add Items**.
+key for that backup, then tap **Import** when its received copy is ready.
 The current library is preserved. Added items use its current recovery key.
 Exact duplicate originals (including Live Photo motion) are skipped. Source
 Never Upload exclusions carry over; check Cloud Copies before uploading.
@@ -102,38 +102,15 @@ still available under Settings → Backups when you only want to check a copy.
 
 ## Choose a look
 
-Settings → Appearance offers all six layouts. Clear Glass is the initial choice;
-subsequent choices are remembered. Nightroom stays dark. The calculator has its
-own appearance. Version/build appears in library Settings and calculator Settings.
-
-For glass colors and a personal video background:
-
-- **Calculator:** top-right Settings → Glass Tint & Video Background → Choose Your Video.
-- **Library:** Settings → Appearance → Library Glass & Video Background → Choose a Library Video.
-  Import your own video with Library → + → Photos & Videos first.
-
-These two areas have separate tints and backgrounds. Purple is the default;
-Neutral, Blue, Mint, Rose and Amber are also available. Liquid Glass requires
-iOS 26+; earlier iOS versions use translucent material.
-
-Videos must be under 256 MB. Choose the loop start/length, crop position and a
-still frame, then tap **Use Background**. A silent, reduced-size copy loops for
-up to 30 seconds without altering the original. Low Power Mode and Reduce Motion
-show the chosen still frame. **Edit Loop, Crop & Still Frame** lets you revise it.
-Background preferences are local to this installation; choose them
-again after restoring into a new installation. A calculator background is visible
-before unlocking, so choose something suitable for that public screen.
+Settings → Appearance contains **Theme** and **Surfaces**. Bloom and Theme default are initial/reset choices. All eight themes default to Solid. Liquid Glass has an older-iOS material fallback and respects Reduce Transparency and increased contrast. One theme styles the whole app. Old video/background/layout preferences are ignored; their files are not erased.
 
 ## Organize and find things
 
-- **Select → album button:** add/remove multiple album memberships and tags.
-  A photo remains one encrypted original even when it belongs to several albums.
-- **Albums → …:** pin an album or choose one of its items as the cover.
-- **Settings → Private Text Search:** opt in, then index photos/screenshots to
-  search their words. Tap **Index New Photos** after later imports. Turning this
-  off removes the local encrypted index; names, albums and tags still work.
-- **Settings → Storage:** review largest items, Recently Deleted and exact
-  duplicates. Choose copies yourself; permanent deletion is a separate action.
-- **Settings → Backups:** compare provider coverage and exact-backup recovery
-  results. **Import Backup** adds another archive after setup without replacing
-  the library or rotating its key.
+- Hold a snap to select, then tap **Add to Album**. Cancel or deselect all to exit.
+- **Albums → …:** pin an album or choose its cover.
+- **Privacy & Access → Photo Indexing:** enabled by default; recognizes words locally after imports finish. Turning it off removes its encrypted index and remembers your choice. Low Power Mode, heat, inactivity, and busy operations defer work.
+- **Backups → Storage:** large items, Recently Deleted, and exact duplicates. Nothing is automatically permanently deleted.
+- **Backups:** create, import, test, check provider coverage, or find recovery-key help.
+- **About:** app version, build, and privacy information.
+
+These instructions describe unreleased source changes. The last delivered IPA remains 0.11.0 until a later, explicitly requested build.

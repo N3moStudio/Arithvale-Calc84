@@ -9,7 +9,7 @@ struct CloudBackupView: View {
     @EnvironmentObject private var cloud: CloudBackupModel
     @AppStorage("cloudUseCellular") private var cellular = false
     var body: some View {
-        List {
+        ThemedList {
             Section {
                 Label(restoring ? "Bring your memories back" : cloud.phase, systemImage: "lock.icloud")
                     .font(.headline).padding(.vertical, 6)
@@ -18,7 +18,7 @@ struct CloudBackupView: View {
                     else { ProgressView() }
                     Button("Pause") { cloud.pause() }
                 }
-                if let error = cloud.error { Text(error).font(.subheadline).foregroundStyle(.secondary) }
+                if let error = cloud.error { Text(error).font(.subheadline).foregroundStyle(ArithenPalette.color(.muted)) }
                 if !restoring {
                     Button("Back Up Now", systemImage: "icloud.and.arrow.up") { cloud.backup(vault: vault) }
                         .disabled(vault.busy || cloud.connected.isEmpty).frame(minHeight: 44)
@@ -34,9 +34,9 @@ struct CloudBackupView: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(provider.title).font(.headline)
-                            Text(summary(provider)).font(.subheadline).foregroundStyle(.secondary)
+                            Text(summary(provider)).font(.subheadline).foregroundStyle(ArithenPalette.color(.muted))
                             if let date = cloud.receipts[provider]?.saved {
-                                Text(date, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.secondary)
+                                Text(date, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(ArithenPalette.color(.muted))
                             }
                         }.padding(.vertical, 5)
                     }
@@ -77,7 +77,7 @@ struct CloudProviderView: View {
     @State private var code = ""
     @State private var disconnecting = false
     var body: some View {
-        List {
+        ThemedList {
             if !cloud.connected.contains(provider) {
                 Section {
                     TextField("Email", text: $email).keyboardType(.emailAddress).textContentType(.username)
@@ -88,7 +88,7 @@ struct CloudProviderView: View {
                         TextField("MEGA developer app key", text: $appKey).textInputAutocapitalization(.never).autocorrectionDisabled()
                         Link("Register a MEGA App Key", destination: URL(string: "https://mega.nz/sdk")!)
                         Text("A developer app key identifies this app; it is different from your MEGA recovery key. Never enter your MEGA recovery key here.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                            .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
                     }
                     Button("Connect \(provider.title)") {
                         cloud.connect(provider, email: email, password: password, appKey: appKey, code: code, vault: vault)
@@ -115,7 +115,7 @@ struct CloudProviderView: View {
                 Section {
                     Text(cloud.phase)
                     if cloud.running { ProgressView(); Button("Pause") { cloud.pause() } }
-                    if let error = cloud.error { Text(error).font(.subheadline).foregroundStyle(.secondary) }
+                    if let error = cloud.error { Text(error).font(.subheadline).foregroundStyle(ArithenPalette.color(.muted)) }
                 }
             }
             Section("Your encrypted copy") {
@@ -147,7 +147,7 @@ struct CloudRestoreView: View {
     @State private var code = ""
     @State private var repeatCode = ""
     var body: some View {
-        List {
+        ThemedList {
             Section {
                 Text(testOnly ? "Download and authenticate a backup without replacing your library." : "Start a new library from a cloud backup. Your photos and dates are copied under a fresh key. The original cloud backup keeps its old key.")
                 Button("Find Backups") { selected = nil; cloud.findBackups(provider, vault: vault) }.disabled(vault.busy)
@@ -158,7 +158,7 @@ struct CloudRestoreView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(record.created, format: .dateTime.year().month().day().hour().minute())
-                                Text("Library " + String(record.vaultID.uuidString.prefix(8))).font(.caption).foregroundStyle(.secondary)
+                                Text("Library " + String(record.vaultID.uuidString.prefix(8))).font(.caption).foregroundStyle(ArithenPalette.color(.muted))
                             }
                             Spacer()
                             if selected == record.id { Image(systemName: "checkmark").accessibilityLabel("Selected") }
@@ -193,7 +193,7 @@ struct CloudRestoreView: View {
             Section {
                 Text(cloud.phase)
                 if cloud.running { ProgressView(); Button("Pause") { cloud.pause() } }
-                if let error = cloud.error { Text(error).foregroundStyle(.secondary) }
+                if let error = cloud.error { Text(error).foregroundStyle(ArithenPalette.color(.muted)) }
             }
         }
         .navigationTitle(testOnly ? "Test Recovery" : "Restore Library").navigationBarTitleDisplayMode(.inline)
@@ -208,7 +208,7 @@ struct CloudItemStatusView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var vault: VaultModel
     var body: some View {
-        List {
+        ThemedList {
             Section { Text(item.name).font(.headline) }
             ForEach(CloudProvider.allCases) { provider in
                 Section(provider.title) {

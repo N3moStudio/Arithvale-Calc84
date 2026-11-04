@@ -21,7 +21,7 @@ final class MediaViewerController: UIHostingController<AnyView>, UIAdaptivePrese
         modalPresentationStyle = .fullScreen
         rootView = AnyView(MediaBrowser(items: items, initial: initial, previews: previews,
             close: { [weak self] in self?.close() },
-            didShow: { [weak self] id in self?.currentID = id }).environmentObject(vault))
+            didShow: { [weak self] id in self?.currentID = id }).environmentObject(vault).modifier(AppearanceRoot()))
         configureTransition()
         NotificationCenter.default.addObserver(self, selector: #selector(motionChanged),
             name: UIAccessibility.reduceMotionStatusDidChangeNotification, object: nil)
