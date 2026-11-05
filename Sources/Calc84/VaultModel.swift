@@ -571,7 +571,8 @@ final class VaultModel: ObservableObject {
             status = saved.cleanupDeferred
                 ? "Backup saved and checked. Some older automatic copies were kept because cleanup could not finish."
                 : "Backup saved and checked. Check Files for cloud upload status."
-            if saved.cleanupDeferred { message = "Older copies will be checked again after the next automatic backup. Check Files for cloud upload status." }
+            message = saved.cleanupDeferred
+                ? "Older copies will be checked again after the next automatic backup. Check Files for cloud upload status." : nil
         } catch { if ticket == generation {
             if Task.isCancelled { status = "Backup paused. Changes still need a backup."; return }
             message = "Couldn’t save to the connected folder. Use Save Backup to Files, or reconnect the folder.\n\n" + error.localizedDescription

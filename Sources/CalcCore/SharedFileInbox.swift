@@ -40,18 +40,22 @@ public struct SharedFileInbox: Sendable {
         return entry
     }
     public func receive(_ source: URL, key data: Data) throws -> Entry {
-        try BackupInbox.requireLocalFile(source)
-        let values = try source.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        // Darwin URLs cache resource values. A new share of the same URL may now
+        // contain different bytes; refresh metadata without losing scoped access.
+        var currentSource = source
+        currentSource.removeAllCachedResourceValues()
+        try BackupInbox.requireLocalFile(currentSource)
+        let values = try currentSource.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
         guard values.isRegularFile == true, values.isSymbolicLink != true, let size = values.fileSize,
               size >= 0, size <= VaultLimits.fileBytes else { throw VaultError.limit }
         let key = try key(data), id = UUID(), fm = FileManager.default
-        let entry = Entry(id: id, name: String(source.lastPathComponent.prefix(255)), bytes: size)
+        let entry = Entry(id: id, name: String(currentSource.lastPathComponent.prefix(255)), bytes: size)
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
         try protect(root)
         let pending = root.appendingPathComponent("pending-" + id.uuidString)
         try fm.createDirectory(at: pending, withIntermediateDirectories: false)
         defer { try? fm.removeItem(at: pending) }
-        try VaultStream.encrypt(source, to: pending.appendingPathComponent("contents"), size: size, key: key, context: "incoming/\(id)")
+        try VaultStream.encrypt(currentSource, to: pending.appendingPathComponent("contents"), size: size, key: key, context: "incoming/\(id)")
         let metadata = try VaultCrypto.seal(JSONEncoder().encode(entry), key: key, context: "incoming/\(id)/metadata")
         try metadata.write(to: pending.appendingPathComponent("metadata"), options: .atomic)
         try Task.checkCancellation()

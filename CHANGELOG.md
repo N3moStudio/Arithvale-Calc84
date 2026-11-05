@@ -8,6 +8,7 @@
 - Keep the newest seven automatic copies created and tracked by this installation, separately for each folder and library. Existing older files, explicit saves, and MEGA/Blomp objects are outside cleanup.
 - Save and read back the replacement, persist its receipt, then recheck all seven retained copies before cleanup. Changed files, inaccessible retained copies, failed saves, invalid history, and cancellation prevent unsafe deletion. Cleanup failures preserve extra copies and are reported.
 - Keep archive formats, recovery keys, app identity, and the approved design. See [backup retention](Docs/BACKUP-RETENTION.md) for policy, verification, and device checks.
+- Fix stale cached file-size metadata when sharing an updated file from the same URL again, found by the Mac regression run. Each received copy keeps its own original bytes.
 
 ## 0.12.1 · Focused UI polish
 
