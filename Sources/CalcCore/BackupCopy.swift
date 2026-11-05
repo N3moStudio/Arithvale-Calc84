@@ -20,8 +20,8 @@ public enum BackupCopy {
     }
 
     /// Never replaces an earlier snapshot. Removes only a copy created by this operation.
-    public static func copy(_ source: URL, to destination: URL) throws {
-        let expected = try digest(source)
+    public static func copy(_ source: URL, to destination: URL, expected: Data? = nil) throws {
+        let expected = try expected ?? digest(source)
         try FileManager.default.copyItem(at: source, to: destination)
         do { try verify(destination, expected: expected) }
         catch {

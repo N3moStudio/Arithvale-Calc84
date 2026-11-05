@@ -1,5 +1,12 @@
 # Arithen · phone test guide
 
+## 0.12.2 automatic backup retention (physical device — pending)
+
+- With disposable media, connect an external Files folder and enable Automatic Daily Backup. Verify a successful save, relaunch, and make another change: a second automatic export must wait until 24 hours after the first. Manual saves must still work immediately.
+- Verify catch-up after the due time while unlocked, and after returning from app lock/background or Low Power Mode. Fail/disconnect the provider and confirm no false saved state.
+- In a disposable folder with enough automatic history, verify the latest seven tracked copies survive rotation. Manual/pre-existing files must remain. Damage or remove a retained test copy: cleanup must preserve older candidates and report extra copies kept.
+- Download the completed cloud copy independently and restore into a separate empty container. Check photos/videos and counts; preserve the real library and recovery key. Files read-back and desktop tests do not prove cloud upload or LiveContainer directory permission.
+
 ## Unreleased redesign
 
 Use the current checklist in [UI-REDESIGN.md](Docs/UI-REDESIGN.md#iphone--livecontainer-acceptance-still-required). New UI and LiveContainer intake need physical-device validation; older checklists below describe released builds.

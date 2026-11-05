@@ -4,10 +4,10 @@
 
 <h1 align="center">Arithen</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.12.1 testing · iOS 17+ · SwiftUI · MIT licensed</p>
+<p align="center">0.12.2 testing · iOS 17+ · SwiftUI · MIT licensed</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
-  <a href="Docs/POLISH-2026-10-30.md">What’s new</a> &nbsp;·&nbsp;
+  <a href="Docs/BACKUP-RETENTION.md">What’s new</a> &nbsp;·&nbsp;
   <a href="CHANGELOG.md">Changelog</a> &nbsp;·&nbsp;
   <a href="Docs/CLOUD-BACKUP.md">Cloud choices</a> &nbsp;·&nbsp;
   <a href="Docs/BUILDING.md">Build from source</a>
@@ -19,7 +19,9 @@ control over which memories leave your phone. Previously **Arithvale / Calc 84**
 
 ## Current design
 
-The current local test IPA is **0.12.1, build 17**. It includes the compact library redesign plus improved large-text layouts, accurate received-file states, count labels, and Reduce Motion behavior. It is not a public GitHub release. Update the existing installation to retain its library and calculator code.
+The current local test build is **0.12.2, build 18**. It adds daily automatic folder backups with guarded seven-copy retention, alongside the compact library and accessibility polish. It is not a public GitHub release. Update the existing installation to retain its library and calculator code.
+
+- **Bounded automatic backups.** In Backups → Connected Folder, enable Automatic Daily Backup. Save changed libraries at most once per 24 hours while open and unlocked. Keep seven checked automatic copies; manual and pre-existing backups stay protected. Failed verification preserves extra copies. [Policy and limits](Docs/BACKUP-RETENTION.md).
 
 - **Compact calculator.** Familiar button positions, smaller rounded numerals, and the same calculation and unlock behavior.
 - **Eight complete themes.** Glacier, Afterhours, Porcelain, Ion, Ember, Bloom, Blueprint, and Titanium. **Bloom** is the default. Theme and Surfaces are the only appearance choices; the library follows the theme too.

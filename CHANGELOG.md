@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.12.2 · Bounded automatic backups
+
+**November 4, 2026 · Build 18 · Local test build · iOS 17+**
+
+- Limit automatic connected-folder backups to one successful snapshot per 24 hours when the library changes. Catch up while open and unlocked; manual backups remain available anytime.
+- Keep the newest seven automatic copies created and tracked by this installation, separately for each folder and library. Existing older files, explicit saves, and MEGA/Blomp objects are outside cleanup.
+- Save and read back the replacement, persist its receipt, then recheck all seven retained copies before cleanup. Changed files, inaccessible retained copies, failed saves, invalid history, and cancellation prevent unsafe deletion. Cleanup failures preserve extra copies and are reported.
+- Keep archive formats, recovery keys, app identity, and the approved design. See [backup retention](Docs/BACKUP-RETENTION.md) for policy, verification, and device checks.
+
 ## 0.12.1 · Focused UI polish
 
 **October 30, 2026 · Build 17 · Local test build · iOS 17+**

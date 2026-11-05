@@ -1,5 +1,9 @@
 # Arithen source map
 
+## 0.12.2 automatic folder backups
+
+`CalcCore/AutomaticFolderBackups` owns the 24-hour policy, per-folder/per-library private receipt journal, verified-copy rotation, and seven-copy safety checks. `Calc84/BackupFolder` supplies security-scoped access and coordinated provider operations. `VaultModel` owns foreground scheduling, cancellation, manual/automatic separation, and retry feedback. `VaultSettingsView` exposes Automatic Daily Backup under Connected Folder. `AutomaticFolderBackupTests` covers destructive-cleanup failure cases and actual encrypted-archive recovery. See [retention policy](BACKUP-RETENTION.md).
+
 ## 0.12.1 polish
 
 `LibraryView`, `SharedFilesImportView`, `PhotoImportReview`, `AlbumLibraryView`, and the button style in `MediaBrowser` contain the focused label, receipt-state, large-text, and Reduce Motion refinements described in [the October 30 polish notes](POLISH-2026-10-30.md). Data and backup code are unchanged from 0.12.0.

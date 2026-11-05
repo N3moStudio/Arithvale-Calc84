@@ -3,9 +3,11 @@
 ## Scope and release state
 
 Repository: `C:\Users\naith\Documents\GitHub\Calc 84`.
-Branch: main, with local uncommitted redesign and polish work. Current local test build: 0.12.1 build 17. Older 0.12.0 build 16 contains the redesign but not the subsequent polish.
+Branch: main, with local uncommitted backup-retention work. Current local test build: 0.12.2 build 18. Older 0.12.1 build 17 contains the redesign and polish but not daily backup retention.
 
-The user explicitly authorized **building the polished IPA and putting it in Downloads**. This authorizes local delivery of 0.12.1 build 17; no GitHub release, deployment, or Elsepin edits were requested. Do not push main casually: its workflow builds an IPA. Use `.build/verification/arithen-0.12.1-build17/verification.json` and the generated release kit's `BUILD-RESULT.json` for source-bound evidence and checksum. No branch proliferation or destructive cleanup is needed.
+The user explicitly authorized **limiting automatic backup accumulation while protecting verified older copies, building the IPA, and putting it in Downloads**. This authorizes delivery of 0.12.2 build 18; no GitHub release, deployment, or Elsepin edits were requested. The local WSL environment stalled on restart, so the existing GitHub Actions workflow is the build fallback on `codex/backup-retention-0.12.2`. Keep main unchanged until integration is requested. Use the downloaded workflow verification report and release kit's `BUILD-RESULT.json` for source-bound evidence and checksum. Local evidence/delivery records are under `.build/`; do not confuse the successful earlier focused tests with the final full build.
+
+Read `Docs/BACKUP-RETENTION.md` first for the latest change. Automatic connected-folder saves are limited to one per 24 hours after changes, keep seven tracked copies, and recheck retained/candidate hashes before deletion. Manual/pre-existing/other-installation backups and MEGA/Blomp objects are outside cleanup. Journals are private and scoped to folder plus library. Permission, corruption, journal, cancellation, and delete errors fail safe; extra copies may remain. No live-account or iPhone acceptance has been established. The earlier evidence below is historical; use the 0.12.2 verification report for this build.
 
 Read `Docs/UI-REDESIGN.md`, the 0.12.0 changelog, and `Docs/PROJECT-MAP.md`. The user confirmed **the library follows the selected theme**, not a permanently white canvas. The latest instructions replace the previous Clear Glass default/video wallpaper/gallery-layout settings: eight themes, Bloom default, only Theme and Surfaces, solid theme defaults, rounded compact text with accessibility preserved.
 

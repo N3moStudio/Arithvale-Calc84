@@ -94,13 +94,39 @@ enum BackupFolder {
         UserDefaults.standard.removeObject(forKey: "backupFolderName")
         UserDefaults.standard.set(false, forKey: "automaticFolderBackup")
     }
-    static func save(_ source: URL) throws -> URL {
+    struct SaveResult: Sendable {
+        let url: URL
+        let digest: Data
+        let cleanupDeferred: Bool
+    }
+    private static func managedBackups(folder: URL, library: UUID) throws -> AutomaticFolderBackups {
+        var history = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("AutomaticBackupHistory", isDirectory: true)
+        try FileManager.default.createDirectory(at: history, withIntermediateDirectories: true,
+            attributes: [.protectionKey: FileProtectionType.complete])
+        var values = URLResourceValues(); values.isExcludedFromBackup = true
+        try history.setResourceValues(values)
+        return AutomaticFolderBackups(folder: folder, historyDirectory: history, library: library)
+    }
+    static func automaticDelay(library: UUID) throws -> TimeInterval {
         let folder = try resolve()
         let access = folder.startAccessingSecurityScopedResource()
         defer { if access { folder.stopAccessingSecurityScopedResource() } }
+        return try managedBackups(folder: folder, library: library).delay()
+    }
+    static func save(_ source: URL, library: UUID, automatic: Bool) throws -> SaveResult {
+        let folder = try resolve()
+        let access = folder.startAccessingSecurityScopedResource()
+        defer { if access { folder.stopAccessingSecurityScopedResource() } }
+        try requireExternalLocation(folder)
+        if automatic {
+            let saved = try managedBackups(folder: folder, library: library).save(source, coordinate: coordinate)
+            return SaveResult(url: saved.url, digest: saved.digest, cleanupDeferred: saved.cleanupDeferred)
+        }
+        // Explicit saves remain outside the automatic retention journal.
         let destination = folder.appendingPathComponent(filename())
         try coordinatedWrite(destination) { try BackupCopy.copy(source, to: $0) }
-        return destination
+        return SaveResult(url: destination, digest: try BackupCopy.digest(source), cleanupDeferred: false)
     }
     static func verifyExport(_ destination: URL, expected: Data) throws {
         try requireExternalLocation(destination)
@@ -121,6 +147,25 @@ enum BackupFolder {
         }
         if let coordinationError { throw coordinationError }
         guard let result else { throw MediaBridge.failure("The Files provider did not complete the request. Try Save Backup to Files or another location.") }
+        try result.get()
+    }
+    private static func coordinate(_ url: URL, operation: AutomaticFolderBackups.Operation,
+                                   body: (URL) throws -> Void) throws {
+        var coordinationError: NSError?
+        var result: Result<Void, Error>?
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        switch operation {
+        case .read:
+            coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { target in
+                result = Result { try body(target) }
+            }
+        case .write, .delete:
+            coordinator.coordinate(writingItemAt: url, options: operation == .delete ? .forDeleting : [], error: &coordinationError) { target in
+                result = Result { try body(target) }
+            }
+        }
+        if let coordinationError { throw coordinationError }
+        guard let result else { throw MediaBridge.failure("The Files provider did not finish checking the backup. Older copies were kept.") }
         try result.get()
     }
 }

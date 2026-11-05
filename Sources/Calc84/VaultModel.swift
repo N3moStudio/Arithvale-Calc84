@@ -34,6 +34,8 @@ final class VaultModel: ObservableObject {
     private var importTask: Task<Void, Never>?
     private var setupTask: Task<Void, Never>?
     private var automaticBackupTask: Task<Void, Never>?
+    private var automaticFolderWakeTask: Task<Void, Never>?
+    private var folderBackupWork: Task<BackupFolder.SaveResult, Error>?
     private var automaticBackupPending = false
     private var lifecycle = Set<AnyCancellable>()
     private var failedPhotos: [PhotosPickerItem] = []
@@ -65,7 +67,8 @@ final class VaultModel: ObservableObject {
             NotificationCenter.default.publisher(for: name).receive(on: RunLoop.main).sink { [weak self] note in
                 guard let self else { return }
                 if note.name == UIApplication.willResignActiveNotification {
-                    self.automaticBackupTask?.cancel(); self.textSearch.pause()
+                    self.automaticBackupTask?.cancel(); self.automaticFolderWakeTask?.cancel(); self.textSearch.pause()
+                    if self.unlocked { self.automaticBackupPending = true }
                 } else {
                     if !self.allowsOptionalWork { self.textSearch.pause() }
                     self.textSearch.resumeWhenIdle(vault: self)
@@ -154,7 +157,8 @@ final class VaultModel: ObservableObject {
     }
     func lock() {
         automaticBackupPending = false
-        setupTask?.cancel(); importTask?.cancel(); automaticBackupTask?.cancel(); fileDeletionTask?.cancel()
+        setupTask?.cancel(); importTask?.cancel(); automaticBackupTask?.cancel(); automaticFolderWakeTask?.cancel()
+        folderBackupWork?.cancel(); folderBackupWork = nil; fileDeletionTask?.cancel()
         fileImportReview = nil; failedFileAccess = nil
         failedPhotos = []; failedFiles = []; failedImportCount = 0
         cloud.lock(); textSearch.lock(); cloudPreferences = .init(); albumPreferences = [:]
@@ -447,6 +451,7 @@ final class VaultModel: ObservableObject {
         } catch { if ticket == generation { message = error.localizedDescription }; return false }
     }
     func scheduleAutomaticBackup() {
+        automaticFolderWakeTask?.cancel()
         automaticBackupPending = true
         resumeAutomaticBackup()
     }
@@ -470,7 +475,7 @@ final class VaultModel: ObservableObject {
                 guard readyForAutomaticBackup, ticket == generation else { return }
                 automaticBackupPending = false
                 if UserDefaults.standard.bool(forKey: "automaticFolderBackup"),
-                   UserDefaults.standard.bool(forKey: "libraryNeedsBackup"), BackupFolder.configured { await backup() }
+                   UserDefaults.standard.bool(forKey: "libraryNeedsBackup"), BackupFolder.configured { await backup(automatic: true) }
                 try Task.checkCancellation()
                 if unlocked, ticket == generation, allowsOptionalWork {
                     cloud.refresh(); cloud.backup(vault: self, automaticOnly: true)
@@ -481,6 +486,16 @@ final class VaultModel: ObservableObject {
                 // An interruption defers work; a privacy lock discards the request.
                 if unlocked, ticket == generation { automaticBackupPending = true }
             }
+        }
+    }
+    private func wakeAutomaticFolderBackup(after delay: TimeInterval) {
+        automaticFolderWakeTask?.cancel()
+        let ticket = generation
+        automaticFolderWakeTask = Task { [weak self] in
+            do { try await Task.sleep(nanoseconds: UInt64(max(1, delay) * 1_000_000_000)) }
+            catch { return }
+            guard let self, self.unlocked, self.generation == ticket else { return }
+            self.scheduleAutomaticBackup()
         }
     }
     func finishCloudRestore(_ archive: URL, recovery: String, newRecovery: String, code: String) async throws {
@@ -519,29 +534,54 @@ final class VaultModel: ObservableObject {
         busy = false
         if ticket == generation { scheduleAutomaticBackup() }
     }
-    func backup() async {
+    func backup(automatic: Bool = false) async {
         guard unlocked, !busy else { return }
         busy = true; progress = 0; let ticket = generation
-        defer { busy = false }
+        defer { if ticket == generation { busy = false; folderBackupWork = nil } }
         do {
+            let libraryID = try await engine.identifier()
+            if automatic {
+                let delay = try await Task.detached(priority: .utility) { try BackupFolder.automaticDelay(library: libraryID) }.value
+                try Task.checkCancellation()
+                guard ticket == generation else { return }
+                guard readyForAutomaticFolderWork else {
+                    if unlocked { automaticBackupPending = true }
+                    return
+                }
+                if delay > 0 {
+                    wakeAutomaticFolderBackup(after: delay)
+                    return
+                }
+            }
             let source = try TemporaryFiles.fresh(extension: "c84backup")
             defer { try? FileManager.default.removeItem(at: source) }
             status = "Checking and preparing encrypted backup…"
             try StoragePreflight.require(bytes: items.reduce(Int64(0)) { $0 + Int64($1.byteCount) } * 2)
             try await engine.export(to: source)
-            guard ticket == generation else { return }
+            try Task.checkCancellation()
+            guard ticket == generation, unlocked else { return }
             status = "Saving encrypted copy…"
-            let destination = try await Task.detached(priority: .utility) { try BackupFolder.save(source) }.value
+            let work = Task.detached(priority: .utility) { try BackupFolder.save(source, library: libraryID, automatic: automatic) }
+            folderBackupWork = work
+            // Detached file coordination must receive cancellation on privacy lock or
+            // backgrounding; otherwise cleanup could outlive the operation that owns it.
+            let saved = try await withTaskCancellationHandler { try await work.value } onCancel: { work.cancel() }
             guard ticket == generation else { return }
-            let digest = try await Task.detached(priority: .utility) { try CloudBackup.hash(source) }.value
-            let libraryID = try await engine.identifier()
-            guard ticket == generation else { return }
-            recordBackup(destination, digest: digest, libraryID: libraryID)
-            status = "Backup saved and checked. Check Files for cloud upload status."
+            recordBackup(saved.url, digest: saved.digest.map { String(format: "%02x", $0) }.joined(), libraryID: libraryID)
+            status = saved.cleanupDeferred
+                ? "Backup saved and checked. Some older automatic copies were kept because cleanup could not finish."
+                : "Backup saved and checked. Check Files for cloud upload status."
+            if saved.cleanupDeferred { message = "Older copies will be checked again after the next automatic backup. Check Files for cloud upload status." }
         } catch { if ticket == generation {
+            if Task.isCancelled { status = "Backup paused. Changes still need a backup."; return }
             message = "Couldn’t save to the connected folder. Use Save Backup to Files, or reconnect the folder.\n\n" + error.localizedDescription
             status = "Backup not completed. Your local library is unchanged."
+            if automatic { wakeAutomaticFolderBackup(after: 60 * 60) }
         } }
+    }
+
+    private var readyForAutomaticFolderWork: Bool {
+        unlocked && allowsOptionalWork && UserDefaults.standard.bool(forKey: "automaticFolderBackup") && BackupFolder.configured
     }
 
     private func recordBackup(_ destination: URL, digest: String, libraryID: UUID) {

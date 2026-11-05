@@ -161,12 +161,17 @@ struct BackupSettingsView: View {
                     .disabled(vault.busy)
                 if BackupFolder.configured {
                     Button("Back Up to Connected Folder", systemImage: "externaldrive.badge.plus") { Task { await vault.backup() } }.disabled(vault.busy)
-                    Toggle("Back up after changes", isOn: $automatic).disabled(vault.busy)
+                    Toggle("Automatic Daily Backup", isOn: $automatic).disabled(vault.busy)
+                        .onChange(of: automatic) { _, _ in vault.scheduleAutomaticBackup() }
+                    Text("When there are changes, save at most once per 24 hours while the library is open. Back Up to Connected Folder still works anytime.")
+                        .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
+                    Text("Keep the latest 7 automatic copies. Cleanup requires a verified replacement and rechecked retained copies. Manual saves and existing older backups stay protected.")
+                        .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
                     Button("Disconnect Folder") { BackupFolder.forget() }.disabled(vault.busy)
                 }
                 }.navigationTitle("Connected Folder") }
             } footer: {
-                Text("Choose a writable folder, then tap Open. We check access before connecting it. If your provider or installer cannot keep folder access, use Create Backup above. Automatic backups run only while the app is open; older snapshots stay until you delete them.")
+                Text("Choose a writable folder, then tap Open. If your provider or installer cannot keep folder access, use Create Backup. A checked Files copy does not confirm cloud upload.")
             }
         }
         .navigationTitle("Backup Center").navigationBarTitleDisplayMode(.inline)
