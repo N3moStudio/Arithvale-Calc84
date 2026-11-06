@@ -4,10 +4,10 @@
 
 <h1 align="center">Arithen</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.12.2 testing · iOS 17+ · SwiftUI · MIT licensed</p>
+<p align="center">0.12.3 testing · iOS 17+ · SwiftUI · MIT licensed</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
-  <a href="Docs/BACKUP-RETENTION.md">What’s new</a> &nbsp;·&nbsp;
+  <a href="CHANGELOG.md#0123--faster-calculator-entry">What’s new</a> &nbsp;·&nbsp;
   <a href="CHANGELOG.md">Changelog</a> &nbsp;·&nbsp;
   <a href="Docs/CLOUD-BACKUP.md">Cloud choices</a> &nbsp;·&nbsp;
   <a href="Docs/BUILDING.md">Build from source</a>
@@ -19,7 +19,9 @@ control over which memories leave your phone. Previously **Arithvale / Calc 84**
 
 ## Current design
 
-The current local test build is **0.12.2, build 18**. It adds daily automatic folder backups with guarded seven-copy retention, alongside the compact library and accessibility polish. It is not a public GitHub release. Update the existing installation to retain its library and calculator code.
+The current test-build target is **0.12.3, build 19**. It shortens hold Equals to half a second and skips the successful opening slide, while retaining daily automatic folder backups with guarded seven-copy retention. It is not a public GitHub release. Update the existing installation to retain its library and calculator code. Native build evidence does not establish physical-device opening latency.
+
+- **Quicker entry.** Type your code and hold Equals for 0.5 seconds. Entry starts while held and reveals the library after verification, without a modal slide. Ordinary taps calculate; existing code security and throttling stay in place.
 
 - **Bounded automatic backups.** In Backups → Connected Folder, enable Automatic Daily Backup. Save changed libraries at most once per 24 hours while open and unlocked. Keep seven checked automatic copies; manual and pre-existing backups stay protected. Failed verification preserves extra copies. [Policy and limits](Docs/BACKUP-RETENTION.md).
 

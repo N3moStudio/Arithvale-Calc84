@@ -1,5 +1,11 @@
 # Arithen · phone test guide
 
+## 0.12.3 half-second entry (physical device — pending)
+
+- Type the correct code and keep Equals held: authentication must begin at 0.5 seconds, with no finger release needed or modal slide after success. Measure on-device before claiming a total opening time; secure verification and library loading still take time.
+- A short Equals tap must only calculate. Releasing early, moving beyond the hold tolerance, a wrong code, a computed result, or editing/evaluating the code during verification must not reveal the library.
+- Rapid holds/VoiceOver Hold Equals must not overlap attempts. Check the starter recovery path, wrong-code throttling, app backgrounding during verification, Reduce Motion, and normal calculator tap/press feedback.
+
 ## 0.12.2 automatic backup retention (physical device — pending)
 
 - With disposable media, connect an external Files folder and enable Automatic Daily Backup. Verify a successful save, relaunch, and make another change: a second automatic export must wait until 24 hours after the first. Manual saves must still work immediately.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.3 · Faster calculator entry
+
+**November 6, 2026 · Build 19 · Test build · iOS 17+**
+
+- Recognize hold Equals after 0.5 seconds, without waiting for finger release, and reveal the private screen without a modal slide after authentication succeeds. Ordinary taps still calculate.
+- Prevent overlapping unlock requests and reject an entry that was evaluated or changed while verification was running. Code verification, retry limits, recovery entry, and encryption stay unchanged.
+- Includes the guarded daily backup retention from 0.12.2. Physical-device gesture and opening latency checks remain pending; use the build's verification report for native compilation and automated-test evidence.
+
 ## 0.12.2 · Bounded automatic backups
 
 **November 4, 2026 · Build 18 · Local test build · iOS 17+**

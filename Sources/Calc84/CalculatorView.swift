@@ -29,6 +29,7 @@ struct CalculatorView: View {
     @State private var scientific = false
     @State private var didEvaluate = false
     @State private var access = false
+    @State private var unlockInFlight = false
     @State private var showingHistory = false
     @State private var showingSettings = false
     @State private var history: [CalculationRecord] = []
@@ -146,7 +147,9 @@ struct CalculatorView: View {
     @ViewBuilder private func key(_ value: String, side: CGFloat, utility: Bool = false) -> some View {
         if value == "=" {
             keyFace(value, side: side, utility: utility)
-                .highPriorityGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in unlockLibrary() })
+                // Recognize at the threshold while still held; a short tap remains Equals.
+                .highPriorityGesture(LongPressGesture(minimumDuration: 0.5, maximumDistance: 10)
+                    .onEnded { _ in unlockLibrary() })
                 .accessibilityAction(named: "Hold Equals") { unlockLibrary() }
         } else { keyFace(value, side: side, utility: utility) }
     }
@@ -160,12 +163,19 @@ struct CalculatorView: View {
         }.accessibilityLabel(label(for: value))
     }
     private func unlockLibrary() {
-        guard VaultCode.isDirectEntry(expression, evaluated: didEvaluate), !vault.busy else { return }
+        guard VaultCode.isDirectEntry(expression, evaluated: didEvaluate),
+              scenePhase == .active, !access, !unlockInFlight, !vault.busy else { return }
         let code = expression
+        unlockInFlight = true
         Task {
+            defer { unlockInFlight = false }
             if await vault.enter(code: code) {
-                guard expression == code, scenePhase == .active else { vault.lock(); return }
-                expression = ""; result = "0"; didEvaluate = false; access = true
+                guard expression == code, !didEvaluate, scenePhase == .active else { vault.lock(); return }
+                expression = ""; result = "0"; didEvaluate = false
+                // Authentication stays unchanged; only the successful reveal skips the modal slide.
+                var reveal = Transaction(animation: nil)
+                reveal.disablesAnimations = true
+                withTransaction(reveal) { access = true }
             }
         }
     }

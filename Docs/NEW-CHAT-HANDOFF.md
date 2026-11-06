@@ -1,6 +1,12 @@
 # Arithen handoff
 
-## Scope and release state
+## Current build task — November 6, 2026
+
+The user requested completion of the half-second entry change, including a new tested IPA. Target: **0.12.3 build 19**, using the existing GitHub Mac workflow on `codex/quick-unlock-0.12.3`; local WSL remains unresponsive. Use `.build/github-0.12.3-run.json`, `.build/delivery-0.12.3.json`, and the downloaded verification report for the completed run's evidence. Do not infer success from this handoff alone. No public release or merge to main is requested.
+
+`CalculatorView` now recognizes hold Equals at 0.5 seconds and disables only the successful full-screen opening animation. It keeps the native high-priority long press and normal Button tap/accessibility behavior, blocks overlapping requests, and rechecks direct-entry state after authentication. Credential verification, throttling, data, and backups are unchanged. Native gesture/timing checks remain pending. Deliver only the current IPA to `C:\Users\naith\Desktop\ipa\My Projects (N3mo Studio)`, keeping evidence in the workspace. Remove older copies of this same app from that delivery folder only after verification; preserve other projects.
+
+## Previous backup-retention build
 
 Repository: `C:\Users\naith\Documents\GitHub\Calc 84`.
 Branch: main, with local uncommitted backup-retention work. Current local test build: 0.12.2 build 18. Older 0.12.1 build 17 contains the redesign and polish but not daily backup retention.

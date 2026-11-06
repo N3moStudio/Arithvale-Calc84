@@ -3,7 +3,7 @@
 ## First use
 
 1. Install the test IPA using your installer or existing LiveContainer setup.
-2. Enter **160160**, then **hold = for about 0.6 seconds**.
+2. Enter **160160**, then **hold = for half a second**. From 0.12.3, recognition starts entry while your finger is still down, and successful entry skips the opening slide animation.
 3. Save the generated recovery key somewhere separate from this app. Confirm its last eight characters.
 4. Choose a personal **6–12 digit calculator code**. Enter that code and hold = to return to the library.
 5. Tap **+ → Photos & Videos**, or **Import from Files**. For Files, share the source to LiveContainer → Arithen first, unlock, then tap **Import**. Try disposable samples first.

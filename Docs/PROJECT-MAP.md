@@ -1,5 +1,9 @@
 # Arithen source map
 
+## 0.12.3 calculator entry
+
+`Calc84/CalculatorView` owns the 0.5-second native hold, ordinary Equals taps, one in-flight unlock request, stale-entry checks, and the animation-free successful reveal. `VaultModel.enter` and `DeviceAccess` still perform the existing verification and throttling; no shortcut opens decrypted content before authentication. Device timing and gesture checks are in `DEVICE-CHECKS.md`.
+
 ## 0.12.2 automatic folder backups
 
 `CalcCore/AutomaticFolderBackups` owns the 24-hour policy, per-folder/per-library private receipt journal, verified-copy rotation, and seven-copy safety checks. `Calc84/BackupFolder` supplies security-scoped access and coordinated provider operations. `VaultModel` owns foreground scheduling, cancellation, manual/automatic separation, and retry feedback. `VaultSettingsView` exposes Automatic Daily Backup under Connected Folder. `AutomaticFolderBackupTests` covers destructive-cleanup failure cases and actual encrypted-archive recovery. See [retention policy](BACKUP-RETENTION.md).
