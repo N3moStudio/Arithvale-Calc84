@@ -1,6 +1,20 @@
 # Arithen handoff
 
-## Current build task — November 6, 2026
+## Current requested build — November 7, 2026
+
+The user subsequently requested a GitHub IPA build of the settings changes and delivery to `C:\Users\naith\Desktop\ipa\My Projects (N3mo Studio)`. Target **0.12.4 build 20**, branch `codex/native-settings-0.12.4`, isolated build checkout `.build/ci-native-settings`. Keep the main checkout's existing uncommitted work intact. Use `.build/github-0.12.4-run.json`, `.build/delivery-0.12.4.json` and the downloaded verification report to establish completion. The source-only history below predates this build request.
+
+Deliver only `Arithen-0.12.4.ipa` after native compilation, core/recovery tests and package verification succeed. Replace only older Arithen IPAs in that folder after the replacement is verified; preserve other projects' files. No public release or main merge is requested. Native settings layout, accessibility, gestures, permissions and real cloud/provider behavior still need physical-device acceptance; a CI pass does not establish them.
+
+## Latest source-only settings adoption — November 7, 2026
+
+The user explicitly requested adoption of the local Native Settings Kit while preserving all controls/state, and **no IPA, publishing or another-app changes**. Read `Docs/SETTINGS-FEATURE-MAP.md` and `Docs/SETTINGS-ADOPTION.md` plus the new repository `AGENTS.md`. The supplied kit is retained at `UI/NativeSettingsKit` as an unlinked reference; production adapts its patterns using existing Arithen tokens and stores.
+
+Six existing Swift views plus `SettingsComponents.swift` and `BackupSettingsDetails.swift` implement the larger identity/appearance cards, native rows/theme tiles, solid themed lists, and focused backup/help pages. Existing Theme default is intentionally preserved alongside Solid and Liquid Glass. The calculator access/press handlers, cloud provider/recovery code and backup picker completion/cancellation remain unchanged. The eight changed/new app files and seven kit files pass syntax parsing; 59 protected source/config/test files match the tested 0.12.3 source; kit content/144 contrast checks pass. Evidence: `.build/settings-adoption-checks.json`. Native compilation, XCTest and device/simulator checks are **not run** for this pass; WSL availability timed out. Do not reuse the previous IPA's test result as proof of the new UI.
+
+The delivered IPA remains 0.12.3 build 19; its Desktop delivery folder was not modified. The current source changes remain local and uncommitted, alongside earlier existing changes. No settings/data migration or package dependency was introduced.
+
+## Previous build — November 6, 2026
 
 The user requested completion of the half-second entry change, including a new tested IPA. Target: **0.12.3 build 19**, using the existing GitHub Mac workflow on `codex/quick-unlock-0.12.3`; local WSL remains unresponsive. Use `.build/github-0.12.3-run.json`, `.build/delivery-0.12.3.json`, and the downloaded verification report for the completed run's evidence. Do not infer success from this handoff alone. No public release or merge to main is requested.
 

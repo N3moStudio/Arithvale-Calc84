@@ -100,15 +100,14 @@ struct CalculatorView: View {
             .sheet(isPresented: $showingSettings) {
                 NavigationStack {
                     ThemedForm {
+                        Section { AppearanceSettingsCard() }
                         Section("Calculator") {
                             Toggle("Scientific buttons", isOn: $scientific)
                             Toggle("Use degrees", isOn: $degrees)
                         }
-                        Section {
-                            NavigationLink("Appearance") { AppearanceSettingsView() }
-                        }
-                        Section { ArithenIdentity() }
-                    }.navigationTitle("Calculator Settings").navigationBarTitleDisplayMode(.inline)
+                        Section { LabeledContent(AppBrand.name, value: AppBrand.version) }
+                    }.contentMargins(.top, 16, for: .scrollContent)
+                        .navigationTitle("Calculator Settings").navigationBarTitleDisplayMode(.inline)
                         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showingSettings = false } } }
                 }.tint(CalcTheme.accent)
             }

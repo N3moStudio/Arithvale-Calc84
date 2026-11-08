@@ -33,8 +33,7 @@ struct CloudBackupView: View {
                         CloudProviderView(provider: provider, restoring: restoring, setup: setup)
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(provider.title).font(.headline)
-                            Text(summary(provider)).font(.subheadline).foregroundStyle(ArithenPalette.color(.muted))
+                            SettingsRow(provider.title, symbol: "icloud", detail: summary(provider))
                             if let date = cloud.receipts[provider]?.saved {
                                 Text(date, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(ArithenPalette.color(.muted))
                             }
@@ -48,11 +47,8 @@ struct CloudBackupView: View {
                         .onChange(of: cellular) { _, _ in cloud.connectionChanged() }
                 }.disabled(vault.busy)
                 Section {
-                    Text("Keep the app open and unlocked while transferring. Locking pauses the job. Tap Back Up Now to resume; completed files are reused.")
-                    Text("Choose items separately for each provider. Automatic mode backs up all eligible items after changes while the app is open. Never Upload overrides both modes. This version does not merge changes from two phones.")
-                    Text("Deleting from this phone never deletes cloud backups. Old recovery catalogs are kept; retained files can use extra cloud space.")
-                    Text("The first upload includes a download check. Full recovery tests also download everything and need free space on your phone.")
-                } header: { Text("How it works") }
+                    NavigationLink { CloudCopyHelpView() } label: { SettingsRow("How Cloud Copies Work", symbol: "questionmark.circle") }
+                }
             }
         }
         .navigationTitle(restoring ? "Cloud Recovery" : "Cloud Backup").navigationBarTitleDisplayMode(.inline)
@@ -62,6 +58,21 @@ struct CloudBackupView: View {
         guard cloud.connected.contains(provider) else { return "Not connected" }
         guard let receipt = cloud.receipts[provider], receipt.saved != nil else { return "Connected · first backup needed" }
         return receipt.needsBackup ? "Changes waiting for backup" : "Latest backup completed"
+    }
+}
+
+private struct CloudCopyHelpView: View {
+    var body: some View {
+        ThemedList {
+            Section("Transfers") {
+                Text("Keep the app open and unlocked while transferring. Locking pauses the job. Tap Back Up Now to resume; completed files are reused.")
+                Text("The first upload includes a download check. Full recovery tests also download everything and need free space on your phone.")
+            }
+            Section("Your choices") {
+                Text("Choose items separately for each provider. Automatic mode backs up all eligible items after changes while the app is open. Never Upload overrides both modes. This version does not merge changes from two phones.")
+                Text("Deleting from this phone never deletes cloud backups. Old recovery catalogs are kept; retained files can use extra cloud space.")
+            }
+        }.navigationTitle("Cloud Copies").navigationBarTitleDisplayMode(.inline)
     }
 }
 

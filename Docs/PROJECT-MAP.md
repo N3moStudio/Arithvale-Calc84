@@ -1,5 +1,9 @@
 # Arithen source map
 
+## 0.12.4 native settings presentation
+
+`SettingsComponents` contains host-themed native row labels, the larger branded appearance card and adaptive theme tiles. `ArithenIdentity` shares the original artwork. `Appearance` keeps the existing root/type/storage policy and refines list surfaces/spacing/selection. `VaultSettingsView` owns the overview and backup export/picker state; `BackupSettingsDetails` provides focused folder, status, reminder and help pages without owning that export state. Calculator/Cloud/About reuse the presentation while retaining original task handlers. See [complete feature map](SETTINGS-FEATURE-MAP.md), [adoption and checks](SETTINGS-ADOPTION.md), and `UI/NativeSettingsKit` for the unlinked reference/notices.
+
 ## 0.12.3 calculator entry
 
 `Calc84/CalculatorView` owns the 0.5-second native hold, ordinary Equals taps, one in-flight unlock request, stale-entry checks, and the animation-free successful reveal. `VaultModel.enter` and `DeviceAccess` still perform the existing verification and throttling; no shortcut opens decrypted content before authentication. Device timing and gesture checks are in `DEVICE-CHECKS.md`.

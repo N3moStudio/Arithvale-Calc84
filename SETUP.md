@@ -113,4 +113,4 @@ Settings → Appearance contains **Theme** and **Surfaces**. Bloom and Theme def
 - **Backups:** create, import, test, check provider coverage, or find recovery-key help.
 - **About:** app version, build, and privacy information.
 
-These instructions describe unreleased source changes. The last delivered IPA remains 0.11.0 until a later, explicitly requested build.
+These instructions describe the current source and 0.12.4 build 20 target. Use the matching build verification report for automated results; installation, layouts and live provider transfers require device checks.

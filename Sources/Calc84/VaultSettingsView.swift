@@ -5,35 +5,26 @@ import CalcCore
 struct VaultSettingsView: View {
     @EnvironmentObject private var vault: VaultModel
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.arithenTheme) private var theme
-    @AppStorage(ArithenPalette.surfaceKey) private var surface = ThemeSurface.theme.rawValue
     var body: some View {
         ThemedList {
-            Section {
-                NavigationLink { BackupSettingsView() } label: { settingsRow("Backups", detail: "Save, add or check a copy", symbol: "externaldrive") }
-                NavigationLink { CloudBackupView() } label: { settingsRow("Cloud Copies", detail: "Choose what leaves this device", symbol: "icloud") }
-                NavigationLink { PrivacyAccessView() } label: { settingsRow("Privacy & Access", detail: "Code and photo indexing", symbol: "lock") }
-                NavigationLink { AppearanceSettingsView() } label: { settingsRow("Appearance", detail: theme.title + " · " + (ThemeSurface(rawValue: surface) ?? .theme).title, symbol: "paintpalette") }
+            Section { AppearanceSettingsCard() }
+            Section("Library") {
+                NavigationLink { BackupSettingsView() } label: { SettingsRow("Backups", symbol: "externaldrive") }
+                NavigationLink { CloudBackupView() } label: { SettingsRow("Cloud Copies", symbol: "icloud") }
+                NavigationLink { PrivacyAccessView() } label: { SettingsRow("Privacy & Access", symbol: "lock") }
+            }
+            Section("Help") {
+                NavigationLink { AboutView() } label: { SettingsRow("About", symbol: "info.circle", value: AppBrand.version) }
             }
             Section {
-                NavigationLink { AboutView() } label: { settingsRow("About", detail: AppBrand.name + " " + AppBrand.version, symbol: "info.circle") }
                 Button("Lock & Return to Calculator", systemImage: "lock.fill") { vault.lock(); dismiss() }
             }
-        }.navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
+        }.contentMargins(.top, 16, for: .scrollContent)
+            .navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .alert("Couldn’t Complete", isPresented: Binding(get: { vault.message != nil }, set: { if !$0 { vault.message = nil } })) {
                 Button("Close", role: .cancel) { vault.message = nil }
             } message: { Text(vault.message ?? "") }
-    }
-    private func settingsRow(_ title: String, detail: String, symbol: String) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: symbol).font(.system(size: 18, weight: .semibold)).foregroundStyle(.tint)
-                .frame(width: 38, height: 38).background(ArithenPalette.color(.accent).opacity(0.10), in: RoundedRectangle(cornerRadius: 11))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.body.weight(.medium))
-                Text(detail).font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
-            }
-        }.padding(.vertical, 5)
     }
 }
 
@@ -42,8 +33,8 @@ struct PrivacyAccessView: View {
     var body: some View {
         ThemedList {
             Section {
-                NavigationLink("Change Calculator Code") { ChangeCodeView() }
-                NavigationLink("Photo Indexing") { PrivateSearchSettings(search: vault.textSearch) }
+                NavigationLink { ChangeCodeView() } label: { SettingsRow("Change Calculator Code", symbol: "lock.rotation") }
+                NavigationLink { PrivateSearchSettings(search: vault.textSearch) } label: { SettingsRow("Photo Indexing", symbol: "text.viewfinder") }
             }
             Section("Private storage") {
                 Text("Your library stays encrypted in private app storage. Save an external backup before removing the app or its data container.")
@@ -76,14 +67,8 @@ private enum BackupSheet: Identifiable {
 struct BackupSettingsView: View {
     @EnvironmentObject private var vault: VaultModel
     @AppStorage("backupFolderName") private var folderName = "Not connected"
-    @AppStorage("automaticFolderBackup") private var automatic = false
-    @AppStorage("lastEncryptedExport") private var lastExport = 0.0
-    @AppStorage("lastBackupFilename") private var filename = ""
-    @AppStorage("lastBackupFolder") private var savedFolder = ""
-    @AppStorage("libraryNeedsBackup") private var needsBackup = true
     @AppStorage("privateBackupReminders") private var reminders = false
-    @AppStorage("lastRecoveryTest") private var lastTest = 0.0
-    @AppStorage("lastRecoveryTestIdentity") private var lastTestIdentity = ""
+    // Export/picker ownership stays here while detail pages only invoke these bindings/actions.
     @State private var sheet: BackupSheet?
     @State private var activeExport: PreparedBackup?
     @State private var picked: BackupSelection?
@@ -97,81 +82,33 @@ struct BackupSettingsView: View {
                             activeExport = request; sheet = .save(request)
                         }
                     }
-                } label: { Label("Create Backup", systemImage: "square.and.arrow.down").fontWeight(.semibold).frame(minHeight: 44) }
+                } label: { SettingsRow("Create Backup", symbol: "square.and.arrow.down") }
                 .disabled(vault.busy)
-                NavigationLink { BackupImportView() } label: { Label("Import Backup", systemImage: "externaldrive.badge.plus").frame(minHeight: 44) }.disabled(vault.busy)
-                NavigationLink { RecoveryTestView() } label: { Label("Test Backup", systemImage: "checkmark.shield").frame(minHeight: 44) }.disabled(vault.busy)
-            } footer: { Text("Choose a location outside \(AppBrand.name) / LiveContainer. No folder connection is required for this save.") }
-            Section { NavigationLink("Storage") { LibraryStorageView() } }
-            BackupCoverageView()
-            Section {
-                Toggle("Private Backup Reminders", isOn: $reminders)
-            } footer: {
-                Text("Show a reminder inside the unlocked library when changes need a Files backup and the last saved copy is at least a week old, or no copy has been saved. Snooze it until tomorrow. No Lock Screen notifications.")
-            }
-            Section {
-                NavigationLink { SharedBackupGuide() } label: { Label("How to Import from Files", systemImage: "square.and.arrow.down") }
-                Text("Files → Share → LiveContainer → Arithen. Unlock the library, then tap Backup received or Import Backup above. You can add another backup any time.")
-                    .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
-                StorageEstimateView(bytes: vault.items.reduce(Int64(0)) { $0 + Int64($1.byteCount) }, copies: 2)
-            }
-            if vault.busy || !vault.status.isEmpty {
-                Section {
-                    HStack(spacing: 12) {
-                        if vault.busy { ProgressView() }
-                        Text(vault.status.isEmpty ? "Working…" : vault.status).font(.subheadline)
-                    }
-                    if let message = vault.message {
-                        Text(message).font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
-                    }
-                }
-            }
-            Section {
-                NavigationLink("Last Saved Copy") { ThemedList {
-                if lastExport > 0 {
-                    LabeledContent("Saved") { Text(Date(timeIntervalSince1970: lastExport), format: .dateTime.month().day().hour().minute()) }
-                    if !savedFolder.isEmpty { LabeledContent("Folder", value: savedFolder) }
-                    Text(filename).font(.footnote).textSelection(.enabled)
-                    if needsBackup { Label("New changes need another backup", systemImage: "exclamationmark.circle") }
-                    Text("Find this filename in Files. A successful save does not confirm cloud upload.").font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
-                } else { Text("No backup has been saved and checked yet.").foregroundStyle(ArithenPalette.color(.muted)) }
-                }.navigationTitle("Last Saved Copy") }
-            }
-            Section {
-                if lastTest > 0 {
-                    Text(lastTestIdentity.isEmpty ? "Older test · snapshot identity was not recorded" : lastTestIdentity).font(.caption).textSelection(.enabled)
-                    LabeledContent("Last test") { Text(Date(timeIntervalSince1970: lastTest), format: .dateTime.month().day().hour().minute()) }
-                }
-                NavigationLink("Recovery Key") { RecoveryKeyHelpView() }
-                NavigationLink("Restore after reinstalling") {
-                    ThemedList {
-                        Text("1. Before deleting anything, save a backup outside the app and test that exact file. Wait for your Files provider to finish uploading.")
-                        Text("2. In a fresh installation, enter 160160 and hold =. Choose Start from Existing Backups, or share a backup from Files to this app.")
-                        Text("3. Select the .c84backup file, enter its old recovery key, and tap Add Backup to Setup. Save and confirm the new recovery key, choose a calculator code, then create the library.")
-                        Text("4. Check photos, videos, and dates. Reconnect your backup folder if you used one.")
-                        Text("A normal update using the same app identity or LiveContainer data container should retain your library. Make a verified backup first; do not uninstall just to update.")
-                        Text("Every new library gets a new key, even when it starts from the same photos in an old backup. Old archives keep their original keys. Adding more backups later keeps the current library’s key.")
-                    }.navigationTitle("Restore Your Library").navigationBarTitleDisplayMode(.inline)
-                }
-            } header: { Text("Check & restore") } footer: { Text("A recovery test checks the file you select, not all your backups. A screenshot of the key does not contain your photos.") }
-            Section {
-                NavigationLink("Connected Folder") { ThemedList {
-                LabeledContent("Connected folder", value: folderName)
-                Button(BackupFolder.configured ? "Reconnect or Change Folder" : "Connect Backup Folder", systemImage: "folder.badge.plus") { sheet = .folder }
+                NavigationLink { BackupImportView() } label: { SettingsRow("Import Backup", symbol: "externaldrive.badge.plus") }
                     .disabled(vault.busy)
-                if BackupFolder.configured {
-                    Button("Back Up to Connected Folder", systemImage: "externaldrive.badge.plus") { Task { await vault.backup() } }.disabled(vault.busy)
-                    Toggle("Automatic Daily Backup", isOn: $automatic).disabled(vault.busy)
-                        .onChange(of: automatic) { _, _ in vault.scheduleAutomaticBackup() }
-                    Text("When there are changes, save at most once per 24 hours while the library is open. Back Up to Connected Folder still works anytime.")
-                        .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
-                    Text("Keep the latest 7 automatic copies. Cleanup requires a verified replacement and rechecked retained copies. Manual saves and existing older backups stay protected.")
-                        .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
-                    Button("Disconnect Folder") { BackupFolder.forget() }.disabled(vault.busy)
-                }
-                }.navigationTitle("Connected Folder") }
+                NavigationLink { RecoveryTestView() } label: { SettingsRow("Test Backup", symbol: "checkmark.shield") }
+                    .disabled(vault.busy)
             } footer: {
-                Text("Choose a writable folder, then tap Open. If your provider or installer cannot keep folder access, use Create Backup. A checked Files copy does not confirm cloud upload.")
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Choose a location outside \(AppBrand.name) / LiveContainer. No folder connection is required for this save.")
+                    StorageEstimateView(bytes: vault.items.reduce(Int64(0)) { $0 + Int64($1.byteCount) }, copies: 2)
+                }
+            }
+            BackupActivitySection()
+            Section("Save & status") {
+                NavigationLink {
+                    ConnectedBackupFolderSettings { sheet = .folder }
+                } label: { SettingsRow("Connected Folder", symbol: "folder", detail: folderName) }
+                NavigationLink { BackupStatusSettingsView() } label: { SettingsRow("Backup Status", symbol: "checkmark.shield") }
+            }
+            Section("Options") {
+                NavigationLink { BackupRemindersSettingsView() } label: {
+                    SettingsRow("Backup Reminders", symbol: "bell", value: reminders ? "On" : "Off")
+                }
+                NavigationLink { LibraryStorageView() } label: { SettingsRow("Storage", symbol: "internaldrive") }
+            }
+            Section {
+                NavigationLink { BackupHelpSettingsView() } label: { SettingsRow("Backup Help", symbol: "questionmark.circle") }
             }
         }
         .navigationTitle("Backup Center").navigationBarTitleDisplayMode(.inline)

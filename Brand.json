@@ -1,7 +1,7 @@
 {
   "displayName": "Arithen",
   "productName": "Arithen",
-  "version": "0.12.3",
-  "build": "19",
+  "version": "0.12.4",
+  "build": "20",
   "bundleIdentifier": "studio.n3mo.calc84"
 }

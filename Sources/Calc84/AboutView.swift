@@ -13,14 +13,16 @@ struct AboutView: View {
                 Text("Thumbnails and Live Photo videos each count as a resource. Keep a checked backup and its recovery key outside this app.")
             }
             Section("Help") {
-                Link("Support & source", destination: AppBrand.support)
-                NavigationLink("Recovery guide") {
-                    ScrollView { Text("Open with your code and hold =. On a fresh install use 160160, then choose Files or Cloud Recovery. Use the recovery key belonging to that backup. Save and test an external backup before updating or removing the app. Existing Calc 84 libraries and .c84backup files remain compatible.").padding() }.navigationTitle("Recovery Guide")
-                }
-                NavigationLink("Privacy") {
-                    ScrollView { Text("Arithen encrypts its local library. There is no developer account or analytics. Optional backups send encrypted files to your own MEGA or Blomp account. Those services receive account and connection information under their own policies. Exported originals are ordinary files and may include location. The app does not block screenshots. Your recovery key cannot be reset by the developer.").padding() }.navigationTitle("Privacy")
-                }
-                NavigationLink("Third-party notices") { NoticesView() }
+                Link(destination: AppBrand.support) { SettingsRow("Support & source", symbol: "arrow.up.right.square") }
+                NavigationLink {
+                    ThemedList { Section { Text("Open with your code and hold =. On a fresh install use 160160, then choose Files or Cloud Recovery. Use the recovery key belonging to that backup. Save and test an external backup before updating or removing the app. Existing Calc 84 libraries and .c84backup files remain compatible.") } }
+                        .navigationTitle("Recovery Guide").navigationBarTitleDisplayMode(.inline)
+                } label: { SettingsRow("Recovery guide", symbol: "arrow.counterclockwise") }
+                NavigationLink {
+                    ThemedList { Section { Text("Arithen encrypts its local library. There is no developer account or analytics. Optional backups send encrypted files to your own MEGA or Blomp account. Those services receive account and connection information under their own policies. Exported originals are ordinary files and may include location. The app does not block screenshots. Your recovery key cannot be reset by the developer.") } }
+                        .navigationTitle("Privacy").navigationBarTitleDisplayMode(.inline)
+                } label: { SettingsRow("Privacy", symbol: "hand.raised") }
+                NavigationLink { NoticesView() } label: { SettingsRow("Third-party notices", symbol: "doc.text") }
             }
         }.navigationTitle("About").navigationBarTitleDisplayMode(.inline)
     }
@@ -32,6 +34,9 @@ private struct NoticesView: View {
         return enumerator.compactMap { $0 as? URL }.filter { ["txt", "md"].contains($0.pathExtension) }
             .sorted { $0.path < $1.path }.compactMap { url in (try? String(contentsOf: url, encoding: .utf8)).map { url.lastPathComponent + "\n\n" + $0 } }.joined(separator: "\n\n")
     }
-    var body: some View { ScrollView { Text(notices).font(.footnote).textSelection(.enabled).padding() }.navigationTitle("Notices") }
+    var body: some View {
+        ScrollView { Text(notices).font(.footnote).textSelection(.enabled).padding() }
+            .settingsScreen().navigationTitle("Notices").navigationBarTitleDisplayMode(.inline)
+    }
 }
 #endif

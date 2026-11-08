@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.12.4 · Native settings presentation
+
+**November 7, 2026 · Build 20 · Test build · iOS 17+**
+
+- Adopt Native Settings Kit 0.1.0 through Arithen's existing appearance system: larger branded appearance cards, adaptive theme tiles, compact rounded text and simple native rows on coherent themed surfaces.
+- Split Backup Center into focused folder, status, reminder and help pages while retaining Create/Import/Test, real progress/errors, storage estimates and original picker/task ownership. Keep cloud/provider/recovery behavior and every mapped setting/action.
+- Preserve existing themes, Theme default/Solid/Liquid Glass values, reset defaults, app identity, credentials, backups and calculator access safety. Add the complete feature map and adoption/native-validation checklist.
+- Requested GitHub test build; no public release. See [settings adoption](Docs/SETTINGS-ADOPTION.md) and the build's verification report for actual evidence and remaining native/device checks.
+
 ## 0.12.3 · Faster calculator entry
 
 **November 6, 2026 · Build 19 · Test build · iOS 17+**

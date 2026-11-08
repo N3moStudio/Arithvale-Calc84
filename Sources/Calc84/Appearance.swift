@@ -61,12 +61,16 @@ struct AppearanceRoot: ViewModifier {
 }
 struct SettingsScreen: ViewModifier {
     @Environment(\.arithenTheme) private var theme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+    @AppStorage(ArithenPalette.surfaceKey) private var surface = ThemeSurface.theme.rawValue
     func body(content: Content) -> some View {
-        content.scrollContentBackground(.hidden).background(ArithenPalette.color(.canvas, theme: theme))
-            .listStyle(.insetGrouped).listRowSpacing(theme == .afterhours ? 6 : 0)
-            .listSectionSpacing(theme == .porcelain ? 28 : 24).environment(\.defaultMinListRowHeight, 56)
+        let glass = surface == ThemeSurface.glass.rawValue && !reduceTransparency && contrast != .increased
+        return content.scrollContentBackground(.hidden).background(ArithenPalette.color(.canvas, theme: theme))
+            .listStyle(.insetGrouped).listRowSpacing(0)
+            .listSectionSpacing(24).environment(\.defaultMinListRowHeight, 52)
             .toolbarBackground(ArithenPalette.color(.surface, theme: theme), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(glass ? .automatic : .visible, for: .navigationBar)
     }
 }
 extension View {
@@ -77,12 +81,12 @@ extension View {
 struct ThemedList<Content: View>: View {
     @Environment(\.arithenTheme) private var theme
     @ViewBuilder var content: () -> Content
-    var body: some View { List { content().listRowBackground(ArithenPalette.color(theme == .porcelain ? .canvas : .surface, theme: theme)).listRowSeparatorTint(ArithenPalette.color(.text, theme: theme).opacity(0.10)) }.settingsScreen() }
+    var body: some View { List { content().listRowBackground(ArithenPalette.color(.surface, theme: theme)).listRowSeparatorTint(ArithenPalette.color(.text, theme: theme).opacity(0.10)) }.settingsScreen() }
 }
 struct ThemedForm<Content: View>: View {
     @Environment(\.arithenTheme) private var theme
     @ViewBuilder var content: () -> Content
-    var body: some View { Form { content().listRowBackground(ArithenPalette.color(theme == .porcelain ? .canvas : .surface, theme: theme)).listRowSeparatorTint(ArithenPalette.color(.text, theme: theme).opacity(0.10)) }.settingsScreen() }
+    var body: some View { Form { content().listRowBackground(ArithenPalette.color(.surface, theme: theme)).listRowSeparatorTint(ArithenPalette.color(.text, theme: theme).opacity(0.10)) }.settingsScreen() }
 }
 
 struct FloatingLibraryBar: ViewModifier {
@@ -91,33 +95,41 @@ struct FloatingLibraryBar: ViewModifier {
 struct AppearanceSettingsView: View {
     @AppStorage(ArithenPalette.themeKey) private var theme = ArithenTheme.defaultStyle.rawValue
     @AppStorage(ArithenPalette.surfaceKey) private var surface = ThemeSurface.theme.rawValue
+    @Environment(\.dynamicTypeSize) private var size
+    // Existing installations retain the third choice and original reset semantics.
+    private let surfaces: [ThemeSurface] = [.solid, .glass, .theme]
     var body: some View {
-        List {
+        ThemedList {
             Section("Theme") {
-                ForEach(ArithenTheme.allCases) { choice in
-                    Button { theme = choice.rawValue } label: {
-                        HStack(spacing: 14) {
-                            RoundedRectangle(cornerRadius: 13).fill(ArithenPalette.color(.canvas, theme: choice))
-                                .overlay { Circle().fill(ArithenPalette.color(.accent, theme: choice)).padding(14) }
-                                .frame(width: 52, height: 52)
-                                .overlay { RoundedRectangle(cornerRadius: 13).stroke(.primary.opacity(0.12), lineWidth: 1) }
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(choice.title).font(.body.weight(.semibold))
-                                Text(choice.detail).font(.subheadline).foregroundStyle(ArithenPalette.color(.muted))
+                LazyVGrid(columns: size.isAccessibilitySize ? [GridItem(.flexible())]
+                          : [GridItem(.adaptive(minimum: 140), spacing: 12)], spacing: 12) {
+                    ForEach(ArithenTheme.allCases) { choice in
+                        SettingsThemeTile(theme: choice, selected: ArithenTheme(storedValue: theme) == choice) {
+                            theme = choice.rawValue
+                        }
+                    }
+                }.padding(.vertical, 8)
+            }
+            Section {
+                ForEach(surfaces, id: \.rawValue) { choice in
+                    Button { surface = choice.rawValue } label: {
+                        HStack {
+                            Text(choice == .solid ? "Solid" : choice.title)
+                                .foregroundStyle(ArithenPalette.color(.text))
+                            Spacer(minLength: 8)
+                            if (ThemeSurface(rawValue: surface) ?? .theme) == choice {
+                                Image(systemName: "checkmark").accessibilityHidden(true)
                             }
-                            Spacer(minLength: 4)
-                            if ArithenTheme(storedValue: theme) == choice { Image(systemName: "checkmark").foregroundStyle(.tint) }
-                        }.frame(minHeight: 60).contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityAddTraits(ArithenTheme(storedValue: theme) == choice ? .isSelected : [])
+                        }.frame(minHeight: 44).contentShape(Rectangle())
+                    }.accessibilityAddTraits((ThemeSurface(rawValue: surface) ?? .theme) == choice ? [.isSelected] : [])
                 }
-            }.settingsRows()
-            Section("Surfaces") {
-                Picker("Surfaces", selection: $surface) {
-                    ForEach(ThemeSurface.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
-                }
+            } header: { Text("Surfaces") } footer: {
+                Text("Settings stay solid for readability. Liquid Glass styles floating controls where supported. Theme default currently uses Solid.")
+            }
+            Section {
                 Button("Reset Appearance") { theme = ArithenTheme.defaultStyle.rawValue; surface = ThemeSurface.theme.rawValue }
-            }.settingsRows()
-        }.settingsScreen().navigationTitle("Appearance").navigationBarTitleDisplayMode(.inline)
+            }
+        }.navigationTitle("Appearance").navigationBarTitleDisplayMode(.inline)
     }
 }
 #endif

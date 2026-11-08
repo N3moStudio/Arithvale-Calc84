@@ -1,0 +1,9 @@
+Native Settings Kit 0.1.0 - 2026-11-07
+
+PASS: 8 themes, 144 solid-color contrast pairs (minimum 5.09:1), 28 local documentation links.
+PASS: bundle files and production source ownership/navigation guardrails.
+NOT RUN: native Swift compilation, XCTest execution, simulator/device visual, accessibility and gesture checks.
+
+PASS: 7 Swift files parsed; syntax grammar only, no type checking.
+
+Elsepin repository unchanged at 4f6c3e17b5b3162f1a70a84ab24402d2994b5fd6. No IPA built.

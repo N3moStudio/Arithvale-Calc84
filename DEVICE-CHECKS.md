@@ -1,5 +1,10 @@
 # Arithen · phone test guide
 
+## 0.12.4 native settings (physical device — pending)
+
+- Follow the native acceptance list in `Docs/SETTINGS-ADOPTION.md`: large text, theme/surface persistence, native Back/edge swipe, every mapped settings destination, backup picker completion/cancellation and preserved active work.
+- CI compilation and automated core/recovery results do not establish physical-device settings layouts, gestures, permissions or provider transfers.
+
 ## 0.12.3 half-second entry (physical device — pending)
 
 - Type the correct code and keep Equals held: authentication must begin at 0.5 seconds, with no finger release needed or modal slide after success. Measure on-device before claiming a total opening time; secure verification and library loading still take time.
