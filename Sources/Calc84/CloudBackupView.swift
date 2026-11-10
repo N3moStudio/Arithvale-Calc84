@@ -7,7 +7,7 @@ struct CloudBackupView: View {
     var setup: Binding<SetupSession>? = nil
     @EnvironmentObject private var vault: VaultModel
     @EnvironmentObject private var cloud: CloudBackupModel
-    @AppStorage("cloudUseCellular") private var cellular = false
+    @AppStorage("cloudUseCellular") private var cellular = true
     var body: some View {
         ThemedList {
             Section {

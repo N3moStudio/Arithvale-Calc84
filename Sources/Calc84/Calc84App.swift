@@ -5,6 +5,7 @@ import CalcCore
 
 @main
 struct ArithenApp: App {
+    init() { AppPreferences.register() }
     @UIApplicationDelegateAdaptor(PrivacyDelegate.self) private var delegate
     @StateObject private var vault = VaultModel()
     @StateObject private var sharedBackup = SharedBackupModel()

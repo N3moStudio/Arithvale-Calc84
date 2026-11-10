@@ -10,6 +10,7 @@ struct BackupCoverageView: View {
     @AppStorage("lastBackupDigest") private var digest = ""
     @AppStorage("lastBackupLibraryID") private var savedLibrary = ""
     @AppStorage("lastBackupFilename") private var filename = ""
+    @AppStorage("lastBackupFolder") private var folder = ""
     @AppStorage(RecoveryEvidenceStore.key) private var evidence = Data()
     @State private var libraryID: UUID?
     private var records: [RecoveryCheck] { (try? JSONDecoder().decode([RecoveryCheck].self, from: evidence)) ?? [] }
@@ -17,10 +18,11 @@ struct BackupCoverageView: View {
     var body: some View {
         Section("Your backup copies") {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Files", systemImage: "folder").font(.headline)
+                Label("Saved to Files", systemImage: "folder").font(.headline)
                 if lastExport > 0, savedLibrary == libraryID?.uuidString {
                     Text(needsBackup ? "Library changes need a new backup" : "Current library saved; file copy checked")
                     Text(filename).font(.caption).textSelection(.enabled)
+                    if !folder.isEmpty { Text("Folder: \(folder)").font(.caption).textSelection(.enabled) }
                     Text("Saved \(Date(timeIntervalSince1970: lastExport).formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
                     recovery(source: "Files", snapshotID: digest)
                 } else {
@@ -61,7 +63,7 @@ struct BackupCoverageView: View {
                 recovery(source: provider.title, snapshotID: receipt?.snapshotID?.uuidString)
             }
             HStack {
-                NavigationLink("Manage \(provider.title)") { CloudBackupView() }
+                NavigationLink("Manage \(provider.title)") { CloudProviderView(provider: provider) }
                 Spacer()
                 if cloud.connected.contains(provider), !eligible.isEmpty {
                     Button("Back Up Now") { cloud.backup(vault: vault, only: provider) }.buttonStyle(.borderless).disabled(vault.busy)
@@ -74,7 +76,7 @@ struct BackupCoverageView: View {
             Label("This backup passed recovery · \(record.items) items · \(record.checked.formatted(date: .abbreviated, time: .omitted))", systemImage: "checkmark.shield")
                 .font(.caption)
         } else {
-            Label("Recovery not yet tested for this exact backup", systemImage: "questionmark.circle")
+            Label("Optional recovery check not run", systemImage: "questionmark.circle")
                 .font(.caption).foregroundStyle(ArithenPalette.color(.muted))
         }
     }

@@ -63,9 +63,8 @@ struct SettingsScreen: ViewModifier {
     @Environment(\.arithenTheme) private var theme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
-    @AppStorage(ArithenPalette.surfaceKey) private var surface = ThemeSurface.theme.rawValue
     func body(content: Content) -> some View {
-        let glass = surface == ThemeSurface.glass.rawValue && !reduceTransparency && contrast != .increased
+        let glass = !reduceTransparency && contrast != .increased
         return content.scrollContentBackground(.hidden).background(ArithenPalette.color(.canvas, theme: theme))
             .listStyle(.insetGrouped).listRowSpacing(0)
             .listSectionSpacing(24).environment(\.defaultMinListRowHeight, 52)
@@ -94,10 +93,7 @@ struct FloatingLibraryBar: ViewModifier {
 }
 struct AppearanceSettingsView: View {
     @AppStorage(ArithenPalette.themeKey) private var theme = ArithenTheme.defaultStyle.rawValue
-    @AppStorage(ArithenPalette.surfaceKey) private var surface = ThemeSurface.theme.rawValue
     @Environment(\.dynamicTypeSize) private var size
-    // Existing installations retain the third choice and original reset semantics.
-    private let surfaces: [ThemeSurface] = [.solid, .glass, .theme]
     var body: some View {
         ThemedList {
             Section("Theme") {
@@ -111,23 +107,7 @@ struct AppearanceSettingsView: View {
                 }.padding(.vertical, 8)
             }
             Section {
-                ForEach(surfaces, id: \.rawValue) { choice in
-                    Button { surface = choice.rawValue } label: {
-                        HStack {
-                            Text(choice == .solid ? "Solid" : choice.title)
-                                .foregroundStyle(ArithenPalette.color(.text))
-                            Spacer(minLength: 8)
-                            if (ThemeSurface(rawValue: surface) ?? .theme) == choice {
-                                Image(systemName: "checkmark").accessibilityHidden(true)
-                            }
-                        }.frame(minHeight: 44).contentShape(Rectangle())
-                    }.accessibilityAddTraits((ThemeSurface(rawValue: surface) ?? .theme) == choice ? [.isSelected] : [])
-                }
-            } header: { Text("Surfaces") } footer: {
-                Text("Settings stay solid for readability. Liquid Glass styles floating controls where supported. Theme default currently uses Solid.")
-            }
-            Section {
-                Button("Reset Appearance") { theme = ArithenTheme.defaultStyle.rawValue; surface = ThemeSurface.theme.rawValue }
+                Button("Reset Appearance") { theme = ArithenTheme.defaultStyle.rawValue }
             }
         }.navigationTitle("Appearance").navigationBarTitleDisplayMode(.inline)
     }

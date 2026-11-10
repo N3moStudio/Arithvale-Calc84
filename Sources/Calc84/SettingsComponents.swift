@@ -45,7 +45,6 @@ struct SettingsRow: View {
 struct AppearanceSettingsCard: View {
     @Environment(\.arithenTheme) private var theme
     @Environment(\.dynamicTypeSize) private var size
-    @AppStorage(ArithenPalette.surfaceKey) private var surface = ThemeSurface.theme.rawValue
     var body: some View {
         NavigationLink { AppearanceSettingsView() } label: {
             let layout = size.isAccessibilitySize
@@ -57,7 +56,7 @@ struct AppearanceSettingsCard: View {
                     Text(AppBrand.name.uppercased()).font(.caption.weight(.semibold)).tracking(1.2)
                         .foregroundStyle(ArithenPalette.color(.accent, theme: theme))
                     Text("Make it yours").font(.title2.bold()).foregroundStyle(ArithenPalette.color(.text, theme: theme))
-                    Text(theme.title + " · " + (ThemeSurface(rawValue: surface) ?? .theme).title)
+                    Text(theme.title + " · " + ThemeSurface.glass.title)
                         .font(.subheadline).foregroundStyle(ArithenPalette.color(.muted, theme: theme))
                 }.fixedSize(horizontal: false, vertical: true)
             }.padding(.vertical, 16).accessibilityElement(children: .combine)

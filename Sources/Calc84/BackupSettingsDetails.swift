@@ -21,20 +21,24 @@ struct BackupActivitySection: View {
 }
 
 struct ConnectedBackupFolderSettings: View {
-    let connect: () -> Void
     @EnvironmentObject private var vault: VaultModel
     @AppStorage("backupFolderName") private var folderName = "Not connected"
     @AppStorage("automaticFolderBackup") private var automatic = false
+    private struct Request: Identifiable { let id = UUID() }
+    @State private var request: Request?
+    @State private var picked: BackupSelection?
+    @State private var notice: String?
     var body: some View {
         ThemedList {
             Section {
                 LabeledContent("Connected folder", value: folderName)
-                Button(action: connect) {
+                Button { picked = nil; notice = nil; request = Request() } label: {
                     SettingsRow(BackupFolder.configured ? "Reconnect or Change Folder" : "Connect Backup Folder", symbol: "folder.badge.plus")
                 }.disabled(vault.busy)
             } footer: {
-                Text("Choose a writable folder, then tap Open. If your provider or installer cannot keep folder access, use Create Backup. A checked Files copy does not confirm cloud upload.")
+                Text("Select the folder itself, then tap Open. If you are inside it, go back one level first. Only one folder can be connected.")
             }
+            if let notice { Section { Text(notice).font(.subheadline) } }
             if BackupFolder.configured {
                 Section {
                     Button("Back Up to Connected Folder", systemImage: "externaldrive.badge.plus") { Task { await vault.backup() } }
@@ -52,56 +56,47 @@ struct ConnectedBackupFolderSettings: View {
             if BackupFolder.configured {
                 Section { Button("Disconnect Folder") { BackupFolder.forget() }.disabled(vault.busy) }
             }
+            Section {
+                DisclosureGroup("If Open does nothing") {
+                    Text("In Files, go to the parent folder, tap Select if shown, select one folder, then Open.")
+                    Text("In LiveContainer, use Fix File Picker and turn off Fix File Picker (legacy), then relaunch Arithen. The legacy option may copy a folder into the app instead of granting access to the original.")
+                    Text("Some host/provider combinations cannot grant folder access. Create Backup can still save individual copies. A shared or copied folder cannot create a permanent connection.")
+                }
+            }
         }.navigationTitle("Connected Folder").navigationBarTitleDisplayMode(.inline)
+            .sheet(item: $request, onDismiss: {
+                if let selection = picked {
+                    picked = nil
+                    vault.connectBackupFolder(selection.url)
+                    withExtendedLifetime(selection) {}
+                } else if notice == nil {
+                    notice = "Files closed without returning a folder. Your existing connection is unchanged."
+                }
+            }) { presented in
+                BackupDocumentPicker(purpose: .connectFolder, finished: { url in
+                    guard request?.id == presented.id else { return }
+                    picked = url.map { BackupSelection($0) }
+                    if url == nil { notice = "No folder selected. Your existing connection is unchanged." }
+                    request = nil
+                }, failure: { message in
+                    guard request?.id == presented.id else { return }
+                    notice = message; request = nil
+                })
+            }
     }
 }
 
 struct BackupStatusSettingsView: View {
-    @AppStorage("lastRecoveryTest") private var lastTest = 0.0
-    @AppStorage("lastRecoveryTestIdentity") private var lastTestIdentity = ""
     var body: some View {
         ThemedList {
             BackupActivitySection()
             BackupCoverageView()
-            Section {
-                NavigationLink { LastSavedBackupSettingsView() } label: { SettingsRow("Last Saved Copy", symbol: "doc.badge.clock") }
-            }
-            Section {
-                if lastTest > 0 {
-                    Text(lastTestIdentity.isEmpty ? "Older test · snapshot identity was not recorded" : lastTestIdentity)
-                        .font(.subheadline).textSelection(.enabled)
-                    LabeledContent("Last test") { Text(Date(timeIntervalSince1970: lastTest), format: .dateTime.month().day().hour().minute()) }
-                } else { Text("Test a backup to record a recovery check.").foregroundStyle(ArithenPalette.color(.muted)) }
-            } header: { Text("Recovery checks") } footer: {
-                Text("A recovery test checks the file you select, not all your backups. A screenshot of the key does not contain your photos.")
-            }
         }.navigationTitle("Backup Status").navigationBarTitleDisplayMode(.inline)
     }
 }
 
-private struct LastSavedBackupSettingsView: View {
-    @AppStorage("lastEncryptedExport") private var lastExport = 0.0
-    @AppStorage("lastBackupFilename") private var filename = ""
-    @AppStorage("lastBackupFolder") private var savedFolder = ""
-    @AppStorage("libraryNeedsBackup") private var needsBackup = true
-    var body: some View {
-        ThemedList {
-            Section {
-                if lastExport > 0 {
-                    LabeledContent("Saved") { Text(Date(timeIntervalSince1970: lastExport), format: .dateTime.month().day().hour().minute()) }
-                    if !savedFolder.isEmpty { LabeledContent("Folder", value: savedFolder) }
-                    Text(filename).font(.subheadline).textSelection(.enabled)
-                    if needsBackup { Label("New changes need another backup", systemImage: "exclamationmark.circle") }
-                } else { Text("No backup has been saved and checked yet.").foregroundStyle(ArithenPalette.color(.muted)) }
-            } footer: {
-                if lastExport > 0 { Text("Find this filename in Files. A successful save does not confirm cloud upload.") }
-            }
-        }.navigationTitle("Last Saved Copy").navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 struct BackupRemindersSettingsView: View {
-    @AppStorage("privateBackupReminders") private var reminders = false
+    @AppStorage("privateBackupReminders") private var reminders = true
     var body: some View {
         ThemedForm {
             Section {
@@ -119,7 +114,7 @@ struct BackupHelpSettingsView: View {
             Section {
                 NavigationLink { SharedBackupGuide() } label: { SettingsRow("How to Import from Files", symbol: "square.and.arrow.down") }
             } header: { Text("Import") } footer: {
-                Text("Files → Share → LiveContainer → Arithen. Unlock the library, then tap Backup received or Import Backup in Backup Center. You can add another backup any time.")
+                Text("Receive a backup in Files, then add it through Import Backup. You can import another backup any time.")
             }
             Section("Recovery") {
                 NavigationLink { RecoveryKeyHelpView() } label: { SettingsRow("Recovery Key", symbol: "key") }

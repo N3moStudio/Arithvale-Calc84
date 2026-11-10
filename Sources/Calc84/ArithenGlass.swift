@@ -24,10 +24,9 @@ struct ArithenGlass<S: InsettableShape>: ViewModifier {
     var interactive = true
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
-    @AppStorage(ArithenPalette.surfaceKey) private var surface = ThemeSurface.theme.rawValue
     @Environment(\.arithenTheme) private var theme
     func body(content: Content) -> some View {
-        if surface != ThemeSurface.glass.rawValue || reduceTransparency || contrast == .increased {
+        if reduceTransparency || contrast == .increased {
             content.background(ArithenPalette.color(prominent ? .accent : .surface, theme: theme), in: shape)
                 .overlay(shape.strokeBorder(ArithenPalette.color(.text, theme: theme).opacity(contrast == .increased ? 0.4 : 0.12), lineWidth: 1).allowsHitTesting(false))
         } else if #available(iOS 26.0, *) {

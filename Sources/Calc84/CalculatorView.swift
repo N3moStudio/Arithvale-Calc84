@@ -18,7 +18,6 @@ struct CalculatorView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
-    @AppStorage(ArithenPalette.surfaceKey) private var surface = ThemeSurface.theme.rawValue
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var textSize
     @AppStorage("calculatorGlassTint") private var glassTintValue = GlassTint.plum.rawValue
@@ -157,7 +156,7 @@ struct CalculatorView: View {
         return Button { press(value) } label: {
             Text(value).font(.system(size: min(29, side * 0.36), weight: .regular, design: .rounded))
                 .frame(width: side, height: side)
-                .foregroundStyle(ArithenPalette.color(operation && (surface != "glass" || reduceTransparency || contrast == .increased) ? .onAccent : .text, theme: theme))
+                .foregroundStyle(ArithenPalette.color(operation && (reduceTransparency || contrast == .increased) ? .onAccent : .text, theme: theme))
                 .modifier(ArithenGlass(tint: glassTint, shape: Circle(), prominent: operation))
         }.accessibilityLabel(label(for: value))
     }

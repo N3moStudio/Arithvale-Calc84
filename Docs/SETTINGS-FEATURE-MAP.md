@@ -1,5 +1,22 @@
 # Native Settings Kit adoption — Arithen
 
+## November 8 correction map (before implementation)
+
+The user requested independent Albums navigation, fewer duplicate routes, seven themes and Liquid Glass only. This supersedes the original surface-choice preservation below.
+
+| Feature / existing owner | New home / behavior |
+| --- | --- |
+| Library/Albums/Search filters and selection, LibraryView | Independent tab screens and Albums path; Recently Deleted stays in Albums; reselecting Albums pops its path |
+| BackupDocumentPicker / BackupFolder bookmark / VaultModel.connectBackupFolder | Connected Folder owns its visible picker and result; validate one external directory, bookmark round-trip and real write/read before connection; cancellation and unsupported-host guidance remain visible |
+| Create/Import/RecoveryTestView | Main Backups: Create Backup, Import Backup, Check a Backup; check is nondestructive and not duplicated under Help |
+| Last Saved Copy / RecoveryEvidenceStore | Backup Status shows the saved filename/date and matching verification evidence in place; remove redundant historical-test and nested copy pages |
+| BackupCoverageView provider links | Direct CloudProviderView(provider:) links; provider credentials and policy unchanged |
+| LibraryStorageView | Settings → Storage, no Recently Deleted navigation or Open Backup Center loop; app-specific storage wording |
+| privateBackupReminders / cloudUseCellular | Default true for missing preferences; preserve explicit saved false values |
+| Share receipt and import models | One compact instruction component with separate Direct install and LiveContainer routes; received-copy and key gates unchanged |
+| ArithenTheme / ThemeSurface / AppearanceRoot | Seven selectable themes; retired Titanium decodes to Bloom; fixed Liquid Glass with accessibility/older-iOS fallback; old surface values remain decodable |
+| Back/Done/lock/progress/error/cancel | Keep native Back, existing state and security gates; no duplicate navigation roots inside pushed settings |
+
 Prepared before moving controls, November 7, 2026. Scope: presentation and navigation grouping only. Kit 0.1.0 is a reference; the app keeps its own palette, models, persistence, and navigation owner.
 
 ## Starting state

@@ -11,6 +11,7 @@ struct VaultSettingsView: View {
             Section("Library") {
                 NavigationLink { BackupSettingsView() } label: { SettingsRow("Backups", symbol: "externaldrive") }
                 NavigationLink { CloudBackupView() } label: { SettingsRow("Cloud Copies", symbol: "icloud") }
+                NavigationLink { LibraryStorageView() } label: { SettingsRow("Storage", symbol: "internaldrive") }
                 NavigationLink { PrivacyAccessView() } label: { SettingsRow("Privacy & Access", symbol: "lock") }
             }
             Section("Help") {
@@ -52,23 +53,21 @@ struct RecoveryKeyHelpView: View {
                 Text("The app does not keep a viewable copy of your recovery key. The old key for a source backup cannot open a newer library created with a different key.")
                 Text("Your calculator code opens this installation. It cannot decrypt a backup by itself.")
             }
-            Section {
-                NavigationLink("Test a Backup & Key") { RecoveryTestView() }
-            } footer: { Text("Adding items from a different backup keeps this library’s key. The source key only opens the backup you are adding.") }
+            Section { Text("Adding items from a different backup keeps this library’s key. The source key only opens the backup you are adding.") }
         }.navigationTitle("Recovery Key").navigationBarTitleDisplayMode(.inline)
     }
 }
 
 private enum BackupSheet: Identifiable {
-    case folder, save(PreparedBackup)
-    var id: String { switch self { case .folder: return "folder"; case .save(let request): return request.id.uuidString } }
+    case save(PreparedBackup)
+    var id: String { switch self { case .save(let request): return request.id.uuidString } }
 }
 
 struct BackupSettingsView: View {
     @EnvironmentObject private var vault: VaultModel
     @AppStorage("backupFolderName") private var folderName = "Not connected"
-    @AppStorage("privateBackupReminders") private var reminders = false
-    // Export/picker ownership stays here while detail pages only invoke these bindings/actions.
+    @AppStorage("privateBackupReminders") private var reminders = true
+    // This screen owns exports; the visible Connected Folder page owns its folder picker.
     @State private var sheet: BackupSheet?
     @State private var activeExport: PreparedBackup?
     @State private var picked: BackupSelection?
@@ -86,7 +85,7 @@ struct BackupSettingsView: View {
                 .disabled(vault.busy)
                 NavigationLink { BackupImportView() } label: { SettingsRow("Import Backup", symbol: "externaldrive.badge.plus") }
                     .disabled(vault.busy)
-                NavigationLink { RecoveryTestView() } label: { SettingsRow("Test Backup", symbol: "checkmark.shield") }
+                NavigationLink { RecoveryTestView() } label: { SettingsRow("Check a Backup", symbol: "checkmark.shield") }
                     .disabled(vault.busy)
             } footer: {
                 VStack(alignment: .leading, spacing: 12) {
@@ -97,7 +96,7 @@ struct BackupSettingsView: View {
             BackupActivitySection()
             Section("Save & status") {
                 NavigationLink {
-                    ConnectedBackupFolderSettings { sheet = .folder }
+                    ConnectedBackupFolderSettings()
                 } label: { SettingsRow("Connected Folder", symbol: "folder", detail: folderName) }
                 NavigationLink { BackupStatusSettingsView() } label: { SettingsRow("Backup Status", symbol: "checkmark.shield") }
             }
@@ -105,26 +104,18 @@ struct BackupSettingsView: View {
                 NavigationLink { BackupRemindersSettingsView() } label: {
                     SettingsRow("Backup Reminders", symbol: "bell", value: reminders ? "On" : "Off")
                 }
-                NavigationLink { LibraryStorageView() } label: { SettingsRow("Storage", symbol: "internaldrive") }
             }
             Section {
                 NavigationLink { BackupHelpSettingsView() } label: { SettingsRow("Backup Help", symbol: "questionmark.circle") }
             }
         }
-        .navigationTitle("Backup Center").navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Backups").navigationBarTitleDisplayMode(.inline)
         .onDisappear { if activeExport == nil { preparation?.cancel() } }
         .sheet(item: $sheet, onDismiss: {
             if let activeExport { vault.finishBackupExport(activeExport, destination: picked?.url) }
-            else if let picked { vault.connectBackupFolder(picked.url) }
             activeExport = nil; picked = nil
         }) { request in
             switch request {
-            case .folder:
-                BackupDocumentPicker(purpose: .folder) { url in
-                    guard sheet != nil else { return }
-                    picked = url.map { BackupSelection($0) }
-                    sheet = nil
-                }
             case .save(let backup):
                 BackupDocumentPicker(purpose: .save(backup.url)) { url in
                     guard sheet != nil else { return }

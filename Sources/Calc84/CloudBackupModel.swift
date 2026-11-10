@@ -27,7 +27,7 @@ final class CloudBackupModel: ObservableObject {
     private var operation: Task<Void, Never>?
     private var stores: [CloudProvider: any CloudStore] = [:]
     private var operationID = UUID()
-    var wifiOnly: Bool { !UserDefaults.standard.bool(forKey: "cloudUseCellular") }
+    var wifiOnly: Bool { !AppPreferences.cellular() }
 
     func refresh() {
         for provider in CloudProvider.allCases {

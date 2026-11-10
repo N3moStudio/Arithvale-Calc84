@@ -2,10 +2,10 @@ import Foundation
 
 /// Interface style and Home Screen artwork deliberately have separate storage.
 public enum ArithenTheme: String, CaseIterable, Identifiable, Sendable {
-    case glacier, afterhours, porcelain, ion, ember, bloom, blueprint, titanium
+    case glacier, afterhours, porcelain, ion, ember, bloom, blueprint
     public static let defaultStyle = ArithenTheme.bloom
     /// Retired themes map to the current default so old backups and saved choices still load.
-    public static let retiredStyles: [String: ArithenTheme] = ["abyss": .bloom]
+    public static let retiredStyles: [String: ArithenTheme] = ["abyss": .bloom, "titanium": .bloom]
     public var id: String { rawValue }
     public var title: String { rawValue.capitalized }
     public var detail: String {
@@ -17,7 +17,6 @@ public enum ArithenTheme: String, CaseIterable, Identifiable, Sendable {
         case .ember: return "Copper & charcoal"
         case .bloom: return "Petal pink & berry"
         case .blueprint: return "Paper & cobalt"
-        case .titanium: return "Platinum & ink"
         }
     }
     public var cornerRadius: Double { self == .afterhours ? 28 : self == .porcelain ? 13 : 20 }
@@ -50,9 +49,6 @@ public enum ArithenTheme: String, CaseIterable, Identifiable, Sendable {
         case .blueprint:
             light = [0x2151C7, 0xFFFFFF, 0x415C8C, 0xEDF2FF, 0xFFFFFF, 0x132747, 0x526582]
             night = [0xA8C4FF, 0x10275C, 0xB2C4E6, 0x111B30, 0x202F4A, 0xF0F5FF, 0xB6C5DF]
-        case .titanium:
-            light = [0x475465, 0xFFFFFF, 0x536174, 0xF1F3F6, 0xFFFFFF, 0x222830, 0x5D6877]
-            night = [0xD4DCE8, 0x202731, 0xBBC8DA, 0x15171B, 0x242830, 0xF2F5FA, 0xB6C0CE]
         }
         let index: Int
         switch ink { case .accent: index = 0; case .onAccent: index = 1; case .secondary: index = 2
@@ -69,7 +65,7 @@ public enum ThemeSurface: String, Codable, CaseIterable, Sendable {
 }
 public extension ArithenTheme {
     var colorMode: String { switch self {
-    case .afterhours, .ion, .ember, .titanium: "dark"
+    case .afterhours, .ion, .ember: "dark"
     case .porcelain, .bloom, .blueprint: "light"
     case .glacier: "system"
     } }

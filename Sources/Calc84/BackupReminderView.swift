@@ -5,7 +5,7 @@ import CalcCore
 struct BackupReminderView: View {
     @EnvironmentObject private var vault: VaultModel
     @Environment(\.scenePhase) private var scene
-    @AppStorage("privateBackupReminders") private var enabled = false
+    @AppStorage("privateBackupReminders") private var enabled = true
     @AppStorage("libraryNeedsBackup") private var changed = true
     @AppStorage("lastEncryptedExport") private var saved = 0.0
     @AppStorage("backupReminderSnoozedUntil") private var snoozed = 0.0

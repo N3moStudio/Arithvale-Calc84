@@ -18,7 +18,7 @@ struct LibraryStorageView: View {
     private func size(_ value: Int64) -> String { ByteCountFormatter.string(fromByteCount: value, countStyle: .file) }
     var body: some View {
         ThemedList {
-            Section("On this phone") {
+            Section("In this app") {
                 if let report {
                     LabeledContent("Encrypted library", value: size(report.encryptedBytes))
                     storageRow("Photos", items: active.filter { UTType($0.contentType)?.conforms(to: .image) == true })
@@ -32,9 +32,6 @@ struct LibraryStorageView: View {
             Section {
                 NavigationLink("Largest Items · \(active.count)") {
                     StorageItemsView(title: "Largest Items", items: largest, bytes: report?.resourceBytes ?? [:])
-                }
-                NavigationLink("Recently Deleted") {
-                    StorageItemsView(title: "Recently Deleted", items: vault.items.filter { $0.visible && $0.deletedAt != nil }, bytes: report?.resourceBytes ?? [:], deleted: true)
                 }
             } footer: { Text("Sizes include encrypted originals, Live Photo motion and previews. Recently Deleted still uses space until you explicitly remove those copies permanently.") }
             Section {
@@ -55,7 +52,6 @@ struct LibraryStorageView: View {
             } header: { Text("Review duplicates") } footer: { Text("Checks authenticated originals, including Live Photo motion. Similar-looking photos are not treated as duplicates. Nothing is selected or deleted automatically.") }
             Section("Before your next backup") {
                 StorageEstimateView(bytes: vault.items.reduce(Int64(0)) { $0 + Int64($1.byteCount) }, copies: 2)
-                NavigationLink("Open Backup Center") { BackupSettingsView() }
             }
             if let error { Section { Text(error).foregroundStyle(ArithenPalette.color(.muted)); Button("Retry Measurement") { Task { await refresh() } } } }
         }.navigationTitle("Storage").navigationBarTitleDisplayMode(.inline)
