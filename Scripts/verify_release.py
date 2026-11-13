@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import platform
+import plistlib
 import re
 import shutil
 import subprocess
@@ -35,6 +36,15 @@ def main():
     parser.add_argument('--python', default=sys.executable)
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
+    # Fail before an expensive native build if release identity files drift.
+    brand = json.loads((ROOT / 'Brand.json').read_text())
+    with (ROOT / 'Sources/Calc84/Info.plist').open('rb') as stream:
+        metadata = plistlib.load(stream)
+    for key, expected in [('CFBundleShortVersionString', brand['version']),
+                          ('CFBundleVersion', brand['build']),
+                          ('CFBundleDisplayName', brand['displayName'])]:
+        if metadata.get(key) != expected:
+            raise SystemExit(f'Release metadata mismatch: {key}; update Info.plist to match Brand.json')
     run = args.output or ROOT / '.build' / 'verification' / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'-'+uuid.uuid4().hex[:6])
     run = run.resolve(); run.mkdir(parents=True, exist_ok=False)
     # Apple builds use system CryptoKit and have no Swift package dependencies.

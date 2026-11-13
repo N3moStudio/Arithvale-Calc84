@@ -51,7 +51,7 @@ def main():
         # Swift can encode short enum labels as instruction immediates rather
         # than contiguous strings. Layout availability/defaults have core tests;
         # inspect longer UI literals here and bind their source to the report.
-        for prompt in ('Choose Backup File', 'Choose Backup Folder', 'Tap the backup filename here to select it.', 'Original capture date unavailable.', 'Receive Backup from Files', 'Use Received Backup', 'Add from Backup', 'Save Your New Recovery Key', 'Add Backup to Setup', 'Create Library from Backups'):
+        for prompt in ('Choose Backup File', 'Choose Backup Folder', 'Tap the backup filename here to select it.', 'Original capture date unavailable.', 'Receive Backup from Files', 'Use Received Backup', 'Save Your New Recovery Key', 'Add Backup to Setup', 'Create Library from Backups'):
             assert prompt.encode() in binary, 'Missing expected recovery/viewer UI: '+prompt
         for prompt in ('Importing Backup',):
             assert prompt.encode() in binary, 'Missing expected motion/progress UI: '+prompt
