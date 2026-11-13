@@ -194,6 +194,9 @@ struct BackupDocumentPicker: UIViewControllerRepresentable {
     let purpose: Purpose
     let finished: (URL?) -> Void
     var failure: ((String) -> Void)? = nil
+    init(purpose: Purpose, failure: ((String) -> Void)? = nil, finished: @escaping (URL?) -> Void) {
+        self.purpose = purpose; self.failure = failure; self.finished = finished
+    }
     func makeCoordinator() -> Coordinator { Coordinator(finished, failure: failure) }
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let picker: UIDocumentPickerViewController

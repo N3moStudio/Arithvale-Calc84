@@ -73,14 +73,14 @@ struct ConnectedBackupFolderSettings: View {
                     notice = "Files closed without returning a folder. Your existing connection is unchanged."
                 }
             }) { presented in
-                BackupDocumentPicker(purpose: .connectFolder, finished: { url in
+                BackupDocumentPicker(purpose: .connectFolder, failure: { message in
+                    guard request?.id == presented.id else { return }
+                    notice = message; request = nil
+                }, finished: { url in
                     guard request?.id == presented.id else { return }
                     picked = url.map { BackupSelection($0) }
                     if url == nil { notice = "No folder selected. Your existing connection is unchanged." }
                     request = nil
-                }, failure: { message in
-                    guard request?.id == presented.id else { return }
-                    notice = message; request = nil
                 })
             }
     }

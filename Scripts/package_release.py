@@ -57,7 +57,7 @@ def main():
             assert prompt.encode() in binary, 'Missing expected motion/progress UI: '+prompt
         for prompt in ('Reset Appearance', 'Import from Files'):
             assert prompt.encode() in binary, 'Missing expected appearance UI: '+prompt
-        for prompt in ('Your backup copies', 'Optional recovery check not run.',
+        for prompt in ('Your backup copies', 'Optional recovery check not run',
                        'Photo Indexing', 'Index New Photos', 'Find Exact Duplicates',
                        'Tags, separated by commas', 'In Files, share the downloaded file, then unlock your library.'):
             assert prompt.encode() in binary, 'Missing expected library UI: '+prompt
