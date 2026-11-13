@@ -1,5 +1,9 @@
 # Arithen handoff
 
+## Latest follow-up — November 12, 2026
+
+User reported duplicate glass bar, requested direct Files import for FlareStore, shorter settings, and explicitly confirmed locked erase/start-over. See DIRECT-FILES-AND-RESET.md and the feature map. Source validation uses validate.yml, without IPA packaging. The delivered 0.12.5 build 21 predates these follow-up changes. Keep the existing 160160 recovery entry; it never unlocks photos. Never perform a real reset on the user's library during testing. Native UI, file-provider behavior and FlareStore-signed runtime still require device acceptance.
+
 ## Current work — November 12, 2026
 
 Target 0.12.5 build 21 on main. User authorized public repository and GitHub build; GitHub confirmed the repository is already public. New original additions have reserved rights, with historical MIT and third-party exclusions. This section supersedes older settings/surface/build instructions below.

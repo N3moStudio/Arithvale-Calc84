@@ -1,0 +1,39 @@
+name: Validate Arithen source
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: macos-26-intel
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          brew install xtool-org/tap/xtool
+          python3 -m venv .build/ci-python
+          .build/ci-python/bin/pip install -r Scripts/recovery-requirements.txt
+          python3 Scripts/prepare_mega.py
+      - name: Core and recovery tests
+        run: python3 Scripts/verify_release.py --python "$PWD/.build/ci-python/bin/python"
+      - name: Compile iPhone app without packaging an IPA
+        run: |
+          export ARITHEN_IOS_SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
+          mkdir -p .build/native-validation
+          set +e
+          xtool dev build --configuration release > .build/native-validation/ios-build.log 2>&1
+          result=$?
+          printf '%s\n' "$result" > .build/native-validation/exit-code.txt
+          if [ "$result" -ne 0 ]; then tail -n 120 .build/native-validation/ios-build.log; fi
+          exit "$result"
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arithen-Checks-${{ github.sha }}
+          path: |
+            .build/verification/
+            .build/native-validation/
+          include-hidden-files: true
+          if-no-files-found: error

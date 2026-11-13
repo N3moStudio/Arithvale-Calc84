@@ -25,7 +25,7 @@ struct CloudBackupView: View {
                 }
             } footer: {
                 Text(restoring ? "Use the recovery key belonging to the saved library. Cloud sign-in alone cannot decrypt it."
-                     : "Only eligible items and their thumbnails, Live Photo videos, and dates are included. Each provider starts with no items selected.")
+                     : "Only items chosen for each service are uploaded.")
             }
             Section("Your services") {
                 ForEach(CloudProvider.allCases) { provider in

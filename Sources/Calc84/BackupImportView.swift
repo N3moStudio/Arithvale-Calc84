@@ -72,8 +72,20 @@ struct BackupImportView: View {
             } else {
                 ThemedForm {
                     Section {
-                        SharedImportInstructions().foregroundStyle(ArithenPalette.color(.muted))
-                        if let entry = shared.entry { Label(entry.displayName, systemImage: "doc.badge.arrow.up").font(.subheadline) }
+                        Button("Choose Backup File", systemImage: "doc") {
+                            usedReceipt = nil; input.choose(.file)
+                        }.disabled(input.working || review.working || vault.busy)
+                        if let backup = input.backup {
+                            Label(backup.displayName, systemImage: "doc.badge.checkmark").font(.subheadline)
+                        }
+                        DisclosureGroup("Or share from Files") {
+                            SharedImportInstructions().foregroundStyle(ArithenPalette.color(.muted))
+                            if let entry = shared.entry {
+                                Button("Use Received Backup") { receiveBackup() }
+                                    .disabled(input.working || review.working || vault.busy)
+                                Text(entry.displayName).font(.caption)
+                            }
+                        }
                         SecureField("Backup recovery key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
                         Button("Import") {
                             if let backup = input.backup { review.prepare(backup, key: key); key = "" }
@@ -84,6 +96,7 @@ struct BackupImportView: View {
                             OperationProgressView(title: "Importing Backup", detail: vault.importing ? vault.status : review.phase)
                         }
                         if let error = shared.error ?? input.error ?? review.error { Text(error).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)) }
+                        if let notice = input.notice { Text(notice).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)) }
                     }
                     if shared.entry != nil {
                         Section { Button("Remove Received Copy", role: .destructive) { removeReceived = true }
@@ -93,6 +106,7 @@ struct BackupImportView: View {
             }
         }
         .navigationTitle("Add from Backup")
+        .backupPicker(input)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .cancellationAction) {
             Button(vault.importing ? "Cancel Import" : "Close") {
@@ -131,7 +145,7 @@ struct BackupImportView: View {
         } message: { Text(importError ?? "") }
     }
     private func receiveBackup() {
-        guard !input.working, !review.working, !vault.busy, let entry = shared.entry else { return }
+        guard input.request == nil, !input.working, !review.working, !vault.busy, let entry = shared.entry else { return }
         usedReceipt = entry.url; input.prepare(entry.url, displayName: entry.displayName)
     }
 }

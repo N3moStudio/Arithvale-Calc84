@@ -159,3 +159,12 @@ call `initializeFromBackups`. Existing-library `Add from Backup` remains separat
 
 The calculator's existing press feedback, all six layouts, Clear Glass default,
 encrypted storage and backup compatibility remain unchanged by the motion work.
+
+
+### Direct Files and locked reset follow-up
+
+- `SharedFilesImportView.swift`: direct multi-file system picker and existing encrypted inbox staging.
+- `BackupImportView.swift`: direct backup picker plus shared-backup route.
+- `EraseLibraryView.swift`: typed ERASE plus destructive confirmation; `VaultModel.eraseLockedLibrary` coordinates reset, `VaultRepository.erase(expectedID:)` limits deletion to the confirmed library.
+- `VaultResetTests.swift`: old identity rejection, fresh vault keys, external backup preservation.
+- `.github/workflows/validate.yml`: core/recovery tests and native compilation without IPA packaging.

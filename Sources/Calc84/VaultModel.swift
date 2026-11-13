@@ -166,6 +166,33 @@ final class VaultModel: ObservableObject {
         if let pendingBackup { finishBackupExport(pendingBackup, destination: nil) }
         lockTask = Task { await engine.lock(); exists = await engine.exists() }
     }
+    func eraseLockedLibrary(confirmation: String) async -> Bool {
+        guard confirmation == "ERASE", exists, !unlocked, !busy, !cloud.running else { return false }
+        lock()
+        busy = true
+        defer { busy = false }
+        let ticket = generation
+        await lockTask?.value
+        do {
+            let id = try await engine.identifier()
+            guard ticket == generation else { return false }
+            try await engine.erase(expectedID: id)
+            exists = false
+            TemporaryFiles.clean()
+            BackupFolder.forget() // Disconnect only; never remove an external copy.
+            for key in ["lastBackupDigest", "lastBackupLibraryID", "lastBackupFilename", "lastBackupFolder",
+                        "lastEncryptedExport", "backupReminderSnoozedUntil", "libraryNeedsBackup", RecoveryEvidenceStore.key] {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+            do { try await deviceAccess.forget(for: id) }
+            catch { message = "The library was erased, but secure-code cleanup failed. " + error.localizedDescription }
+            return true
+        } catch {
+            exists = await engine.exists()
+            message = "Couldn’t finish erasing the library. " + error.localizedDescription
+            return false
+        }
+    }
     func changed() {
         if !UserDefaults.standard.bool(forKey: "libraryNeedsBackup") {
             UserDefaults.standard.set(true, forKey: "libraryNeedsBackup")

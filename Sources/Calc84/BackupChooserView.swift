@@ -133,8 +133,8 @@ struct BackupInputSection: View {
             if let notice = input.notice { Text(notice).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)).accessibilityIdentifier("backup.pickerNotice") }
         } header: { Text("Encrypted Backup") } footer: {
             VStack(alignment: .leading, spacing: 8) {
-                Text("File: tap the backup itself. Folder: open the folder containing it, tap Open, then tap the filename in the list above. Opening a folder alone does not select a backup.")
-                Text("If the picker closes or will not select the file, use Receive Backup from Files above. That route bypasses this picker.")
+                Text("Choose a backup file or browse its folder.")
+                Text("Sharing from Files is also available.")
             }
         }.disabled(input.working || !enabled)
     }

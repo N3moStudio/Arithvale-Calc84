@@ -13,7 +13,11 @@ struct LibraryView: View {
     var body: some View {
         TabView(selection: Binding(get: { navigation.selected }, set: { navigation.select($0) })) {
             ForEach(LibraryTab.allCases, id: \.self) { tab in
-                LibraryPane(pageTab: tab, navigation: $navigation, close: close).tag(tab)
+                LibraryPane(pageTab: tab, navigation: $navigation, close: close)
+                    // Visibility preferences must originate inside each tab, not
+                    // above TabView, or iOS can show an empty second glass bar.
+                    .toolbar(.hidden, for: .tabBar)
+                    .tag(tab)
             }
         }.toolbar(.hidden, for: .tabBar)
     }
@@ -76,11 +80,13 @@ private struct LibraryPane: View {
             screen(albumDetail: false)
                 .navigationTitle(pageTab.rawValue)
                 .toolbar(.hidden, for: .navigationBar)
+                .toolbar(.hidden, for: .tabBar)
                 .navigationDestination(for: String.self) { route in
                     screen(albumDetail: true)
                         .navigationTitle(selecting ? "\(selection.count.formatted()) Selected" : albumTitle(route))
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar(.visible, for: .navigationBar)
+                        .toolbar(.hidden, for: .tabBar)
                         .toolbar {
                             ToolbarItemGroup(placement: .topBarTrailing) {
                                 if selecting { Button("Cancel") { selection = []; selecting = false } }

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased · Direct Files and recovery reset
+
+- Hide the duplicate native tab bar while retaining the custom dock and independent Albums navigation.
+- Add Choose Backup File and multi-file Choose Files alongside sharing; keep authenticated backup checks and encrypted inbox staging.
+- Add locked-library Erase and Start Over with typed confirmation, final destructive confirmation, identity-bound erasure and fresh setup keys. External backups stay untouched.
+- Keep 160160 as recovery/setup entry, never an unlock code. Retain existing-code access and recovery-key authentication.
+- Shorten primary settings text; keep optional help, error feedback and data-loss warnings.
+- Add source-only GitHub validation (core/recovery tests and iPhone compile, no IPA). See Docs/DIRECT-FILES-AND-RESET.md for platform research and device checks.
+
 ## 0.12.5 · Focused settings and independent album navigation
 
 **November 12, 2026 · Build 21 · Test build**

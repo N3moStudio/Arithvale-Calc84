@@ -33,8 +33,8 @@ struct RecoveryTestView: View {
     @State private var passed = false
     var body: some View {
         ThemedForm {
-            SharedBackupSection(input: backupInput)
             BackupInputSection(input: backupInput, enabled: !vault.busy)
+            SharedBackupSection(input: backupInput)
             Section {
                 Text("Check that this file and recovery key can restore your photos without changing your library. Extra temporary space is required.")
                 SecureField("Recovery key or original password", text: $secret)

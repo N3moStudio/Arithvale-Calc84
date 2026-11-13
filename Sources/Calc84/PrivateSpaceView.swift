@@ -12,11 +12,9 @@ struct PrivateSpaceView: View {
     @EnvironmentObject private var vault: VaultModel
     let close: () -> Void
     var body: some View {
-        NavigationStack {
-            Group {
-                if vault.unlocked { LibraryView(close: close) }
-                else { AccessView(close: close) }
-            }
+        Group {
+            if vault.unlocked { LibraryView(close: close) }
+            else { NavigationStack { AccessView(close: close) } }
         }.tint(CalcTheme.accent)
             .onChange(of: vault.unlocked) { old, new in if old && !new { close() } }
     }
@@ -49,7 +47,7 @@ private struct AccessView: View {
                         .foregroundStyle(CalcTheme.accent).accessibilityHidden(true)
                     Text(creating ? "A space of your own." : "Recover access.").font(.largeTitle.bold())
                     Text(creating ? "Your calculator code opens this phone. Your recovery key brings your files back on another."
-                         : "Use your recovery key, or the password from the original version 0.1. Your existing files won’t be replaced.")
+                         : "Enter your recovery key to keep your photos and set a new calculator code.")
                         .foregroundStyle(ArithenPalette.color(.muted))
                 }.padding(.vertical, 12)
             }
@@ -109,7 +107,7 @@ private struct AccessView: View {
             }
             Section {
                 SecureField("New calculator code", text: $code).keyboardType(.numberPad)
-                SecureField("Repeat calculator code", text: $confirmation).keyboardType(.numberPad)
+                SecureField("Confirm calculator code", text: $confirmation).keyboardType(.numberPad)
             } header: { Text("Calculator Code") } footer: {
                 if !code.isEmpty && !VaultCode.valid(code) { Text("Use 6–12 digits, different from 160160.") }
                 else if !confirmation.isEmpty && code != confirmation { Text("The codes don’t match yet.") }
@@ -127,6 +125,13 @@ private struct AccessView: View {
                 }.disabled(!canContinue)
                 if vault.busy && !vault.status.isEmpty { Text(vault.status).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)) }
             }
+            if !creating {
+                Section {
+                    Button("Use My Calculator Code") { vault.lock(); clearSecrets(); close() }
+                    NavigationLink("Erase and Start Over") { EraseLibraryView() }
+                        .foregroundStyle(.red).disabled(vault.busy)
+                }
+            }
         }
         .backupPicker(backupInput)
         .safeAreaInset(edge: .bottom) { Text(AppBrand.name + " " + AppBrand.version).font(.caption).foregroundStyle(ArithenPalette.color(.muted)).padding(6).frame(maxWidth: .infinity).background(.bar) }
@@ -136,7 +141,18 @@ private struct AccessView: View {
             Button(vault.busy ? "Cancel Setup" : "Calculator") { vault.lock(); clearSecrets(); close() }
         } }
         .onChange(of: vault.unlocked) { _, unlocked in if unlocked { clearSecrets() } }
-        .onChange(of: vault.generation) { _, _ in clearSecrets() }
+        .onChange(of: vault.generation) { _, _ in
+            clearSecrets()
+            if !vault.exists { setup = SetupSession() }
+        }
+        .onChange(of: vault.exists) { _, exists in
+            if !exists {
+                // Reset invalidates the old setup session. Generate a fresh key,
+                // never reuse an emptied or previously displayed recovery key.
+                clearSecrets(); setup = SetupSession(); restoring = false
+                backupInput.clearSelection()
+            }
+        }
         .onChange(of: restoring) { _, value in
             if !value { backups = []; password = ""; backupInput.clearSelection() }
         }

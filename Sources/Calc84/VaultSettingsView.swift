@@ -38,8 +38,8 @@ struct PrivacyAccessView: View {
                 NavigationLink { PrivateSearchSettings(search: vault.textSearch) } label: { SettingsRow("Photo Indexing", symbol: "text.viewfinder") }
             }
             Section("Private storage") {
-                Text("Your library stays encrypted in private app storage. Save an external backup before removing the app or its data container.")
-                Text("Exported originals are ordinary photos and videos. They may contain location information.")
+                Text("Keep an external backup before deleting this app.")
+                Text("Exported files are unencrypted and may include location.")
             }
 
         }.navigationTitle("Privacy & Access").navigationBarTitleDisplayMode(.inline)

@@ -3,6 +3,7 @@ import SwiftUI
 import Security
 import Combine
 import CalcCore
+import UniformTypeIdentifiers
 
 private actor SharedFilesStorage {
     private let inbox = SharedFileInbox(root: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("ArithenIncomingFiles"))
@@ -136,10 +137,16 @@ struct SharedFilesImportView: View {
     @EnvironmentObject private var vault: VaultModel
     @Environment(\.dismiss) private var dismiss
     @State private var removing = false
+    @State private var choosing = false
+    @State private var selectedFiles: [BackupSelection] = []
     var body: some View {
         ThemedForm {
             Section {
-                SharedImportInstructions().foregroundStyle(ArithenPalette.color(.muted))
+                Button("Choose Files", systemImage: "doc.on.doc") { choosing = true }
+                    .disabled(shared.working || vault.busy)
+                DisclosureGroup("Or share from Files") {
+                    SharedImportInstructions().foregroundStyle(ArithenPalette.color(.muted))
+                }
                 if !shared.entries.isEmpty { Label("\(shared.entries.count.formatted()) \(shared.entries.count == 1 ? "file received" : "files received")", systemImage: "doc.on.doc") }
                 if let count = shared.importedCount, count > 0 { Label("\(count.formatted()) \(count == 1 ? "file imported" : "files imported")", systemImage: "checkmark.circle") }
                 if shared.working { ProgressView(vault.importing ? "Importing…" : "Receiving…") }
@@ -151,10 +158,48 @@ struct SharedFilesImportView: View {
                 Section { Button("Remove Received Copies", role: .destructive) { removing = true }.disabled(shared.working || vault.busy) }
             }
         }.navigationTitle("Import from Files").navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $choosing, onDismiss: {
+                // Hold temporary access until the encrypted inbox takes ownership.
+                let pending = selectedFiles; selectedFiles = []
+                for selection in pending { shared.receive(selection.url) }
+                withExtendedLifetime(pending) {}
+            }) {
+                SelectedFilesPicker { urls in
+                    selectedFiles = urls.map { BackupSelection($0) }
+                    choosing = false
+                }
+            }
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
             .confirmationDialog("Remove received copies?", isPresented: $removing, titleVisibility: .visible) {
                 Button("Remove Copies", role: .destructive) { shared.discard() }
             } message: { Text("The originals in Files stay where they are.") }
+    }
+}
+
+/// Direct installations use the system picker; sharing remains available for hosts
+/// that cannot deliver document selections. Both routes use the encrypted inbox.
+private struct SelectedFilesPicker: UIViewControllerRepresentable {
+    let finished: ([URL]) -> Void
+    func makeCoordinator() -> Coordinator { Coordinator(finished) }
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.data], asCopy: true)
+        picker.allowsMultipleSelection = true
+        picker.shouldShowFileExtensions = true
+        picker.delegate = context.coordinator
+        return picker
+    }
+    func updateUIViewController(_ controller: UIDocumentPickerViewController, context: Context) {}
+    static func dismantleUIViewController(_ controller: UIDocumentPickerViewController, coordinator: Coordinator) {
+        controller.delegate = nil; coordinator.finished = nil
+    }
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        var finished: (([URL]) -> Void)?
+        init(_ finished: @escaping ([URL]) -> Void) { self.finished = finished }
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { complete(urls) }
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { complete([]) }
+        private func complete(_ urls: [URL]) {
+            let callback = finished; finished = nil; callback?(urls)
+        }
     }
 }
 

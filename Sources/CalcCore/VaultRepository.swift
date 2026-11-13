@@ -51,6 +51,16 @@ public final class VaultRepository {
         return VaultCredential(id: header.id, key: key.withUnsafeBytes { Data($0) })
     }
     public func identifier() throws -> UUID { try readHeader().id }
+    /// Explicit destructive reset only. Bind confirmation to the library identity
+    /// so a stale request cannot erase a replacement library or external backups.
+    public func erase(expectedID: UUID) throws {
+        guard try identifier() == expectedID else { throw VaultError.changed }
+        guard try root.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
+            throw VaultError.changed
+        }
+        lock()
+        try fm.removeItem(at: root)
+    }
     private func readHeader() throws -> VaultHeader {
         let h = try JSONDecoder().decode(VaultHeader.self, from: Self.read(root.appendingPathComponent("header.json"), limit: 4096))
         try h.validate(); return h

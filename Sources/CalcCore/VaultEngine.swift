@@ -18,6 +18,7 @@ public actor VaultEngine {
         return repository.items
     }
     public func lock() { repository.lock() }
+    public func erase(expectedID: UUID) throws { try repository.erase(expectedID: expectedID) }
     public func add(data: Data, name: String, contentType: String) throws -> [VaultItem] {
         try repository.add(data: data, name: name, contentType: contentType)
         return repository.items

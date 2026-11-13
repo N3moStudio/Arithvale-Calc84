@@ -18,6 +18,11 @@ actor DeviceAccess {
          kSecAttrAccount as String: "local-library", kSecAttrSynchronizable as String: false]
     }
     func configured(for id: UUID) throws -> Bool { try load()?.credential.id == id }
+    func forget(for id: UUID) throws {
+        guard try load()?.credential.id == id else { return }
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else { throw keychainError(status) }
+    }
     func enroll(code: String, credential: VaultCredential) throws {
         guard VaultCode.valid(code) else { throw VaultError.invalidCode }
         let salt = VaultCode.salt()

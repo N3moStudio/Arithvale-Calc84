@@ -36,7 +36,7 @@ struct ConnectedBackupFolderSettings: View {
                     SettingsRow(BackupFolder.configured ? "Reconnect or Change Folder" : "Connect Backup Folder", symbol: "folder.badge.plus")
                 }.disabled(vault.busy)
             } footer: {
-                Text("Select the folder itself, then tap Open. If you are inside it, go back one level first. Only one folder can be connected.")
+                Text("Choose one folder outside this app.")
             }
             if let notice { Section { Text(notice).font(.subheadline) } }
             if BackupFolder.configured {
@@ -47,8 +47,8 @@ struct ConnectedBackupFolderSettings: View {
                         .onChange(of: automatic) { _, _ in vault.scheduleAutomaticBackup() }
                 } footer: {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("When there are changes, save at most once per 24 hours while the library is open. Back Up to Connected Folder still works anytime.")
-                        Text("Keep the latest 7 automatic copies. Cleanup requires a verified replacement and rechecked retained copies. Manual saves and existing older backups stay protected.")
+                        Text("Save changes once a day while the library is open.")
+                        Text("Keep 7 verified automatic copies. Manual saves and protected older backups stay.")
                     }
                 }
             }
@@ -102,7 +102,7 @@ struct BackupRemindersSettingsView: View {
             Section {
                 Toggle("Private Backup Reminders", isOn: $reminders)
             } footer: {
-                Text("Show a reminder inside the unlocked library when changes need a Files backup and the last saved copy is at least a week old, or no copy has been saved. Snooze it until tomorrow. No Lock Screen notifications.")
+                Text("Reminders appear only inside your unlocked library.")
             }
         }.navigationTitle("Backup Reminders").navigationBarTitleDisplayMode(.inline)
     }
@@ -114,7 +114,7 @@ struct BackupHelpSettingsView: View {
             Section {
                 NavigationLink { SharedBackupGuide() } label: { SettingsRow("How to Import from Files", symbol: "square.and.arrow.down") }
             } header: { Text("Import") } footer: {
-                Text("Receive a backup in Files, then add it through Import Backup. You can import another backup any time.")
+                Text("Choose a file or share it to Arithen.")
             }
             Section("Recovery") {
                 NavigationLink { RecoveryKeyHelpView() } label: { SettingsRow("Recovery Key", symbol: "key") }

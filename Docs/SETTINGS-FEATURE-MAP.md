@@ -82,3 +82,14 @@ Fill in Docs/SETTINGS-ADOPTION.md after checks. Source/token/syntax validation i
 
 
 November 12 integration: Check a Backup stays in main Backups; shared-file guidance distinguishes direct installation and LiveContainer. Folder connection verifies the resolved bookmark before replacing saved access. The model defaults preserve explicit opt-outs. Regression coverage: SettingsNavigationTests and ThemeAndInboxTests.
+
+## November 12 follow-up map
+
+| Action | Existing model/storage | Updated location/behavior |
+|---|---|---|
+| Library/Albums/Search | LibraryTabNavigation + per-tab state | Same custom dock; hide system bar from each tab's content |
+| Import backup | BackupInputModel + authenticated temporary copy | Add Choose Backup File beside existing shared-inbox import |
+| Import files | SharedFilesModel encrypted inbox | Add Choose Files; feed selections through the same encrypted inbox |
+| Recovery | VaultModel + DeviceAccess + encrypted VaultRepository | Keep starter entry and recovery-key authentication; add explicit destructive reset |
+| Start over | New identity-checked repository erase | Recovery detail page; typed ERASE then final confirmation; external copies untouched |
+| Backup help text | No stored preference changes | Short primary screens; detailed instructions remain in Backup Help/disclosures |

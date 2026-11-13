@@ -49,7 +49,7 @@ struct LibraryStorageView: View {
                         }
                     }
                 }
-            } header: { Text("Review duplicates") } footer: { Text("Checks authenticated originals, including Live Photo motion. Similar-looking photos are not treated as duplicates. Nothing is selected or deleted automatically.") }
+            } header: { Text("Review duplicates") } footer: { Text("Exact files only. Nothing is deleted automatically.") }
             Section("Before your next backup") {
                 StorageEstimateView(bytes: vault.items.reduce(Int64(0)) { $0 + Int64($1.byteCount) }, copies: 2)
             }
