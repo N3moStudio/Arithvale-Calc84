@@ -1,21 +1,28 @@
-MIT License
+Arithen - Reserved Rights Notice
+Copyright (c) 2026 HonorableLordFishy / N3mo Studio
 
-Copyright (c) 2026 HonorableLordFishy
+All rights reserved in original additions first published under this notice.
+This is source-available proprietary software, not an open-source license.
+Except for the exceptions below, no permission is granted to copy, modify,
+replicate, create derivative works from, redistribute, sublicense, sell, or
+commercially exploit this code or its original assets without prior written
+permission from the copyright holder. Public visibility is not such permission.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Exceptions and scope:
+1. GitHub and its users retain the rights required by GitHub's Terms of Service,
+   including viewing and forking public repositories through the service.
+2. This notice does not revoke licenses previously granted. Code published
+   under the MIT license through commit ad8af8d remains available under that
+   license; its original notice is preserved in Docs/LEGACY-MIT-LICENSE.txt.
+3. Third-party components and independently licensed material retain their
+   own terms. See Sources/Calc84/Resources/ThirdParty and
+   UI/NativeSettingsKit/LICENSES. This notice does not restrict those rights.
+4. Rights that cannot lawfully be excluded remain unaffected.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+No trademark license is granted. Arithen branding must not be used to imply
+endorsement or to pass off another product as an official release.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. TO THE EXTENT PERMITTED BY LAW, THE AUTHORS ARE NOT LIABLE
+FOR CLAIMS, DAMAGES OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR ITS USE.

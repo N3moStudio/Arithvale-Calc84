@@ -55,11 +55,11 @@ def main():
             assert prompt.encode() in binary, 'Missing expected recovery/viewer UI: '+prompt
         for prompt in ('Importing Backup',):
             assert prompt.encode() in binary, 'Missing expected motion/progress UI: '+prompt
-        for prompt in ('Reset Appearance', 'arithen.surface.v1', 'Import from Files'):
+        for prompt in ('Reset Appearance', 'Import from Files'):
             assert prompt.encode() in binary, 'Missing expected appearance UI: '+prompt
-        for prompt in ('Your backup copies', 'Recovery not yet tested for this exact backup',
+        for prompt in ('Your backup copies', 'Optional recovery check not run.',
                        'Photo Indexing', 'Index New Photos', 'Find Exact Duplicates',
-                       'Tags, separated by commas', 'In Files, share the files to LiveContainer, choose Arithen, then unlock the library.'):
+                       'Tags, separated by commas', 'In Files, share the downloaded file, then unlock your library.'):
             assert prompt.encode() in binary, 'Missing expected library UI: '+prompt
         assert binary[:4]==bytes.fromhex('cffaedfe') and int.from_bytes(binary[4:8],'little')==0x0100000C
         commands=struct.unpack_from('<I',binary,16)[0]; position=32; min_version=None; sdk=None

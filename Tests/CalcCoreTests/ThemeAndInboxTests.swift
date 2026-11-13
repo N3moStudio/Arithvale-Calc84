@@ -3,8 +3,10 @@ import XCTest
 
 final class ThemeAndInboxTests: XCTestCase {
     func testThemeDefaultsAndLegacyMigration() throws {
-        XCTAssertEqual(ArithenTheme.allCases.map(\.rawValue), ["glacier", "afterhours", "porcelain", "ion", "ember", "bloom", "blueprint", "titanium"])
+        XCTAssertEqual(ArithenTheme.allCases.map(\.rawValue), ["glacier", "afterhours", "porcelain", "ion", "ember", "bloom", "blueprint"])
         XCTAssertEqual(ArithenTheme(storedValue: nil), .bloom)
+        XCTAssertEqual(ArithenTheme(storedValue: "titanium"), .bloom)
+        XCTAssertEqual(try JSONDecoder().decode(ArithenTheme.self, from: Data("\"titanium\"".utf8)), .bloom)
         XCTAssertEqual(ArithenTheme(storedValue: "abyss"), .bloom)
         XCTAssertEqual(try JSONDecoder().decode(ArithenTheme.self, from: Data("\"abyss\"".utf8)), .bloom)
         XCTAssertThrowsError(try JSONDecoder().decode(ArithenTheme.self, from: Data("\"unknown\"".utf8)))
@@ -15,7 +17,7 @@ final class ThemeAndInboxTests: XCTestCase {
     func testWholeBloomPaletteAndThemeColorModes() {
         XCTAssertEqual(ArithenTheme.Ink.allCases.map { ArithenTheme.bloom.hex($0, dark: false) },
                        [0xA62E76, 0xFFFFFF, 0x81516C, 0xF8EFF3, 0xFFF9FC, 0x352131, 0x755C6D])
-        for theme in [ArithenTheme.afterhours, .ion, .ember, .titanium] { XCTAssertTrue(theme.isDark(systemDark: false)) }
+        for theme in [ArithenTheme.afterhours, .ion, .ember] { XCTAssertTrue(theme.isDark(systemDark: false)) }
         for theme in [ArithenTheme.porcelain, .bloom, .blueprint] { XCTAssertFalse(theme.isDark(systemDark: true)) }
         XCTAssertTrue(ArithenTheme.glacier.isDark(systemDark: true))
         XCTAssertFalse(ArithenTheme.glacier.isDark(systemDark: false))

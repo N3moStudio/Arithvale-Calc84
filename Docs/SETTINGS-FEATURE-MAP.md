@@ -79,3 +79,6 @@ All model/store names below remain the production implementations. â€œUnchangedâ
 ## Validation record
 
 Fill in Docs/SETTINGS-ADOPTION.md after checks. Source/token/syntax validation is not proof of native layout, permission flow, provider access, or actual gestures. Device acceptance must cover every moved destination, especially export picker cancellation, connected-folder actions, theme changes during navigation, large accessibility text, and Back/edge-swipe.
+
+
+November 12 integration: Check a Backup stays in main Backups; shared-file guidance distinguishes direct installation and LiveContainer. Folder connection verifies the resolved bookmark before replacing saved access. The model defaults preserve explicit opt-outs. Regression coverage: SettingsNavigationTests and ThemeAndInboxTests.

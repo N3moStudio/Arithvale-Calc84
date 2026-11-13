@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.5 · Focused settings and independent album navigation
+
+**November 12, 2026 · Build 21 · Test build**
+
+- Keep Recently Deleted inside Albums, preserve its route when switching tabs, and return to Albums home when reselecting the tab.
+- Put Check a Backup beside Create and Import; remove circular Storage/Backups routes and open only the chosen cloud provider.
+- Improve folder connection ownership, error handling and bookmark validation; clarify direct-install and LiveContainer sharing.
+- Default missing reminder/cellular preferences on without overwriting opt-outs. Standardize Liquid Glass with accessibility fallbacks; retire Titanium to Bloom.
+- Reserve rights in new original additions while retaining historical MIT rights and third-party notices.
+- GitHub native build and regression results are recorded with the artifact; physical-device folder/provider and layout acceptance remain required.
+
 ## 0.12.4 · Native settings presentation
 
 **November 7, 2026 · Build 20 · Test build · iOS 17+**

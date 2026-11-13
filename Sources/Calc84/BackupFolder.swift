@@ -70,6 +70,24 @@ enum BackupFolder {
             try FileManager.default.removeItem(at: target)
         }
         let bookmark = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
+        // Validate the saved grant too, before replacing the last working folder.
+        var stale = false
+        let resolved = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
+        guard !stale else { throw MediaBridge.failure("The folder permission expired. Choose the folder again.") }
+        let resolvedAccess = resolved.startAccessingSecurityScopedResource()
+        defer { if resolvedAccess { resolved.stopAccessingSecurityScopedResource() } }
+        try requireExternalLocation(resolved)
+        guard try resolved.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true else {
+            throw MediaBridge.failure("The provider did not return a folder permission. Choose another location.")
+        }
+        let restoredProbe = resolved.appendingPathComponent(".calc84-bookmark-check-\(UUID().uuidString)")
+        try coordinatedWrite(restoredProbe) { target in
+            let bytes = Data(UUID().uuidString.utf8)
+            try bytes.write(to: target, options: .withoutOverwriting)
+            defer { try? FileManager.default.removeItem(at: target) }
+            guard try Data(contentsOf: target) == bytes else { throw VaultError.invalidBackup }
+            try FileManager.default.removeItem(at: target)
+        }
         UserDefaults.standard.set(bookmark, forKey: "backupFolderBookmark")
         UserDefaults.standard.set(url.lastPathComponent, forKey: "backupFolderName")
     }
@@ -172,14 +190,15 @@ enum BackupFolder {
 
 /// Cancel and interactive dismissal never count as a successful save.
 struct BackupDocumentPicker: UIViewControllerRepresentable {
-    enum Purpose { case folder, openBackup, save(URL) }
+    enum Purpose { case folder, connectFolder, openBackup, save(URL) }
     let purpose: Purpose
     let finished: (URL?) -> Void
-    func makeCoordinator() -> Coordinator { Coordinator(finished) }
+    var failure: ((String) -> Void)? = nil
+    func makeCoordinator() -> Coordinator { Coordinator(finished, failure: failure) }
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let picker: UIDocumentPickerViewController
         switch purpose {
-        case .folder:
+        case .folder, .connectFolder:
             picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
             picker.title = "Choose Folder, Then Tap Open"
             // Do not force Files to reopen a stale provider URL.
@@ -192,6 +211,8 @@ struct BackupDocumentPicker: UIViewControllerRepresentable {
             picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
         }
         picker.allowsMultipleSelection = false
+        // Selecting the folder itself also works when a host expands the type filter.
+        if case .connectFolder = purpose { picker.allowsMultipleSelection = true }
         picker.shouldShowFileExtensions = true
         picker.delegate = context.coordinator
         return picker
@@ -206,7 +227,10 @@ struct BackupDocumentPicker: UIViewControllerRepresentable {
     final class Coordinator: NSObject, UIDocumentPickerDelegate {
         private var finished: ((URL?) -> Void)?
         private var completed = false
-        init(_ finished: @escaping (URL?) -> Void) { self.finished = finished }
+        private let failure: ((String) -> Void)?
+        init(_ finished: @escaping (URL?) -> Void, failure: ((String) -> Void)?) {
+            self.finished = finished; self.failure = failure
+        }
         func finish(_ url: URL?) {
             guard !completed else { return }
             completed = true
@@ -214,7 +238,15 @@ struct BackupDocumentPicker: UIViewControllerRepresentable {
             callback?(url)
         }
         func invalidate() { completed = true; finished = nil }
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { finish(urls.first) }
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard urls.count == 1 else {
+                guard !completed else { return }
+                if let failure { completed = true; finished = nil; failure("Select one folder, then tap Open.") }
+                else { finish(nil) }
+                return
+            }
+            finish(urls.first)
+        }
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { finish(nil) }
     }
 }

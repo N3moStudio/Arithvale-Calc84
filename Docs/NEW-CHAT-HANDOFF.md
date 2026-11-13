@@ -1,5 +1,13 @@
 # Arithen handoff
 
+## Current work — November 12, 2026
+
+Target 0.12.5 build 21 on main. User authorized public repository and GitHub build; GitHub confirmed the repository is already public. New original additions have reserved rights, with historical MIT and third-party exclusions. This section supersedes older settings/surface/build instructions below.
+
+Settings now use seven themes and Liquid Glass with accessibility fallbacks. Check a Backup remains directly in Backups. Albums owns its detail route independently. See SETTINGS-FEATURE-MAP.md and FOLDER-CONNECTION.md. Preserve explicit preference opt-outs and all backup/key formats.
+
+Build evidence: .build/github-0.12.5-run.json and downloaded verification.json. Deliver only the verified Arithen-0.12.5.ipa to the Desktop IPA folder; physical-device validation remains separate.
+
 ## Current requested build — November 7, 2026
 
 The user subsequently requested a GitHub IPA build of the settings changes and delivery to `C:\Users\naith\Desktop\ipa\My Projects (N3mo Studio)`. Target **0.12.4 build 20**, branch `codex/native-settings-0.12.4`, isolated build checkout `.build/ci-native-settings`. Keep the main checkout's existing uncommitted work intact. Use `.build/github-0.12.4-run.json`, `.build/delivery-0.12.4.json` and the downloaded verification report to establish completion. The source-only history below predates this build request.

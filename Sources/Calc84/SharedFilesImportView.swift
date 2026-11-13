@@ -139,7 +139,7 @@ struct SharedFilesImportView: View {
     var body: some View {
         ThemedForm {
             Section {
-                Text("In Files, share the files to LiveContainer, choose Arithen, then unlock the library.").foregroundStyle(ArithenPalette.color(.muted))
+                SharedImportInstructions().foregroundStyle(ArithenPalette.color(.muted))
                 if !shared.entries.isEmpty { Label("\(shared.entries.count.formatted()) \(shared.entries.count == 1 ? "file received" : "files received")", systemImage: "doc.on.doc") }
                 if let count = shared.importedCount, count > 0 { Label("\(count.formatted()) \(count == 1 ? "file imported" : "files imported")", systemImage: "checkmark.circle") }
                 if shared.working { ProgressView(vault.importing ? "Importing…" : "Receiving…") }

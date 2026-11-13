@@ -96,29 +96,31 @@ struct SharedBackupSection: View {
                     .disabled(vault.busy || input.working || shared.working)
             }
         } header: { Text("Receive without the Picker") } footer: {
-            Text("Share the backup from Files to LiveContainer, choose Arithen, then return here. Only an encrypted copy is received. Removing it here leaves the original in Files.")
+            Text("Only an encrypted copy is received. Removing it here leaves the original in Files.")
         }
+    }
+}
+
+struct SharedImportInstructions: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("In Files, share the downloaded file, then unlock your library.")
+            Text("Direct install: choose Arithen.")
+            Text("LiveContainer: choose LiveContainer, then Arithen and your data container.")
+        }.font(.subheadline)
     }
 }
 
 struct SharedBackupGuide: View {
     var body: some View {
         ThemedList {
-            Section("In Files") {
-                Text("1. Open Apple’s Files app yourself and find your .c84backup file. Download it first if it has a cloud icon.")
-                Text("2. Touch and hold the backup file, then tap Share. Share one file, not the folder or an iCloud collaboration link.")
-                Text("3. Choose LiveContainer in the share sheet, then choose Arithen and the data container you want to restore into. Look under More if needed.")
+            Section("Share from Files") { SharedImportInstructions() }
+            Section("Use the received copy") {
+                Text("Return here and choose Use Received Backup. Enter the backup's original recovery key to import or check it. Your original file stays in Files.")
             }
-            Section("Back in Arithen") {
-                Text("4. The calculator stays on screen for privacy. Enter your code and hold =. On an empty installation, use 160160 and hold =.")
-                Text("5. On setup, tap Use Received Backup, enter the backup’s old key, then Add Backup to Setup. Save and confirm the new recovery key, choose a calculator code, and tap Create Library from Backups. New backups will need the new key.")
-                Text("Already have a library? Unlock it and tap Backup received, or + → From a Backup. Enter the backup’s original recovery key, preview it, and choose items to add. Settings → Backups also has Add from Backup and Test a Backup.")
+            Section("If nothing arrives") {
+                Text("Download the file first. Share the file itself, not a folder or collaboration link. If the filename does not appear here, the installer has not delivered it to Arithen.")
             }
-            Section("If Nothing Arrives") {
-                Text("Receiving does not use Arithen’s file picker. If LiveContainer is missing from Share, its share extension may not be installed or enabled. For a directly installed app, choose Arithen instead.")
-                Text("After sharing, look for the filename and Use Received Backup. If you still see No shared backup received yet, the host has not delivered a file to this app. Keep the original backup and key.")
-            }
-            Section { LabeledContent(AppBrand.name, value: AppBrand.version) }
         }.navigationTitle("Receive a Backup").navigationBarTitleDisplayMode(.inline)
     }
 }

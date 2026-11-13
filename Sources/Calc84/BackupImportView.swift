@@ -72,7 +72,7 @@ struct BackupImportView: View {
             } else {
                 ThemedForm {
                     Section {
-                        Text("In Files, share the backup to LiveContainer, choose Arithen, then unlock the library.").foregroundStyle(ArithenPalette.color(.muted))
+                        SharedImportInstructions().foregroundStyle(ArithenPalette.color(.muted))
                         if let entry = shared.entry { Label(entry.displayName, systemImage: "doc.badge.arrow.up").font(.subheadline) }
                         SecureField("Backup recovery key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
                         Button("Import") {

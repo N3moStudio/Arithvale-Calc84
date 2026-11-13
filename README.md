@@ -4,7 +4,7 @@
 
 <h1 align="center">Arithen</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.12.4 testing · iOS 17+ · SwiftUI · MIT licensed</p>
+<p align="center">0.12.5 testing · iOS 17+ · SwiftUI · Source available</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
   <a href="CHANGELOG.md#0124--native-settings-presentation">What’s new</a> &nbsp;·&nbsp;
@@ -105,7 +105,7 @@ reset. Keep an external backup and its original recovery key.
 
 ## Open to everyone
 
-Use it, change it, share it, or help make it better under the [MIT license](LICENSE).
+New original additions are reserved under the [rights notice](LICENSE): no unauthorized copying, redistribution, or sale. GitHub viewing/forking rights, previously MIT-licensed code, and third-party licenses remain in effect. See [the historical MIT notice](Docs/LEGACY-MIT-LICENSE.txt).
 Keep the applicable copyright and dependency notices. The software is provided as is.
 
 Built with SwiftUI, CryptoKit, and the official MEGA SDK. Independent of Apple,
