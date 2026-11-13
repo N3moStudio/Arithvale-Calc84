@@ -68,3 +68,6 @@ The eleven complementary design skills were checked and the focused changes are 
 The final native compile passed with six existing MEGA CMake input warnings and no Swift diagnostics; evidence is recorded in UI-REDESIGN.md and `.build/redesign-validation.json`. Physical-device UI, host share delivery, gestures, accessibility, account/provider behavior, and battery remain unverified. Use the focused device checklist before any delivery claim.
 
 Elsepin was read as a reference only and remained clean. Branding/icon/bundle ID were preserved; legacy appearance assets were not deleted. No user media was added to the repo.
+
+
+Validation completed: GitHub run [43373156776](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/43373156776), code commit `d911f52`. All 141 core tests and 13 independent recovery tests passed; the inverted reset guard was rejected and original source restored; iPhone compilation passed. Seven existing MEGA/C++ warnings remain. No IPA was packaged and no physical-device/simulator visual test was performed. The next requested IPA should use a new version/build (planned 0.12.6 / 22); the delivered 0.12.5 / 21 does not contain this follow-up.

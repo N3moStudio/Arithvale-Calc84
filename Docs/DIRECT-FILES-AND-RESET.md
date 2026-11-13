@@ -25,3 +25,6 @@ Erase and Start Over is available only while locked and idle. It requires typed 
 Hide the native tab bar from each tab's content/root/detail and remove the enclosing redundant NavigationStack. Keep the existing custom dock and independent Albums route. Shorten primary settings copy; retain error messages, destructive confirmations and optional help.
 
 Regression tests cover identity-bound erasure, a new empty vault rejecting old credentials, and restoring the untouched external backup. GitHub's source-validation workflow runs core/recovery tests and compiles the iPhone app without creating an IPA. Actual FlareStore picker callbacks, tab-bar appearance, edge-swipe and maximum Dynamic Type require device/simulator acceptance; native compilation is not visual proof.
+
+
+Validation completed: GitHub run [43373156776](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/43373156776), code commit `d911f52`. All 141 core tests and 13 independent recovery tests passed; the inverted reset guard was rejected and original source restored; iPhone compilation passed. Seven existing MEGA/C++ warnings remain. No IPA was packaged and no physical-device/simulator visual test was performed. The next requested IPA should use a new version/build (planned 0.12.6 / 22); the delivered 0.12.5 / 21 does not contain this follow-up.
