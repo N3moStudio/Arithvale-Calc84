@@ -17,6 +17,8 @@ jobs:
           python3 Scripts/prepare_mega.py
       - name: Core and recovery tests
         run: python3 Scripts/verify_release.py --python "$PWD/.build/ci-python/bin/python"
+      - name: Verify reset guard regression coverage
+        run: python3 Scripts/check_reset_guard.py
       - name: Compile iPhone app without packaging an IPA
         run: |
           export ARITHEN_IOS_SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
