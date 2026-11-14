@@ -7,6 +7,7 @@ from pathlib import Path
 import json
 import os
 import plistlib
+import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[1]
@@ -27,9 +28,20 @@ end = manifest.index('        .target(name: "MEGACore"', start)
 manifest = manifest[:start] + manifest[end:]
 (engine / 'Package.swift').write_text(manifest)
 
-# SwiftPM synthesizes Bundle.module for production. The Xcode host copies the
-# same Resources folder into its main bundle; this shim is never in the IPA.
-(output / 'SimulatorResources.swift').write_text('import Foundation\nextension Bundle { static var module: Bundle { .main } }\n')
+# A root Resources directory makes Apple's bundle classifier treat the app as
+# a different bundle layout. Keep the exact resource-relative paths one level
+# below SimulatorAssets. This adapter is only in the generated simulator host.
+assets = output / 'SimulatorAssets'
+shutil.copytree(root / 'Sources/Calc84/Resources', assets / 'Resources')
+(output / 'SimulatorResources.swift').write_text('''import Foundation
+struct SimulatorResources {
+    var resourceURL: URL? { Bundle.main.resourceURL?.appendingPathComponent("SimulatorAssets") }
+    func url(forResource name: String, withExtension ext: String, subdirectory: String) -> URL? {
+        resourceURL?.appendingPathComponent(subdirectory).appendingPathComponent(name).appendingPathExtension(ext)
+    }
+}
+extension Bundle { static let module = SimulatorResources() }
+''')
 info = plistlib.loads((root / 'Sources/Calc84/Info.plist').read_bytes())
 info.update(CFBundleIdentifier='$(PRODUCT_BUNDLE_IDENTIFIER)', CFBundleExecutable='$(EXECUTABLE_NAME)',
             CFBundleName='Arithen', CFBundlePackageType='APPL', CFBundleInfoDictionaryVersion='6.0')
@@ -44,7 +56,7 @@ spec = {'name': 'ArithenSimulator', 'options': {'deploymentTarget': {'iOS': '17.
             'Arithen': {'type': 'application', 'platform': 'iOS',
                 'sources': [{'path': str(root / 'Sources/Calc84'), 'excludes': ['Info.plist', 'Resources', 'PrivacyInfo.xcprivacy']},
                             {'path': str(output / 'SimulatorResources.swift')},
-                            {'path': str(root / 'Sources/Calc84/Resources'), 'type': 'folder', 'buildPhase': 'resources'},
+                            {'path': str(assets), 'type': 'folder', 'buildPhase': 'resources'},
                             {'path': str(root / 'Sources/Calc84/PrivacyInfo.xcprivacy'), 'buildPhase': 'resources'}],
                 'dependencies': [{'package': 'Engine', 'product': 'Engine'}],
                 'settings': {'base': {'PRODUCT_BUNDLE_IDENTIFIER': 'studio.n3mo.calc84',
