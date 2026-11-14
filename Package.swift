@@ -65,7 +65,10 @@ let package = Package(
             "bindings", "cmake", "contrib", "examples", "tests", "tools",
             "src/android", "src/common/client_adapter_with_sync.cpp", "src/common/platform/windows",
             "src/fuse/supported", "src/win32", "src/file_service/documentation", "third_party/utf8proc/utf8proc_data.c"
-        ], sources: ["src", "third_party/utf8proc/utf8proc.cpp", "third_party/ccronexpr/ccronexpr.cpp"], publicHeadersPath: "include",
+        // Debug simulator linking retains SDK helpers that Release can strip.
+        // Compile their real implementations in both builds.
+        ], sources: ["src", "third_party/utf8proc/utf8proc.cpp", "third_party/ccronexpr/ccronexpr.cpp",
+                     "third_party/http_parser/http_parser.cpp", "third_party/zxcvbn-c/zxcvbn.cpp"], publicHeadersPath: "include",
         cSettings: [.unsafeFlags(["-I" + megaHeaders])],
         cxxSettings: [.headerSearchPath("bindings/ios"), .headerSearchPath("include/mega/osx"),
             .headerSearchPath("include/mega/posix"), .headerSearchPath("src/common/platform/posix"),
