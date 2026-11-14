@@ -22,12 +22,21 @@ jobs:
           device=$(cat .build/simulator/device-id.txt)
           xcrun simctl boot "$device" || true
           xcrun simctl bootstatus "$device" -b
-          xcodebuild test -project .build/simulator/ArithenSimulator.xcodeproj -scheme Arithen \
+          xcodebuild build-for-testing -project .build/simulator/ArithenSimulator.xcodeproj -scheme Arithen \
+            -destination "platform=iOS Simulator,id=$device" \
+            -derivedDataPath .build/simulator/DerivedData \
+            CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES \
+            > .build/simulator/xcodebuild.log 2>&1 || { tail -n 100 .build/simulator/xcodebuild.log; exit 1; }
+          app=.build/simulator/DerivedData/Build/Products/Debug-iphonesimulator/Arithen.app
+          plutil -convert xml1 -o .build/simulator/built-app-info.plist "$app/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = studio.n3mo.calc84
+          codesign --verify "$app"
+          xcodebuild test-without-building -project .build/simulator/ArithenSimulator.xcodeproj -scheme Arithen \
             -destination "platform=iOS Simulator,id=$device" \
             -derivedDataPath .build/simulator/DerivedData \
             -resultBundlePath .build/simulator/Journeys.xcresult \
-            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO \
-            > .build/simulator/xcodebuild.log 2>&1 || { tail -n 100 .build/simulator/xcodebuild.log; exit 1; }
+            -parallel-testing-enabled NO CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES \
+            >> .build/simulator/xcodebuild.log 2>&1 || { tail -n 100 .build/simulator/xcodebuild.log; exit 1; }
       - name: Export simulator evidence
         if: always()
         run: |
@@ -42,6 +51,7 @@ jobs:
           name: Arithen-Simulator-${{ github.sha }}
           path: |
             .build/simulator/device.json
+            .build/simulator/built-app-info.plist
             .build/simulator/xcodebuild.log
             .build/simulator/test-summary.json
             .build/simulator/screenshots/

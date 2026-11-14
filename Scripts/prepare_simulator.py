@@ -31,12 +31,12 @@ manifest = manifest[:start] + manifest[end:]
 (output / 'SimulatorResources.swift').write_text('import Foundation\nextension Bundle { static var module: Bundle { .main } }\n')
 info = plistlib.loads((root / 'Sources/Calc84/Info.plist').read_bytes())
 info.update(CFBundleIdentifier='$(PRODUCT_BUNDLE_IDENTIFIER)', CFBundleExecutable='$(EXECUTABLE_NAME)',
-            CFBundleName='Arithen', CFBundlePackageType='APPL')
+            CFBundleName='Arithen', CFBundlePackageType='APPL', CFBundleInfoDictionaryVersion='6.0')
 with (output / 'Info.plist').open('wb') as stream:
     plistlib.dump(info, stream)
 
 settings = {'SWIFT_VERSION': '5.0', 'IPHONEOS_DEPLOYMENT_TARGET': '17.0',
-            'CODE_SIGNING_ALLOWED': 'NO', 'TARGETED_DEVICE_FAMILY': '1,2'}
+            'CODE_SIGN_IDENTITY': '-', 'CODE_SIGNING_ALLOWED': 'YES', 'TARGETED_DEVICE_FAMILY': '1,2'}
 spec = {'name': 'ArithenSimulator', 'options': {'deploymentTarget': {'iOS': '17.0'}},
         'settings': {'base': settings}, 'packages': {'Engine': {'path': str(engine)}},
         'targets': {
