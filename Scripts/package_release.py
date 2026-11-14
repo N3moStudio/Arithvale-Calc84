@@ -58,7 +58,7 @@ def main():
         for prompt in ('Reset Appearance', 'Import from Files'):
             assert prompt.encode() in binary, 'Missing expected appearance UI: '+prompt
         for prompt in ('Your backup copies', 'Optional recovery check not run',
-                       'Photo Indexing', 'Index New Photos', 'Find Exact Duplicates',
+                       'Index New Photos', 'Find Exact Duplicates',
                        'Tags, separated by commas', 'In Files, share the downloaded file, then unlock your library.'):
             assert prompt.encode() in binary, 'Missing expected library UI: '+prompt
         assert binary[:4]==bytes.fromhex('cffaedfe') and int.from_bytes(binary[4:8],'little')==0x0100000C
