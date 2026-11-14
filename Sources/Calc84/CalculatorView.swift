@@ -53,7 +53,7 @@ struct CalculatorView: View {
                             Button(scientific ? "Basic Calculator" : "Scientific Calculator") { scientific.toggle() }
                             Button(degrees ? "Use Radians" : "Use Degrees") { degrees.toggle() }
                         } label: {
-                            Image(systemName: "calculator").frame(width: 44, height: 44).modifier(ArithenGlass(tint: glassTint, shape: Circle()))
+                            Image(systemName: "plus.forwardslash.minus").frame(width: 44, height: 44).modifier(ArithenGlass(tint: glassTint, shape: Circle()))
                         }.accessibilityLabel("Calculator mode")
                         Button("Settings", systemImage: "gearshape") { showingSettings = true }
                             .labelStyle(.iconOnly).frame(width: 44, height: 44)
