@@ -3,6 +3,9 @@ import XCTest
 final class ArithenUITests: XCTestCase {
     private let app = XCUIApplication()
     override func setUpWithError() throws { continueAfterFailure = false }
+    override func tearDownWithError() throws {
+        if testRun?.hasSucceeded == false { capture("failure-screen") }
+    }
 
     private func capture(_ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
@@ -18,7 +21,9 @@ final class ArithenUITests: XCTestCase {
     private func tap(_ label: String) {
         let button = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", label)).firstMatch
         XCTAssertTrue(button.waitForExistence(timeout: 10), "Missing button: \(label)")
-        reveal(button); button.tap()
+        reveal(button)
+        XCTAssertTrue(button.isEnabled, "Disabled button: \(label)")
+        button.tap()
     }
     private func enter(_ digits: String) {
         tap("Clear all")
@@ -48,7 +53,12 @@ final class ArithenUITests: XCTestCase {
         let tail = String(key.label.filter { $0.isHexDigit }.suffix(8))
         XCTAssertEqual(tail.count, 8)
         let saved = app.switches["setup.savedRecoveryKey"]
-        reveal(saved); saved.tap()
+        reveal(saved)
+        // SwiftUI exposes a labelled row and its native switch separately.
+        // Tap the actual switch instead of the row's non-interactive label.
+        let toggle = saved.switches.firstMatch.exists ? saved.switches.firstMatch : saved
+        toggle.tap()
+        XCTAssertEqual(saved.value as? String, "1")
         let confirm = app.textFields["setup.confirmRecoveryKey"]
         reveal(confirm); confirm.tap(); confirm.typeText(tail)
         for label in ["New calculator code", "Confirm calculator code"] {
