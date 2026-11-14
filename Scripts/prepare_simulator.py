@@ -5,6 +5,7 @@ slice, real encryption and normal setup UI; no mock provider or unlock hook.
 """
 from pathlib import Path
 import json
+import os
 import plistlib
 import subprocess
 
@@ -57,11 +58,13 @@ spec = {'name': 'ArithenSimulator', 'options': {'deploymentTarget': {'iOS': '17.
                     'test': {'targets': ['ArithenUITests'], 'gatherCoverageData': False}}}}
 (output / 'project.json').write_text(json.dumps(spec, indent=2))
 subprocess.run(['xcodegen', 'generate', '--spec', str(output / 'project.json'), '--project', str(output)], check=True)
-devices = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '--json']))
-phones = [(runtime, d) for runtime, group in devices['devices'].items() for d in group
-          if d.get('isAvailable') and 'iPhone' in d['name'] and 'iOS' in runtime]
-assert phones, 'No installed iPhone simulator runtime'
-runtime, device = sorted(phones, key=lambda value: (value[0], value[1]['name']), reverse=True)[0]
+inventory = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', '--json']))
+runtime = os.environ['ARITHEN_SIMULATOR_RUNTIME']
+assert any(r['identifier'] == runtime and r.get('isAvailable') for r in inventory['runtimes']), 'Required iOS simulator runtime unavailable'
+# Use a disposable device, not a runner-image device with stale migration state.
+device_type = next(d for d in inventory['devicetypes'] if d['name'] == 'iPhone 17 Pro')
+udid = subprocess.check_output(['xcrun', 'simctl', 'create', 'Arithen CI', device_type['identifier'], runtime], text=True).strip()
+device = {'name': 'Arithen CI (iPhone 17 Pro)', 'udid': udid, 'deviceTypeIdentifier': device_type['identifier']}
 (output / 'device.json').write_text(json.dumps({'runtime': runtime, **device}, indent=2))
 (output / 'device-id.txt').write_text(device['udid'])
 print('Simulator:', device['name'], runtime)

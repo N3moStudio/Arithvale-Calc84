@@ -9,6 +9,9 @@ jobs:
   simulator:
     runs-on: macos-26
     timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+      ARITHEN_SIMULATOR_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-26-2
     steps:
       - uses: actions/checkout@v4
       - name: Prepare real app simulator host
