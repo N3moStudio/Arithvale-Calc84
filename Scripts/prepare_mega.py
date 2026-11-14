@@ -9,6 +9,7 @@ import urllib.request
 import zipfile
 import argparse
 import plistlib
+import platform
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--simulator', action='store_true', help='Select the pinned XCFramework simulator slice for an isolated simulator build.')
@@ -37,9 +38,9 @@ for filename, url, expected in inputs:
             info = plistlib.loads(archive.read('libmega.xcframework/Info.plist'))
             candidates = [item for item in info['AvailableLibraries']
                           if item.get('SupportedPlatform') == 'ios' and item.get('SupportedPlatformVariant') == 'simulator'
-                          and 'x86_64' in item['SupportedArchitectures']]
+                          and platform.machine().lower() in item['SupportedArchitectures']]
             if len(candidates) != 1:
-                raise SystemExit('Expected one x86_64 iOS Simulator slice in the pinned MEGA XCFramework')
+                raise SystemExit('No matching simulator slice for ' + platform.machine() + ': ' + str(info['AvailableLibraries']))
             prefix = 'libmega.xcframework/' + candidates[0]['LibraryIdentifier'] + '/'
         target = root / "Vendor" / ("MEGASDK" if filename == "sdk.zip" else "MEGADependencies")
         for entry in archive.infolist():
