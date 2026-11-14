@@ -45,7 +45,7 @@ struct MediaBrowser: View {
                     .accessibilityAction(named: "Show Photo Info") { sheet = .details(current) }
                     .accessibilityAction(named: "Next Snap") { navigation.request(navigation.requested + 1) }
                     .accessibilityAction(named: "Previous Snap") { navigation.request(navigation.requested - 1) }
-                HStack {
+                ArithenGlassGroup { HStack {
                     Button("Close", systemImage: "chevron.down", action: close).labelStyle(.iconOnly)
                     Spacer()
                     Button("Lock & Return to Calculator", systemImage: "lock.fill") { previews.clear(); vault.lock(); close() }.labelStyle(.iconOnly)
@@ -54,9 +54,10 @@ struct MediaBrowser: View {
                         Button(current.favorite == true ? "Remove from Favs" : "Add to Favs", systemImage: "heart") {
                             vault.update(current, favorite: current.favorite != true)
                         }.disabled(vault.busy)
+                        Button("Details", systemImage: "info.circle") { sheet = .details(current) }
                     } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }
                         .accessibilityLabel("Snap Options")
-                }.buttonStyle(MediaOverlayButtonStyle()).padding(.horizontal, 14).padding(.top, 6)
+                }.buttonStyle(MediaOverlayButtonStyle()) }.padding(.horizontal, 14).padding(.top, 6)
             }
         }
         .onAppear { focus(position) }

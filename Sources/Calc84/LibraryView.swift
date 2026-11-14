@@ -193,11 +193,13 @@ private struct LibraryPane: View {
             }
             if !showingAlbums || albumDetail { filters }
             if vault.busy {
-                HStack(spacing: 10) {
+                let progressLayout = textSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+                    : AnyLayout(HStackLayout(spacing: 10))
+                progressLayout {
                     OperationProgressView(title: vault.importing ? "Importing into Your Library" : cloud.running ? "Backing Up" : "Working",
                         detail: cloud.running ? cloud.phase : vault.status,
                         progress: vault.importing && vault.progress > 0 ? vault.progress : nil)
-                    Spacer(minLength: 0)
                     if vault.importing { Button("Cancel") { vault.cancelImport() }.frame(minHeight: 44) }
                     if vault.cloud.running { Button("Pause") { vault.cloud.pause() }.frame(minHeight: 44) }
                 }
@@ -221,14 +223,36 @@ private struct LibraryPane: View {
                         // Keep the presentation owner alive if unfavoriting the
                         // current photo empties this query while its viewer is open.
                         if visible.isEmpty {
-                            ContentUnavailableView(search.isEmpty ? (filter == "Recently Deleted" ? "Nothing Deleted" : "Your memories go here") : "No matches",
-                                systemImage: filter == "Recently Deleted" ? "trash" : "photo.on.rectangle",
-                                description: Text(search.isEmpty ? (filter == "Recently Deleted" ? "Deleted items stay here until you remove them permanently." : "Tap + to add photos, videos, files or a backup.") : "Try a shorter word or a tag. Photo Indexing in Privacy & Access finds words inside photos."))
+                            emptyLibrary
                         }
                     }
             }
         }
         .background(ArithenPalette.color(.canvas, theme: theme))
+    }
+    private var emptyLibrary: some View {
+        ContentUnavailableView {
+            Label(emptyTitle, systemImage: filter == "Recently Deleted" ? "trash" : "photo.on.rectangle")
+        } description: {
+            Text(!search.isEmpty ? "Try a different name, album, tag or word inside a photo."
+                : filter == "Recently Deleted" ? "Deleted items stay here until you remove them permanently."
+                : filter == "Favorites" ? "Open a snap and use its options menu to add it to Favs."
+                : filter.hasPrefix("album:") ? "Select snaps in Library and choose Add to Album."
+                : "Tap + to add photos, videos, files or a backup.")
+        } actions: {
+            if !search.isEmpty { Button("Clear Search") { search = "" } }
+            else if !showingAlbums && filter != "All" { Button("Show All Snaps") { filter = "All"; selection = [] } }
+        }
+    }
+    private var emptyTitle: String {
+        if !search.isEmpty { return "No Matches" }
+        switch filter {
+        case "Recently Deleted": return "Nothing Deleted"
+        case "Photos": return "No Photos"
+        case "Videos": return "No Videos"
+        case "Favorites": return "No Favs Yet"
+        default: return filter.hasPrefix("album:") ? "This Album Is Empty" : "Your memories go here"
+        }
     }
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -298,33 +322,51 @@ private struct LibraryPane: View {
     }
     private var filters: some View {
         Group {
-            if showingAlbums { snapCount }
+            if showingAlbums { countAndSort }
             else if textSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 0) {
-                    snapCount
+                    countAndSort
                     ScrollView(.horizontal) { filterButtons.fixedSize(horizontal: true, vertical: false) }
                         .scrollIndicators(.hidden)
                 }
             } else {
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) { snapCount; Spacer(minLength: 0); filterButtons }
-                    VStack(alignment: .leading, spacing: 0) { snapCount; filterButtons }
+                    HStack(spacing: 12) {
+                        snapCount.fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 0)
+                        filterButtons.fixedSize(horizontal: true, vertical: false)
+                        sortMenu
+                    }
+                    VStack(alignment: .leading, spacing: 0) { countAndSort; filterButtons }
                 }
             }
         }.padding(.horizontal, 14).padding(.vertical, 4)
             .overlay(alignment: .bottom) { Rectangle().fill(ArithenPalette.color(.text).opacity(0.12)).frame(height: 0.5) }
+    }
+    private var countAndSort: some View {
+        HStack(spacing: 8) { snapCount; Spacer(minLength: 0); sortMenu }
+    }
+    private var sortMenu: some View {
+        Menu {
+            sortOptions
+        } label: {
+            Image(systemName: "arrow.up.arrow.down").frame(width: 44, height: 44)
+        }
+        .accessibilityLabel("Sort Snaps")
+        .accessibilityValue("\((LibraryDateSource(rawValue: dateSource) ?? .captured).title), \(newestFirst ? "newest first" : "oldest first")")
+    }
+    @ViewBuilder private var sortOptions: some View {
+        Picker("Sort by", selection: $dateSource) {
+            ForEach(LibraryDateSource.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+        }
+        Toggle("Newest First", isOn: $newestFirst)
     }
     private var snapCount: some View {
         Group {
             if showingAlbums { countLabel.frame(maxWidth: .infinity, alignment: .leading) }
             else { Button { filter = "All"; selection = [] } label: { countLabel }.buttonStyle(.plain) }
         }.frame(minHeight: 44)
-            .contextMenu {
-                Picker("Sort by", selection: $dateSource) {
-                    ForEach(LibraryDateSource.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
-                }
-                Toggle("Newest First", isOn: $newestFirst)
-            }
+            .contextMenu { sortOptions }
     }
     private var countLabel: some View {
         Text("\(visible.count.formatted()) \(visible.count == 1 ? "Snap" : "Snaps")").font(.subheadline.weight(.semibold)).monospacedDigit()

@@ -81,11 +81,11 @@ struct BackupSettingsView: View {
                             activeExport = request; sheet = .save(request)
                         }
                     }
-                } label: { SettingsRow("Create Backup", symbol: "square.and.arrow.down") }
+                } label: { SettingsRow("Create Backup", symbol: "square.and.arrow.down", detail: "Save an encrypted copy to Files") }
                 .disabled(vault.busy)
-                NavigationLink { BackupImportView() } label: { SettingsRow("Import Backup", symbol: "externaldrive.badge.plus") }
+                NavigationLink { BackupImportView() } label: { SettingsRow("Import Backup", symbol: "externaldrive.badge.plus", detail: "Add items to this library") }
                     .disabled(vault.busy)
-                NavigationLink { RecoveryTestView() } label: { SettingsRow("Check a Backup", symbol: "checkmark.shield") }
+                NavigationLink { RecoveryTestView() } label: { SettingsRow("Check a Backup", symbol: "checkmark.shield", detail: "Verify a file and key without importing") }
                     .disabled(vault.busy)
             } footer: {
                 VStack(alignment: .leading, spacing: 12) {

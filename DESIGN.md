@@ -1,6 +1,10 @@
-# Arithen · 0.10.0 design
+# Arithen design
 
-> **Current design:** [Unreleased compact library redesign](Docs/UI-REDESIGN.md). Bloom is the default; library colors follow the selected theme. Theme and Surfaces replace all former layout/tint/video-background options. The older design history below is retained for context, not as the current UI specification.
+> **Current decisions, November 14, 2026:** Seven themes, Bloom default, with the library following the selected theme. Standard Liquid Glass is for controls/navigation, with opaque accessibility fallbacks and an older-iOS material fallback. There is no surface picker; Titanium and older appearance values remain decodable without reviving retired choices. Keep the larger branded appearance card, compact rounded text applied once, and native navigation. See [current refinement and feature inventory](Docs/REFINEMENT-2026-11-14.md) and [settings map](Docs/SETTINGS-FEATURE-MAP.md). These supersede the historical layouts, wallpaper/tint controls and defaults below.
+
+Library sorting must be discoverable without a long press. Empty filters must explain the current query, not suggest the whole library is empty. Import selection, authentication and activity have distinct sections; real progress, cancellation and errors stay visible. Check a Backup remains beside Create and Import, with short descriptions distinguishing these actions. Preserve native grid/viewer continuity and immediate authenticated library entry; no extra reveal animation.
+
+## Historical design notes (through 0.10.0)
 
 
 ## Library tools

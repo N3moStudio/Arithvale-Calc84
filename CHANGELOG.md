@@ -1,6 +1,22 @@
 # Changelog
 
-## Unreleased · Direct Files and recovery reset
+## 0.12.7 · Library and backup refinement
+
+**November 14, 2026 · Build 23 · Test build**
+
+- Expose sorting in Library, Search and album details using the existing saved sort settings; retain the count's context menu.
+- Distinguish empty Photos, Videos, Favs and albums from an empty library, with direct clear-search/show-all actions.
+- Let library progress/cancellation stack at accessibility text sizes; keep calculator header/display width independent of short-window keypad sizing and announce the display value to VoiceOver.
+- Add Details to the media options menu while retaining swipe-up; group the existing glass overlay controls without changing paging/zoom/return behavior.
+- Separate file choice, recovery key, import action, progress and errors. Expose Cancel Import in the Files screen, clarify Create/Import/Check, and correct obsolete appearance/picker guidance.
+- Preserve seven themes, stored preferences, immediate authenticated entry, encryption, reset safeguards and automatic backup retention. See Docs/REFINEMENT-2026-11-14.md for the source review; the requested GitHub build adds native and simulator evidence.
+- Add a separate simulator job with screenshot attachments and ordinary setup/navigation/lock checks, using production app sources and real native dependencies. No test-only access path is included in the IPA.
+
+## 0.12.6 · Direct Files and recovery reset
+
+**November 12, 2026 · Build 22 · Test build**
+
+Built and delivered from `1849f48` via GitHub run 43383774456: 141 core tests, 13 recovery tests, native compile and package checks passed. Physical-device acceptance remains pending.
 
 - Hide the duplicate native tab bar while retaining the custom dock and independent Albums navigation.
 - Add Choose Backup File and multi-file Choose Files alongside sharing; keep authenticated backup checks and encrypted inbox staging.

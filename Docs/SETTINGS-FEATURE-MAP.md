@@ -1,5 +1,9 @@
 # Native Settings Kit adoption — Arithen
 
+## November 14 refinement
+
+The [complete journey inventory](REFINEMENT-2026-11-14.md) was written before edits. No settings destination, storage key, default, permission, confirmation or access restriction moves in this pass. Create, Import and Check retain their main Backups positions, with one-line distinctions. Import screens group file choice, key/action, progress and errors separately; models and task ownership are unchanged. Files import gains an in-place Cancel Import button calling the existing handler. The appearance hint advertises only the current theme choice. The seven-theme, fixed-glass decisions below supersede the older eight-theme/surface-picker adoption table.
+
 ## November 8 correction map (before implementation)
 
 The user requested independent Albums navigation, fewer duplicate routes, seven themes and Liquid Glass only. This supersedes the original surface-choice preservation below.

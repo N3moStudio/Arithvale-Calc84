@@ -60,7 +60,7 @@ struct AppearanceSettingsCard: View {
                         .font(.subheadline).foregroundStyle(ArithenPalette.color(.muted, theme: theme))
                 }.fixedSize(horizontal: false, vertical: true)
             }.padding(.vertical, 16).accessibilityElement(children: .combine)
-        }.accessibilityHint("Choose your theme and surfaces")
+        }.accessibilityHint("Choose your theme")
     }
 }
 

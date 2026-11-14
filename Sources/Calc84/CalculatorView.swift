@@ -67,6 +67,7 @@ struct CalculatorView: View {
                             .font(.system(size: 52, weight: .regular, design: .rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.3)
                     }.frame(maxWidth: .infinity, alignment: .trailing).padding(.horizontal, 6).padding(.bottom, 16)
                         .accessibilityElement(children: .combine).accessibilityLabel("Calculator display")
+                        .accessibilityValue(didEvaluate || expression.isEmpty ? result : expression)
                     if scientific {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 7), count: 4), spacing: 7) {
                             ForEach(["sin", "cos", "tan", "sqrt", "ln", "log", "π", "^", "(", ")", "e", degrees ? "DEG" : "RAD"], id: \.self) { key in
@@ -91,7 +92,8 @@ struct CalculatorView: View {
                             HStack(spacing: 7) { ForEach(row, id: \.self) { value in key(value, side: side) } }
                         }
                     }.buttonStyle(CalcKeyStyle()).padding(.bottom, 10)
-                }.foregroundStyle(ink).frame(width: side * 4 + 21, alignment: .center)
+                // Keep the header and display readable when short windows shrink the keys.
+                }.foregroundStyle(ink).frame(width: availableWidth, alignment: .center)
                     .frame(minHeight: geometry.size.height, alignment: .bottom).frame(maxWidth: .infinity)
                 }
             }.background { ArithenPalette.color(.canvas, theme: theme).ignoresSafeArea() }

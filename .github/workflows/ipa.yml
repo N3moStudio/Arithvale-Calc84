@@ -6,6 +6,48 @@ on:
 permissions:
   contents: read
 jobs:
+  simulator:
+    runs-on: macos-26-intel
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare real app simulator host
+        run: |
+          brew install xcodegen
+          python3 Scripts/prepare_mega.py --simulator
+          python3 Scripts/prepare_simulator.py
+      - name: Run simulator journeys and capture screenshots
+        run: |
+          set -o pipefail
+          device=$(cat .build/simulator/device-id.txt)
+          xcrun simctl boot "$device" || true
+          xcrun simctl bootstatus "$device" -b
+          xcodebuild test -project .build/simulator/ArithenSimulator.xcodeproj -scheme Arithen \
+            -destination "platform=iOS Simulator,id=$device" \
+            -derivedDataPath .build/simulator/DerivedData \
+            -resultBundlePath .build/simulator/Journeys.xcresult \
+            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO \
+            > .build/simulator/xcodebuild.log 2>&1 || { tail -n 100 .build/simulator/xcodebuild.log; exit 1; }
+      - name: Export simulator evidence
+        if: always()
+        run: |
+          if [ -d .build/simulator/Journeys.xcresult ]; then
+            xcrun xcresulttool export attachments --path .build/simulator/Journeys.xcresult --output-path .build/simulator/screenshots
+            xcrun xcresulttool get test-results summary --path .build/simulator/Journeys.xcresult > .build/simulator/test-summary.json
+          fi
+      - name: Upload simulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arithen-Simulator-${{ github.sha }}
+          path: |
+            .build/simulator/device.json
+            .build/simulator/xcodebuild.log
+            .build/simulator/test-summary.json
+            .build/simulator/screenshots/
+            .build/simulator/Journeys.xcresult/
+          include-hidden-files: true
+          if-no-files-found: error
   build:
     runs-on: macos-26-intel
     timeout-minutes: 60

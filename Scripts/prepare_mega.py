@@ -7,6 +7,12 @@ from pathlib import Path
 import hashlib
 import urllib.request
 import zipfile
+import argparse
+import plistlib
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--simulator', action='store_true', help='Select the pinned XCFramework simulator slice for an isolated simulator build.')
+options = parser.parse_args()
 
 root = Path(__file__).resolve().parents[1]
 cache = root.parent / "tmp" / "mega-research"
@@ -27,6 +33,14 @@ for filename, url, expected in inputs:
         raise SystemExit(f"Checksum mismatch: {filename}")
     with zipfile.ZipFile(path) as archive:
         prefix = "sdk-10.20.0/" if filename == "sdk.zip" else "libmega.xcframework/ios-arm64/"
+        if filename == "libmega.zip" and options.simulator:
+            info = plistlib.loads(archive.read('libmega.xcframework/Info.plist'))
+            candidates = [item for item in info['AvailableLibraries']
+                          if item.get('SupportedPlatform') == 'ios' and item.get('SupportedPlatformVariant') == 'simulator'
+                          and 'x86_64' in item['SupportedArchitectures']]
+            if len(candidates) != 1:
+                raise SystemExit('Expected one x86_64 iOS Simulator slice in the pinned MEGA XCFramework')
+            prefix = 'libmega.xcframework/' + candidates[0]['LibraryIdentifier'] + '/'
         target = root / "Vendor" / ("MEGASDK" if filename == "sdk.zip" else "MEGADependencies")
         for entry in archive.infolist():
             if not entry.filename.startswith(prefix) or entry.is_dir():
@@ -41,4 +55,4 @@ for filename, url, expected in inputs:
             output = target / relative
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_bytes(archive.read(entry))
-print("Prepared MEGA SDK 10.20.0 and checksum-verified iOS arm64 dependencies.")
+print('Prepared MEGA SDK 10.20.0 and verified ' + ('iOS Simulator' if options.simulator else 'iOS arm64') + ' dependencies.')

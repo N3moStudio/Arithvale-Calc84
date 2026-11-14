@@ -141,18 +141,29 @@ struct SharedFilesImportView: View {
     @State private var selectedFiles: [BackupSelection] = []
     var body: some View {
         ThemedForm {
-            Section {
+            Section("Files") {
                 Button("Choose Files", systemImage: "doc.on.doc") { choosing = true }
                     .disabled(shared.working || vault.busy)
                 DisclosureGroup("Or share from Files") {
                     SharedImportInstructions().foregroundStyle(ArithenPalette.color(.muted))
                 }
+            }
+            Section {
                 if !shared.entries.isEmpty { Label("\(shared.entries.count.formatted()) \(shared.entries.count == 1 ? "file received" : "files received")", systemImage: "doc.on.doc") }
                 if let count = shared.importedCount, count > 0 { Label("\(count.formatted()) \(count == 1 ? "file imported" : "files imported")", systemImage: "checkmark.circle") }
-                if shared.working { ProgressView(vault.importing ? "Importing…" : "Receiving…") }
                 Button("Import") { shared.importPending(vault: vault) }
                     .buttonStyle(ImportButtonStyle()).disabled(shared.entries.isEmpty || shared.working || vault.busy)
-                if let error = shared.error { Text(error).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)) }
+            }
+            if shared.working {
+                Section {
+                    OperationProgressView(title: vault.importing ? "Importing Files" : "Preparing Files",
+                        detail: vault.importing ? vault.status : "Your received copies stay available until import completes.",
+                        progress: vault.importing && vault.progress > 0 ? vault.progress : nil)
+                    if vault.importing { Button("Cancel Import") { vault.cancelImport() }.frame(minHeight: 44) }
+                }
+            }
+            if let error = shared.error {
+                Section { Label(error, systemImage: "exclamationmark.circle").font(.subheadline).fixedSize(horizontal: false, vertical: true) }
             }
             if !shared.entries.isEmpty {
                 Section { Button("Remove Received Copies", role: .destructive) { removing = true }.disabled(shared.working || vault.busy) }

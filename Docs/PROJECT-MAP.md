@@ -1,5 +1,15 @@
 # Arithen source map
 
+## November 14 source refinement
+
+Current baseline is delivered 0.12.6/build 22 (`1849f48`); this local refinement has no new IPA. [Feature/state inventory and evidence](REFINEMENT-2026-11-14.md) covers the current seven-theme, standard-glass design and supersedes historical theme/layout statements below.
+
+- `LibraryView`: visible sort menu bound to existing preferences, query-specific empty states and adaptive progress/action layout. Same tab stacks, grid/viewer owner, selection and export handlers.
+- `CalculatorView`: header/display width independent of short-window key sizing; explicit VoiceOver display value. Authentication, gestures, history and calculation handlers are unchanged.
+- `MediaBrowser`: Details also in the existing options menu; overlay controls use the existing glass group. Pager, preview, zoom, return identity and privacy cleanup are unchanged.
+- `BackupImportView`, `SharedFilesImportView`: separate selection, action, progress and error sections. Files import exposes the existing cancellation handler. No staging/model/format changes.
+- `VaultSettingsView`, `BackupSettingsDetails`, `SettingsComponents`, `BackupChooserView`: distinguish backup actions, readable error feedback and accurate accessibility/picker guidance. Existing real settings and task owners retained.
+
 ## 0.12.4 native settings presentation
 
 `SettingsComponents` contains host-themed native row labels, the larger branded appearance card and adaptive theme tiles. `ArithenIdentity` shares the original artwork. `Appearance` keeps the existing root/type/storage policy and refines list surfaces/spacing/selection. `VaultSettingsView` owns the overview and backup export/picker state; `BackupSettingsDetails` provides focused folder, status, reminder and help pages without owning that export state. Calculator/Cloud/About reuse the presentation while retaining original task handlers. See [complete feature map](SETTINGS-FEATURE-MAP.md), [adoption and checks](SETTINGS-ADOPTION.md), and `UI/NativeSettingsKit` for the unlinked reference/notices.

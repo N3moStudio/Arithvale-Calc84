@@ -71,7 +71,7 @@ struct BackupImportView: View {
                 } actions: { Button("View Library") { dismiss() }.buttonStyle(.borderedProminent) }
             } else {
                 ThemedForm {
-                    Section {
+                    Section("Backup File") {
                         Button("Choose Backup File", systemImage: "doc") {
                             usedReceipt = nil; input.choose(.file)
                         }.disabled(input.working || review.working || vault.busy)
@@ -86,17 +86,29 @@ struct BackupImportView: View {
                                 Text(entry.displayName).font(.caption)
                             }
                         }
+                    }
+                    Section {
                         SecureField("Backup recovery key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
+                            .disabled(input.working || review.working || vault.busy)
                         Button("Import") {
                             if let backup = input.backup { review.prepare(backup, key: key); key = "" }
                         }.buttonStyle(ImportButtonStyle())
                             .disabled(input.backup == nil || key.isEmpty || shared.working || input.working || review.working || vault.busy)
-                        if shared.working || input.working { ProgressView("Receiving backup…") }
-                        if review.working || vault.importing {
-                            OperationProgressView(title: "Importing Backup", detail: vault.importing ? vault.status : review.phase)
+                    } header: { Text("Recovery Key") } footer: {
+                        Text("Use this backup’s key. Your current library keeps its own key.")
+                    }
+                    if shared.working || input.working || review.working || vault.importing {
+                        Section {
+                            OperationProgressView(title: vault.importing ? "Importing Backup" : review.working ? "Checking Backup" : "Receiving Backup",
+                                detail: vault.importing ? vault.status : review.working ? review.phase : "Preparing the selected copy…",
+                                progress: vault.importing && vault.progress > 0 ? vault.progress : nil)
                         }
-                        if let error = shared.error ?? input.error ?? review.error { Text(error).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)) }
-                        if let notice = input.notice { Text(notice).font(.footnote).foregroundStyle(ArithenPalette.color(.muted)) }
+                    }
+                    if let error = shared.error ?? input.error ?? review.error {
+                        Section { Label(error, systemImage: "exclamationmark.circle").font(.subheadline).fixedSize(horizontal: false, vertical: true) }
+                    }
+                    if let notice = input.notice {
+                        Section { Text(notice).font(.subheadline).fixedSize(horizontal: false, vertical: true) }
                     }
                     if shared.entry != nil {
                         Section { Button("Remove Received Copy", role: .destructive) { removeReceived = true }
@@ -109,7 +121,7 @@ struct BackupImportView: View {
         .backupPicker(input)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .cancellationAction) {
-            Button(vault.importing ? "Cancel Import" : "Close") {
+            Button(vault.importing ? "Cancel Import" : review.working ? "Cancel Check" : "Close") {
                 if vault.importing { vault.cancelImport() } else { dismiss() }
             }
         } }

@@ -38,7 +38,7 @@ final class BackupInputModel: ObservableObject {
         // Interactive dismissal is handled here, never by representable teardown.
         guard let value = pending else {
             if !receivedDelegateResult {
-                notice = "Files closed before returning a selection. Use Receive Backup from Files above to share the file into this app instead."
+                notice = "Files closed before returning a selection. Try again, or share the backup from Files to Arithen. In LiveContainer, share to LiveContainer, then choose Arithen."
             }
             return
         }

@@ -13,7 +13,8 @@ struct BackupActivitySection: View {
                         .font(.subheadline)
                 }
                 if let message = vault.message {
-                    Text(message).font(.subheadline).foregroundStyle(ArithenPalette.color(.muted))
+                    Label(message, systemImage: "exclamationmark.circle").font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
