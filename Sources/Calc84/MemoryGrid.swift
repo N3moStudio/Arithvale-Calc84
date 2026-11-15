@@ -114,7 +114,8 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
     }
     @objc private func releaseCache() { images.removeAllObjects() }
     func tearDown() {
-        model.viewerVault?.mediaViewerPresented = false
+        // SwiftUI calls this while destroying its view graph. Purge private
+        // content synchronously without publishing back into that same graph.
         mediaHost?.closeForPrivacy(); mediaHost = nil
         clearImages()
         NotificationCenter.default.removeObserver(self)
@@ -180,7 +181,6 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
             closed: { [weak self, weak vault] id in
                 guard let self else { return }
                 self.mediaHost = nil
-                vault?.mediaViewerPresented = false
                 if vault?.unlocked == true {
                     // The iOS 17/Reduce Motion fallback also returns to the current
                     // item, although it doesn't ask for a native zoom source.
@@ -193,7 +193,6 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
                 } else { self.clearImages() }
             })
         mediaHost = host
-        vault.mediaViewerPresented = true
         present(host, animated: !UIAccessibility.isReduceMotionEnabled)
     }
     private func transitionSource(id: UUID, preview: UIImage?) -> UIView? {

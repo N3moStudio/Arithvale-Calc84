@@ -52,8 +52,6 @@ struct AlbumLibraryView: View {
         .sheet(item: $editing) { album in NavigationStack {
             AlbumCustomizationView(name: album.name, preference: vault.albumPreferences[album.name] ?? .init())
         } }
-        .onChange(of: editing?.id) { _, value in vault.libraryToolPresented = value != nil }
-        .onDisappear { vault.libraryToolPresented = false }
     }
     private func album(_ name: String, values: [VaultItem], filter: String) -> some View {
         Button { open(filter) } label: {
