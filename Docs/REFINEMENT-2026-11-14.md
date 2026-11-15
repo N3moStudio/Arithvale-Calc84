@@ -52,3 +52,15 @@ Apple guidance supports keeping glass in the controls/navigation layer and prese
 - https://developer.apple.com/design/human-interface-guidelines/materials
 - https://developer.apple.com/design/human-interface-guidelines/motion
 - https://developer.apple.com/documentation/swiftui/viewthatfits
+
+## Subsequent authorized GitHub build and simulator result
+
+The user subsequently authorized the IPA and simulator job. Run [43657145638](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/43657145638), source `ffb987ff55eea2fc495d6a72110f05697d886f24`, passed **141 core / 13 independent recovery tests**, native device compilation/package validation and **1 complete simulator UI test (0 failed, 0 skipped)** on iPhone 17 Pro / iOS 26.2. CI used the pinned recovery dependency. Eleven planned screenshots were reviewed. Build 23 was delivered as Arithen-0.12.7.ipa, replacing only this app's old IPA.
+
+The UI journey covers normal setup/authentication, calculator evaluation and stale-entry hold protection, filter/sort controls, Recently Deleted tab retention and Albums reselect, settings/import/check screens, privacy indexing, lock/unlock, relaunch, largest text and an Ion theme change. It does not populate/import media or exercise real providers.
+
+It exposed a real Swift exclusivity crash during Albums reselect. `MemoryGrid.tearDown` wrote an unused `@Published` presentation flag while SwiftUI invalidated its graph. Remove the write-only flags and their writers in MemoryGrid, AlbumLibraryView and VaultModel; keep immediate media close/image clearing and real lock logic intact. The passing final journey exercises the previously crashing route. Also replace the missing calculator mode symbol. MEGA's existing HTTP-parser/zxcvbn sources are now explicitly linked for simulator Debug builds.
+
+Visual limitation: at maximum accessibility size, bottom tab labels wrap awkwardly and header controls are crowded. These are not marked as visually accepted merely because navigation tests pass. Physical-device/provider/media/performance checks above remain open. The extra attachment named failure-screen is a teardown timing artifact; authoritative xcresult reports Passed, 1 passed, 0 failed.
+
+Internal evidence: `.build/simulator-0.12.7-evidence.json`, `.build/delivery-0.12.7.json`, downloaded source-bound verification report and xcresult/screenshots. No public release was published.

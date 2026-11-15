@@ -2,13 +2,21 @@
 
 ## November 14 source refinement
 
-Current baseline is delivered 0.12.6/build 22 (`1849f48`); this local refinement has no new IPA. [Feature/state inventory and evidence](REFINEMENT-2026-11-14.md) covers the current seven-theme, standard-glass design and supersedes historical theme/layout statements below.
+Delivered 0.12.7/build 23 from `ffb987ff` with passing GitHub native and simulator jobs (run 43657145638). [Feature/state inventory and evidence](REFINEMENT-2026-11-14.md) covers the current seven-theme, standard-glass design and supersedes historical theme/layout statements below.
 
 - `LibraryView`: visible sort menu bound to existing preferences, query-specific empty states and adaptive progress/action layout. Same tab stacks, grid/viewer owner, selection and export handlers.
 - `CalculatorView`: header/display width independent of short-window key sizing; explicit VoiceOver display value. Authentication, gestures, history and calculation handlers are unchanged.
 - `MediaBrowser`: Details also in the existing options menu; overlay controls use the existing glass group. Pager, preview, zoom, return identity and privacy cleanup are unchanged.
 - `BackupImportView`, `SharedFilesImportView`: separate selection, action, progress and error sections. Files import exposes the existing cancellation handler. No staging/model/format changes.
 - `VaultSettingsView`, `BackupSettingsDetails`, `SettingsComponents`, `BackupChooserView`: distinguish backup actions, readable error feedback and accurate accessibility/picker guidance. Existing real settings and task owners retained.
+
+## Simulator validation and lifecycle follow-up
+
+- `.github/workflows/ipa.yml`: independent native IPA and arm64 simulator jobs; simulator pins Xcode/iOS 26.2 and creates a fresh disposable device.
+- `Scripts/prepare_simulator.py`: generated Xcode host built from production app sources and real MEGA dependencies; simulator-only resource adapter under ignored build output.
+- `Tests/ArithenUITests/ArithenUITests.swift`: ordinary setup/authentication, calculator, tabs, backup/import/settings, lock and large-text/theme journey with screenshots.
+- `.github/workflows/simulator-diagnostics.yml`: optional xcresult diagnostics export from an existing simulator artifact.
+- `MemoryGrid`, `AlbumLibraryView`, `VaultModel`: removed unused published presentation flags that caused a teardown exclusivity crash; actual media privacy cleanup and lock state remain synchronous.
 
 ## 0.12.4 native settings presentation
 

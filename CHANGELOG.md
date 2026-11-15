@@ -12,6 +12,11 @@
 - Preserve seven themes, stored preferences, immediate authenticated entry, encryption, reset safeguards and automatic backup retention. See Docs/REFINEMENT-2026-11-14.md for the source review; the requested GitHub build adds native and simulator evidence.
 - Add a separate simulator job with screenshot attachments and ordinary setup/navigation/lock checks, using production app sources and real native dependencies. No test-only access path is included in the IPA.
 
+- Fix the simulator-confirmed crash when reselecting Albums from Recently Deleted: remove unused published presentation flags from teardown while retaining immediate media privacy cleanup.
+- Replace the unavailable calculator mode symbol with a supported arithmetic symbol; include MEGA HTTP/zxcvbn helper sources required by simulator linking.
+- GitHub run **43657145638**, source `ffb987ff55eea2fc495d6a72110f05697d886f24`: **141 core tests, 13 recovery tests, native build/package checks and one complete simulator UI journey passed**. Eleven planned screenshots reviewed. Largest accessibility text still causes awkward tab-label wrapping and crowded header controls; signed-device/provider/media acceptance remains pending.
+- Delivered only **Arithen-0.12.7.ipa** to the Desktop project IPA folder, replacing 0.12.6 and preserving other apps. No public release.
+
 ## 0.12.6 · Direct Files and recovery reset
 
 **November 12, 2026 · Build 22 · Test build**

@@ -1,5 +1,15 @@
 # Arithen handoff
 
+## Delivered 0.12.7/build 23 — November 14, 2026
+
+GitHub run [43657145638](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/43657145638) passed both jobs at source **ffb987ff55eea2fc495d6a72110f05697d886f24**: 141 core tests, 13 recovery tests, native IPA/package checks and one complete XCTest UI journey on iPhone 17 Pro / iOS 26.2. Eleven planned screenshots were visually reviewed. The source and artifact manifests match. Evidence is in `.build/delivery-0.12.7.json`, `.build/simulator-0.12.7-evidence.json` and the GitHub artifacts. Later documentation-only commits do not change the tested source.
+
+Delivered `C:\Users\naith\Desktop\ipa\My Projects (N3mo Studio)\Arithen-0.12.7.ipa`; removed the older 0.12.6 IPA only after verification. Other projects preserved. No public release. This supersedes all historical current-build/source-only statements below.
+
+The simulator exposed and verified a fix for an actual Albums reselect crash: unused published presentation flags were written during SwiftUI teardown. Their removal preserves synchronous media close/clear and actual lock state. The calculator mode symbol is now visible. Simulator setup uses ordinary credentials, no test-only access bypass.
+
+Remaining: maximum accessibility text has awkward bottom-tab wrapping and crowded header controls. The passing journey establishes functional navigation, not perfect layout. Real Files/folder provider completion, signed-device behavior, populated media paging/playback, live MEGA/Blomp, battery and frame pacing remain unverified. Never claim all of these passed from the empty disposable simulator vault.
+
 ## Requested GitHub build and simulator validation — November 14, 2026
 
 The user now authorizes pushing this refinement for a GitHub build, running a simulator job, and replacing the prior Arithen IPA in `C:\Users\naith\Desktop\ipa\My Projects (N3mo Studio)`. Target **0.12.7/build 23**. This supersedes the preceding source-only stop below. Deliver only the verified IPA after both jobs succeed; preserve other apps. No GitHub release is requested.
