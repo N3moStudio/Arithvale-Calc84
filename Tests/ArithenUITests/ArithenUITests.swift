@@ -19,8 +19,12 @@ final class ArithenUITests: XCTestCase {
         XCTAssertTrue(element.isHittable, "Not reachable: \(element)")
     }
     private func tap(_ label: String) {
-        let button = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", label)).firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 10), "Missing button: \(label)")
+        let matches = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", label))
+        XCTAssertTrue(matches.firstMatch.waitForExistence(timeout: 10), "Missing button: \(label)")
+        // Full-screen covers can leave the calculator in the AX tree. Interact
+        // with the visible control, not a same-labelled button behind the cover.
+        let candidates = matches.allElementsBoundByIndex
+        let button = candidates.first(where: { $0.isHittable }) ?? candidates.last!
         reveal(button)
         XCTAssertTrue(button.isEnabled, "Disabled button: \(label)")
         button.tap()
