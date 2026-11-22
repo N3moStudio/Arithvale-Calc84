@@ -564,7 +564,7 @@ def main():
     parser.add_argument("--salvage", action="store_true", help="v3 only: recover whole authenticated resources and report every damaged or missing record")
     args = parser.parse_args()
     if args.backup is None:
-        args.backup = Path(input("Encrypted .c84backup or .c84cloud catalog file: ").strip().strip('"'))
+        args.backup = Path(input("Encrypted .arithenbackup, .c84backup or .c84cloud file: ").strip().strip('"'))
         if not args.verify_only and args.output is None:
             args.output = Path(input("New folder for recovered originals: ").strip().strip('"'))
     if not args.verify_only and args.output is None:

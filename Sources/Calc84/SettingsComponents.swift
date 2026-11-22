@@ -18,6 +18,9 @@ struct SettingsRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: symbol).font(.body.weight(.medium))
+                // Decorative symbols must stay inside their slot while the
+                // adjacent setting text retains full accessibility scaling.
+                .dynamicTypeSize(.xSmall ... .xxxLarge)
                 .foregroundStyle(ArithenPalette.color(.accent, theme: theme))
                 .frame(width: 32, height: 32).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {

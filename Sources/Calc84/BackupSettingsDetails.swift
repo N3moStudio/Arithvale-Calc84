@@ -131,7 +131,7 @@ private struct RestoreLibraryHelpView: View {
             Section("Restore your library") {
                 Text("1. Before deleting anything, save a backup outside the app and test that exact file. Wait for your Files provider to finish uploading.")
                 Text("2. In a fresh installation, enter 160160 and hold =. Choose Start from Existing Backups, or share a backup from Files to this app.")
-                Text("3. Select the .c84backup file, enter its old recovery key, and tap Add Backup to Setup. Save and confirm the new recovery key, choose a calculator code, then create the library.")
+                Text("3. Select the backup file, enter its recovery key, and tap Add Backup to Setup. Save and confirm the new recovery key, choose a calculator code, then create the library.")
                 Text("4. Check photos, videos, and dates. Reconnect your backup folder if you used one.")
             }
             Section("Updates and keys") {
