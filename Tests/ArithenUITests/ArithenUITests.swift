@@ -125,15 +125,21 @@ final class ArithenUITests: XCTestCase {
         // PhotosPicker is a separate system process. The covered library's
         // photo.on.rectangle / Add controls remain in Arithen's AX hierarchy.
         let picker = XCUIApplication(bundleIdentifier: "com.apple.mobileslideshow.photospicker")
-        let cell = picker.cells.firstMatch
-        XCTAssertTrue(cell.waitForExistence(timeout: 15), "System photo cells must be selectable: \(picker.debugDescription)")
-        cell.tap()
+        // iOS 26 exposes grid assets as AX images, not collection-view cells.
+        let photo = picker.images.matching(identifier: "PXGGridLayout-Info").firstMatch
+        XCTAssertTrue(photo.waitForExistence(timeout: 15), "System photo must be selectable: \(picker.debugDescription)")
+        photo.tap()
         let add = picker.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label == %@", "Add", "Done")).firstMatch
         XCTAssertTrue(add.waitForExistence(timeout: 10), "System confirm button: \(picker.debugDescription)")
         XCTAssertTrue(add.isEnabled)
         add.tap()
+        // Import requests Photos access for original metadata/deletion. Exercise
+        // the real permission prompt in this disposable simulator library.
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let fullAccess = springboard.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Full Access")).firstMatch
+        if fullAccess.waitForExistence(timeout: 15) { fullAccess.tap() }
         let imported = app.staticTexts["1 Snap Imported"]
-        XCTAssertTrue(imported.waitForExistence(timeout: 60), "Photo import must commit")
+        XCTAssertTrue(imported.waitForExistence(timeout: 60), "Photo import must commit: \(app.debugDescription)\nSystem: \(springboard.debugDescription)")
         capture("photo-import-completed")
         if app.buttons["Keep Originals"].exists { tap("Keep Originals") } else { tap("Done") }
         XCTAssertTrue(app.staticTexts["1 Snap"].waitForExistence(timeout: 10))
