@@ -122,11 +122,16 @@ final class ArithenUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Import"].isEnabled)
         capture("07-files-import"); tap("Close")
         tap("Add to Library"); tap("Photos & Videos")
-        let photo = app.images.matching(NSPredicate(format: "label CONTAINS[c] %@", "Photo")).firstMatch
-        let cell = app.cells.firstMatch
-        XCTAssertTrue(photo.waitForExistence(timeout: 10) || cell.waitForExistence(timeout: 5), "Seeded photo must be selectable")
-        if photo.exists { photo.tap() } else { cell.tap() }
-        tap("Add")
+        // PhotosPicker is a separate system process. The covered library's
+        // photo.on.rectangle / Add controls remain in Arithen's AX hierarchy.
+        let picker = XCUIApplication(bundleIdentifier: "com.apple.mobileslideshow.photospicker")
+        let cell = picker.cells.firstMatch
+        XCTAssertTrue(cell.waitForExistence(timeout: 15), "System photo cells must be selectable: \(picker.debugDescription)")
+        cell.tap()
+        let add = picker.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label == %@", "Add", "Done")).firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 10), "System confirm button: \(picker.debugDescription)")
+        XCTAssertTrue(add.isEnabled)
+        add.tap()
         let imported = app.staticTexts["1 Snap Imported"]
         XCTAssertTrue(imported.waitForExistence(timeout: 60), "Photo import must commit")
         capture("photo-import-completed")
