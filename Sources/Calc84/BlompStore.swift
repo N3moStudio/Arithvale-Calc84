@@ -19,12 +19,15 @@ private final class CloudHTTP: NSObject, URLSessionDataDelegate, @unchecked Send
     static func run(_ request: URLRequest, upload: URL? = nil, destination: URL? = nil,
                     limit: Int, cellular: Bool) async throws -> (Data, HTTPURLResponse) {
         let operation = CloudHTTP(limit: limit)
-        if let destination {
-            guard FileManager.default.createFile(atPath: destination.path, contents: nil,
-                attributes: [.protectionKey: FileProtectionType.complete]) else { throw CloudError.service }
-            operation.output = try FileHandle(forWritingTo: destination)
-        }
+        var createdDestination = false
         do {
+            if let destination {
+                guard !FileManager.default.fileExists(atPath: destination.path) else { throw CloudError.service }
+                guard FileManager.default.createFile(atPath: destination.path, contents: nil,
+                    attributes: [.protectionKey: FileProtectionType.complete]) else { throw CloudError.service }
+                createdDestination = true
+                operation.output = try FileHandle(forWritingTo: destination)
+            }
             return try await withTaskCancellationHandler {
                 try await withCheckedThrowingContinuation { completion in
                     operation.mutex.lock()
@@ -47,7 +50,7 @@ private final class CloudHTTP: NSObject, URLSessionDataDelegate, @unchecked Send
             }
         } catch {
             try? operation.output?.close(); operation.output = nil
-            if let destination { try? FileManager.default.removeItem(at: destination) }; throw error
+            if createdDestination, let destination { try? FileManager.default.removeItem(at: destination) }; throw error
         }
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
@@ -148,9 +151,19 @@ actor BlompStore: CloudStore {
         try Self.check(response.statusCode)
     }
     func download(path: String, to: URL, maximum: Int) async throws {
-        let (_, response) = try await CloudHTTP.run(request(path: path, method: "GET"), destination: to, limit: maximum, cellular: cellular)
-        do { try Self.check(response.statusCode) }
-        catch { try? FileManager.default.removeItem(at: to); throw error }
+        guard !FileManager.default.fileExists(atPath: to.path) else { throw CloudError.service }
+        guard let expected = try await size(path: path) else { throw CloudError.missing }
+        try DownloadLength.validate(actual: expected, expected: expected, maximum: maximum)
+        do {
+            let (_, response) = try await CloudHTTP.run(request(path: path, method: "GET"), destination: to, limit: maximum, cellular: cellular)
+            try Self.check(response.statusCode)
+            let actual = try to.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? -1
+            try DownloadLength.validate(actual: actual, expected: expected, maximum: maximum)
+            if let advertised = response.value(forHTTPHeaderField: "Content-Length") {
+                guard let length = Int(advertised) else { throw VaultError.invalidBackup }
+                try DownloadLength.validate(actual: actual, expected: length, maximum: maximum)
+            }
+        } catch { try? FileManager.default.removeItem(at: to); throw error }
     }
     private struct ObjectName: Decodable { let name: String }
     private static func check(_ status: Int) throws {

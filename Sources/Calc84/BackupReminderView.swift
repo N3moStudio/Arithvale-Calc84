@@ -3,6 +3,7 @@ import SwiftUI
 import CalcCore
 
 struct BackupReminderView: View {
+    @Environment(\.arithenTheme) private var theme
     @EnvironmentObject private var vault: VaultModel
     @Environment(\.scenePhase) private var scene
     @AppStorage("privateBackupReminders") private var enabled = true
@@ -25,7 +26,7 @@ struct BackupReminderView: View {
                         Label {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Time for a backup").font(.subheadline.weight(.semibold))
-                                Text("Library changes need a new Files backup.").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
+                                Text("Library changes need a new Files backup.").font(.caption).foregroundStyle(ArithenPalette.color(.muted, theme: theme))
                             }
                         } icon: { Image(systemName: "externaldrive.badge.exclamationmark") }
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)

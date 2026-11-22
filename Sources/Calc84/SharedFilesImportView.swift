@@ -5,6 +5,8 @@ import Combine
 import CalcCore
 import UniformTypeIdentifiers
 
+private enum InboxAccessError: Error { case missingKey }
+
 private actor SharedFilesStorage {
     private let inbox = SharedFileInbox(root: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("ArithenIncomingFiles"))
     private func key() throws -> Data {
@@ -17,15 +19,26 @@ private actor SharedFilesStorage {
         if status == errSecSuccess, let data = value as? Data { return data }
         guard status == errSecItemNotFound else { throw CocoaError(.fileReadNoPermission) }
         // A missing device key must not silently replace the key for pending files.
-        if FileManager.default.fileExists(atPath: inbox.root.path),
-           !(try FileManager.default.contentsOfDirectory(atPath: inbox.root.path)).isEmpty { throw CocoaError(.fileReadNoPermission) }
+        if !(try inbox.receivedIDs()).isEmpty { throw InboxAccessError.missingKey }
         let data = SharedFileInbox.newKey()
         var create = query; create[kSecValueData as String] = data
         create[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         guard SecItemAdd(create as CFDictionary, nil) == errSecSuccess else { throw CocoaError(.fileWriteNoPermission) }
         return data
     }
-    func entries() throws -> [SharedFileInbox.Entry] { try inbox.entries(key: key()) }
+    struct Scan: Sendable {
+        let entries: [SharedFileInbox.Entry]
+        let unreadableIDs: [UUID]
+        let missingKey: Bool
+    }
+    func scan() throws -> Scan {
+        do {
+            let result = try inbox.scan(key: key())
+            return Scan(entries: result.entries, unreadableIDs: result.unreadableIDs, missingKey: false)
+        } catch InboxAccessError.missingKey {
+            return Scan(entries: [], unreadableIDs: try inbox.receivedIDs(), missingKey: true)
+        }
+    }
     func receive(_ access: BackupSelection) throws {
         defer { withExtendedLifetime(access) {} }
         let data = try key()
@@ -43,19 +56,33 @@ private actor SharedFilesStorage {
         guard let result else { throw CocoaError(.fileReadUnknown) }
         try result.get()
     }
-    func prepare(_ entries: [SharedFileInbox.Entry], at root: URL) throws -> [URL: UUID] {
+    struct Prepared: Sendable { let mapping: [URL: UUID]; let unreadableIDs: [UUID] }
+    func prepare(_ entries: [SharedFileInbox.Entry], at root: URL) throws -> Prepared {
         let data = try key(); var result: [URL: UUID] = [:]
         try StoragePreflight.require(bytes: entries.reduce(Int64(0)) { $0 + Int64($1.bytes) } * 3)
+        var unreadable: [UUID] = []
         for entry in entries {
+            try Task.checkCancellation()
             let directory = root.appendingPathComponent(entry.id.uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
                 attributes: [.protectionKey: FileProtectionType.complete])
             let url = directory.appendingPathComponent(entry.name)
-            try inbox.materialize(entry, key: data, to: url)
-            try FileManager.default.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: url.path)
-            result[url] = entry.id
+            do {
+                try inbox.materialize(entry, key: data, to: url)
+                try FileManager.default.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: url.path)
+                result[url] = entry.id
+            } catch {
+                try Task.checkCancellation()
+                // Authentication damage is isolated; permissions/space/I/O failures
+                // remain retryable and must never be labelled safe to discard.
+                if case VaultError.invalidBackup = error {
+                    unreadable.append(entry.id); try? FileManager.default.removeItem(at: directory)
+                } else if case VaultError.wrongPasswordOrDamaged = error {
+                    unreadable.append(entry.id); try? FileManager.default.removeItem(at: directory)
+                } else { throw error }
+            }
         }
-        return result
+        return Prepared(mapping: result, unreadableIDs: unreadable)
     }
     func discard(_ ids: [UUID]) throws { for id in ids { try inbox.discard(id) } }
 }
@@ -63,19 +90,28 @@ private actor SharedFilesStorage {
 @MainActor
 final class SharedFilesModel: ObservableObject {
     @Published private(set) var entries: [SharedFileInbox.Entry] = []
+    @Published private(set) var unreadableIDs: [UUID] = []
+    @Published private(set) var missingKey = false
     @Published private var receiving = 0
     @Published private var importing = false
     var working: Bool { receiving > 0 || importing }
     @Published private(set) var error: String?
     @Published private(set) var importedCount: Int?
-    var hasPending: Bool { !entries.isEmpty || working || error != nil }
+    var hasPending: Bool { !entries.isEmpty || !unreadableIDs.isEmpty || working || error != nil }
     private let storage = SharedFilesStorage()
+    private var payloadUnreadableIDs = Set<UUID>()
     private var receipt: Task<Void, Never>?
     private var preparation: Task<Void, Never>?
     private var privacy: AnyCancellable?
     init() { receipt = Task { await reload() } }
     private func reload() async {
-        do { entries = try await storage.entries() } catch { self.error = error.localizedDescription }
+        do {
+            let result = try await storage.scan()
+            payloadUnreadableIDs.formIntersection(Set(result.entries.map(\.id)).union(result.unreadableIDs))
+            unreadableIDs = Array(Set(result.unreadableIDs).union(payloadUnreadableIDs))
+            entries = result.entries.filter { !unreadableIDs.contains($0.id) }
+            missingKey = result.missingKey
+        } catch { entries = []; self.error = error.localizedDescription }
     }
     func receive(_ url: URL) {
         guard url.isFileURL else { error = "Share the downloaded file itself, not a link."; return }
@@ -92,21 +128,32 @@ final class SharedFilesModel: ObservableObject {
     }
     func importPending(vault: VaultModel) {
         guard vault.unlocked, !vault.busy, !working, !entries.isEmpty else { return }
+        let operationToken = vault.beginOperation()
         importing = true; error = nil; importedCount = nil
         // Reserve the operation before decrypting the inbox, so indexing and
         // other imports cannot overlap this preparation window.
-        vault.textSearch.pause(); vault.busy = true
+        vault.textSearch.pause()
         let batch = entries, generation = vault.generation
         let root = TemporaryFiles.directory.appendingPathComponent("shared-" + UUID().uuidString)
         privacy = vault.$unlocked.dropFirst().filter { !$0 }.sink { [weak self] _ in self?.preparation?.cancel() }
         preparation = Task {
             defer { preparation = nil }
             do {
-                let mapping = try await storage.prepare(batch, at: root)
+                let prepared = try await storage.prepare(batch, at: root)
+                let mapping = prepared.mapping
+                payloadUnreadableIDs.formUnion(prepared.unreadableIDs)
+                unreadableIDs = Array(Set(unreadableIDs).union(prepared.unreadableIDs))
                 guard !Task.isCancelled, vault.unlocked, generation == vault.generation else {
-                    try? FileManager.default.removeItem(at: root); importing = false; vault.busy = false; privacy = nil; return
+                    try? FileManager.default.removeItem(at: root); importing = false; vault.endOperation(operationToken); privacy = nil; return
                 }
-                vault.busy = false
+                vault.endOperation(operationToken)
+                guard !mapping.isEmpty else {
+                    try? FileManager.default.removeItem(at: root)
+                    importing = false; privacy = nil
+                    await reload()
+                    error = "No readable files were found. Share the originals again or remove the unreadable received copies."
+                    return
+                }
                 vault.importFiles(Array(mapping.keys), receivedCopies: true) { [self] imported in
                     Task { @MainActor in
                         defer { try? FileManager.default.removeItem(at: root); self.importing = false; self.privacy = nil }
@@ -118,16 +165,16 @@ final class SharedFilesModel: ObservableObject {
                     }
                 }
             } catch {
-                try? FileManager.default.removeItem(at: root); importing = false; vault.busy = false; privacy = nil; if !Task.isCancelled { self.error = error.localizedDescription }
+                try? FileManager.default.removeItem(at: root); importing = false; vault.endOperation(operationToken); privacy = nil; if !Task.isCancelled { self.error = error.localizedDescription }
             }
         }
     }
-    func discard() {
+    func discard(unreadableOnly: Bool = false) {
         guard !working else { return }
-        importing = true; let ids = entries.map(\.id)
+        importing = true; let ids = unreadableOnly ? unreadableIDs : entries.map(\.id) + unreadableIDs
         Task {
             defer { importing = false }
-            do { try await storage.discard(ids); error = nil; await reload() } catch { self.error = error.localizedDescription }
+            do { try await storage.discard(ids); unreadableIDs.removeAll { ids.contains($0) }; payloadUnreadableIDs.subtract(ids); error = nil; await reload() } catch { self.error = error.localizedDescription }
         }
     }
 }
@@ -137,6 +184,7 @@ struct SharedFilesImportView: View {
     @EnvironmentObject private var vault: VaultModel
     @Environment(\.dismiss) private var dismiss
     @State private var removing = false
+    @State private var removingUnreadable = false
     @State private var choosing = false
     @State private var selectedFiles: [BackupSelection] = []
     var body: some View {
@@ -165,6 +213,13 @@ struct SharedFilesImportView: View {
             if let error = shared.error {
                 Section { Label(error, systemImage: "exclamationmark.circle").font(.subheadline).fixedSize(horizontal: false, vertical: true) }
             }
+            if !shared.unreadableIDs.isEmpty {
+                Section("Unreadable Received Copies") {
+                    Text(shared.missingKey ? "This device no longer has the key for these received copies. Share the originals again after removing them." : "Some received copies could not be opened. Your readable files can still be imported.")
+                    Button("Remove Unreadable Copies", role: .destructive) { removingUnreadable = true }
+                        .disabled(shared.working || vault.busy)
+                }
+            }
             if !shared.entries.isEmpty {
                 Section { Button("Remove Received Copies", role: .destructive) { removing = true }.disabled(shared.working || vault.busy) }
             }
@@ -181,6 +236,9 @@ struct SharedFilesImportView: View {
                 }
             }
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            .confirmationDialog("Remove unreadable received copies?", isPresented: $removingUnreadable, titleVisibility: .visible) {
+                Button("Remove Unreadable Copies", role: .destructive) { shared.discard(unreadableOnly: true) }
+            } message: { Text("Only the received copies in Arithen will be removed. Your library and originals in Files stay unchanged.") }
             .confirmationDialog("Remove received copies?", isPresented: $removing, titleVisibility: .visible) {
                 Button("Remove Copies", role: .destructive) { shared.discard() }
             } message: { Text("The originals in Files stay where they are.") }
@@ -215,11 +273,12 @@ private struct SelectedFilesPicker: UIViewControllerRepresentable {
 }
 
 struct ImportButtonStyle: ButtonStyle {
+    @Environment(\.arithenTheme) private var theme
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.headline).frame(maxWidth: .infinity, minHeight: 50)
-            .foregroundStyle(enabled ? ArithenPalette.color(.onAccent) : ArithenPalette.color(.muted))
-            .background(enabled ? ArithenPalette.color(.accent) : ArithenPalette.color(.muted).opacity(0.12), in: Capsule())
+            .foregroundStyle(enabled ? ArithenPalette.color(.onAccent, theme: theme) : ArithenPalette.color(.muted, theme: theme))
+            .background(enabled ? ArithenPalette.color(.accent, theme: theme) : ArithenPalette.color(.muted, theme: theme).opacity(0.12), in: Capsule())
             .opacity(configuration.isPressed ? 0.75 : 1)
     }
 }

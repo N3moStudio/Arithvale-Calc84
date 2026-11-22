@@ -1,5 +1,9 @@
 # Arithen handoff
 
+## Current reliability build — November 21, 2026
+
+User authorized fixing the two external reviews, GitHub IPA build and expanded simulator testing. Target **0.12.8/build 24**. Read RELIABILITY-2026-11-21.md for each finding/disposition. Preserve formats/keys/identity; no encryption migration. Await current CI artifacts before reporting delivery. Deliver only current verified IPA to Desktop/ipa/My Projects (N3mo Studio), replacing prior Arithen only.
+
 ## Delivered 0.12.7/build 23 — November 14, 2026
 
 GitHub run [43657145638](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/43657145638) passed both jobs at source **ffb987ff55eea2fc495d6a72110f05697d886f24**: 141 core tests, 13 recovery tests, native IPA/package checks and one complete XCTest UI journey on iPhone 17 Pro / iOS 26.2. Eleven planned screenshots were visually reviewed. The source and artifact manifests match. Evidence is in `.build/delivery-0.12.7.json`, `.build/simulator-0.12.7-evidence.json` and the GitHub artifacts. Later documentation-only commits do not change the tested source.

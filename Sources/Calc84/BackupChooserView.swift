@@ -77,7 +77,9 @@ final class BackupInputModel: ObservableObject {
     }
     func prepare(_ url: URL, scope: BackupSelection? = nil, displayName: String? = nil) {
         guard !working else { return }
-        working = true; error = nil; notice = nil
+        // A failed replacement must never leave the previous archive actionable
+        // under the newly selected filename/error.
+        backup = nil; working = true; error = nil; notice = nil
         let access = scope ?? BackupSelection(url); let parent = folder
         preparation = Task {
             defer { working = false }

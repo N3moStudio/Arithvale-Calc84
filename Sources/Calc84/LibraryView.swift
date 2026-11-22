@@ -4,6 +4,7 @@ import CalcCore
 import PhotosUI
 #if canImport(_PhotosUI_SwiftUI)
 import _PhotosUI_SwiftUI
+
 #endif
 import UniformTypeIdentifiers
 
@@ -102,7 +103,7 @@ private struct LibraryPane: View {
             Group {
                 if selecting { actionBar }
                 else { navigationBar.padding(5) }
-            }.modifier(FloatingLibraryBar()).padding(.horizontal, textSize.isAccessibilitySize ? 14 : 30).padding(.vertical, 8)
+            }.modifier(AdaptiveLibraryBar()).padding(.horizontal, textSize.isAccessibilitySize ? 14 : 30).padding(.vertical, 8)
         }
         .background(ArithenPalette.color(.canvas, theme: theme).ignoresSafeArea())
         .sheet(isPresented: $settings) { NavigationStack { VaultSettingsView().environmentObject(vault) } }
@@ -185,10 +186,10 @@ private struct LibraryPane: View {
             if sharedFiles.hasPending { receivedFiles }
             if searching {
                 HStack {
-                    Image(systemName: "magnifyingglass").foregroundStyle(ArithenPalette.color(.muted))
+                    Image(systemName: "magnifyingglass").foregroundStyle(ArithenPalette.color(.muted, theme: theme))
                     TextField("Search names, albums, tags or text", text: $search).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    Button("Clear", systemImage: "xmark.circle.fill") { search = "" }.labelStyle(.iconOnly).frame(width: 44, height: 44)
-                }.padding(.leading, 14).background(ArithenPalette.color(.surface), in: RoundedRectangle(cornerRadius: 12))
+                    Button("Clear", systemImage: "xmark.circle.fill") { search = "" }.labelStyle(.iconOnly).font(.system(size: 22)).frame(width: 44, height: 44)
+                }.padding(.leading, 14).background(ArithenPalette.color(.surface, theme: theme), in: RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 16).padding(.bottom, 8)
             }
             if !showingAlbums || albumDetail { filters }
@@ -203,7 +204,7 @@ private struct LibraryPane: View {
                     if vault.importing { Button("Cancel") { vault.cancelImport() }.frame(minHeight: 44) }
                     if vault.cloud.running { Button("Pause") { vault.cloud.pause() }.frame(minHeight: 44) }
                 }
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(12).background(ArithenPalette.color(.surface))
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(12).background(ArithenPalette.color(.surface, theme: theme))
             }
             if vault.failedImportCount > 0 && !vault.busy {
                 Button("Retry \(vault.failedImportCount) Unimported Items") { vault.retryImports() }.frame(minHeight: 44)
@@ -258,7 +259,7 @@ private struct LibraryPane: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Button("Lock & Return to Calculator", systemImage: "lock.fill") { vault.lock(); close() }
-                    .labelStyle(.iconOnly).frame(width: 44, height: 44)
+                    .labelStyle(.iconOnly).font(.system(size: 22)).frame(width: 44, height: 44)
                 if !textSize.isAccessibilitySize { headerTitle }
                 Spacer(minLength: 0)
                 if selecting {
@@ -266,9 +267,9 @@ private struct LibraryPane: View {
                         .font(.body.weight(.semibold)).fixedSize(horizontal: true, vertical: false).frame(minHeight: 44)
                 } else {
                     Button("Add to Library", systemImage: "plus") { adding = true }
-                        .labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(vault.busy)
+                        .labelStyle(.iconOnly).font(.system(size: 22)).frame(width: 44, height: 44).disabled(vault.busy)
                     Button("Settings", systemImage: "gearshape") { settings = true }
-                        .labelStyle(.iconOnly).frame(width: 44, height: 44)
+                        .labelStyle(.iconOnly).font(.system(size: 22)).frame(width: 44, height: 44)
                 }
             }
             // Give large text its own row instead of shrinking it beside the controls.
@@ -289,14 +290,14 @@ private struct LibraryPane: View {
                 else { Image(systemName: sharedFiles.error == nil ? "doc.on.doc" : "exclamationmark.circle").font(.title2).frame(width: 28) }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(sharedFiles.working ? "Preparing files…" : sharedFiles.error != nil ? "Files need attention" : "\(sharedFiles.entries.count.formatted()) \(sharedFiles.entries.count == 1 ? "file received" : "files received")")
-                        .font(.subheadline.weight(.semibold)).foregroundStyle(ArithenPalette.color(.text))
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(ArithenPalette.color(.text, theme: theme))
                     Text(sharedFiles.working ? "Your received copies are being processed" : sharedFiles.error != nil ? "Review the import" : "Ready to import into your library")
-                        .font(.caption).foregroundStyle(ArithenPalette.color(.muted))
+                        .font(.caption).foregroundStyle(ArithenPalette.color(.muted, theme: theme))
                 }.multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold))
             }.frame(minHeight: 44).padding(14)
-                .background(ArithenPalette.color(.surface), in: RoundedRectangle(cornerRadius: 14))
+                .background(ArithenPalette.color(.surface, theme: theme), in: RoundedRectangle(cornerRadius: 14))
         }.buttonStyle(.plain).padding(.horizontal, 14).padding(.bottom, 8)
     }
     private var receivedBackup: some View {
@@ -306,18 +307,18 @@ private struct LibraryPane: View {
                     Image(systemName: "doc.badge.arrow.up").font(.title2)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(shared.working ? "Receiving backup…" : shared.error != nil ? "Review received backup" : "Backup received")
-                            .font(.subheadline.weight(.semibold)).foregroundStyle(ArithenPalette.color(.text))
-                        Text("Import into your library").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(ArithenPalette.color(.text, theme: theme))
+                        Text("Import into your library").font(.caption).foregroundStyle(ArithenPalette.color(.muted, theme: theme))
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right").font(.caption.weight(.semibold))
-                }.frame(minHeight: 44)
+                }.fixedSize(horizontal: false, vertical: true).frame(minHeight: 44)
             }.disabled(shared.working || vault.busy)
             Button("Remove Received Copy", systemImage: "xmark") { removeReceived = true }
-                .labelStyle(.iconOnly).frame(width: 44, height: 44).foregroundStyle(ArithenPalette.color(.muted))
+                .labelStyle(.iconOnly).font(.system(size: 22)).frame(width: 44, height: 44).foregroundStyle(ArithenPalette.color(.muted, theme: theme))
                 .disabled(shared.working || vault.busy)
         }.padding(.leading, 14).padding(.vertical, 7)
-            .background(ArithenPalette.color(.surface), in: RoundedRectangle(cornerRadius: style == .contactSheet ? 9 : 14))
+            .background(ArithenPalette.color(.surface, theme: theme), in: RoundedRectangle(cornerRadius: style == .contactSheet ? 9 : 14))
             .padding(.horizontal, 14).padding(.bottom, 8)
     }
     private var filters: some View {
@@ -327,7 +328,9 @@ private struct LibraryPane: View {
                 VStack(alignment: .leading, spacing: 0) {
                     countAndSort
                     ScrollView(.horizontal) { filterButtons.fixedSize(horizontal: true, vertical: false) }
-                        .scrollIndicators(.hidden)
+                        .scrollIndicators(.visible)
+                        .accessibilityLabel("Snap filters")
+                        .accessibilityHint("Swipe horizontally for Photos, Videos and Favs.")
                 }
             } else {
                 ViewThatFits(in: .horizontal) {
@@ -341,7 +344,7 @@ private struct LibraryPane: View {
                 }
             }
         }.padding(.horizontal, 14).padding(.vertical, 4)
-            .overlay(alignment: .bottom) { Rectangle().fill(ArithenPalette.color(.text).opacity(0.12)).frame(height: 0.5) }
+            .overlay(alignment: .bottom) { Rectangle().fill(ArithenPalette.color(.text, theme: theme).opacity(0.12)).frame(height: 0.5) }
     }
     private var countAndSort: some View {
         HStack(spacing: 8) { snapCount; Spacer(minLength: 0); sortMenu }
@@ -350,7 +353,7 @@ private struct LibraryPane: View {
         Menu {
             sortOptions
         } label: {
-            Image(systemName: "arrow.up.arrow.down").frame(width: 44, height: 44)
+            Image(systemName: "arrow.up.arrow.down").font(.system(size: 22)).frame(width: 44, height: 44)
         }
         .accessibilityLabel("Sort Snaps")
         .accessibilityValue("\((LibraryDateSource(rawValue: dateSource) ?? .captured).title), \(newestFirst ? "newest first" : "oldest first")")
@@ -378,7 +381,7 @@ private struct LibraryPane: View {
                 Button { filter = filter == value ? "All" : value; selection = [] } label: {
                     Text(value == "Favorites" ? "Favs" : value).font(.subheadline.weight(filter == value ? .bold : .medium))
                         .fixedSize(horizontal: false, vertical: true)
-                        .foregroundStyle(ArithenPalette.color(filter == value ? .accent : .muted))
+                        .foregroundStyle(ArithenPalette.color(filter == value ? .accent : .muted, theme: theme))
                         .frame(minHeight: 44)
                         .overlay(alignment: .bottom) { if filter == value { Capsule().fill(.tint).frame(height: 2) } }
                 }.accessibilityAddTraits(filter == value ? .isSelected : [])
@@ -400,7 +403,7 @@ private struct LibraryPane: View {
             VStack(spacing: 3) {
                 Image(systemName: symbol).font(.system(size: 21, weight: active ? .semibold : .regular))
                 Text(title).font(.caption2.weight(active ? .semibold : .regular))
-                    .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
             }.frame(maxWidth: .infinity, minHeight: 48)
                 .foregroundStyle(ArithenPalette.color(active ? .accent : .muted, theme: theme))
                 .background {
@@ -409,7 +412,11 @@ private struct LibraryPane: View {
                             .matchedGeometryEffect(id: "library-navigation-selection", in: navigationMotion)
                     }
                 }
-        }.accessibilityAddTraits(active ? .isSelected : [])
+        // Tab chrome stays compact so the library retains usable space. The
+        // native large-content viewer exposes the full label at accessibility sizes.
+        }.dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .accessibilityShowsLargeContentViewer { Label(title, systemImage: symbol) }
+            .accessibilityAddTraits(active ? .isSelected : [])
     }
     private var addSheet: some View {
         NavigationStack {
@@ -434,26 +441,34 @@ private struct LibraryPane: View {
         pendingAdd = nil
     }
     private var actionBar: some View {
-        HStack(spacing: 4) {
+        let layout = textSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 4)) : AnyLayout(HStackLayout(spacing: 4))
+        return layout {
             if filter == "Recently Deleted" {
-                Button("Restore", systemImage: "arrow.uturn.backward") { Task { await vault.updateMany(selectedItems, deleted: false); selection = [] } }
-                    .frame(maxWidth: .infinity, minHeight: 48)
+                Button { Task { await vault.updateMany(selectedItems, deleted: false); selection = [] } } label: {
+                    selectionActionLabel("Restore", symbol: "arrow.uturn.backward")
+                }
             } else {
                 Button { exportItems = selectedItems; showingExports = true } label: {
-                    VStack(spacing: 4) { Image(systemName: "square.and.arrow.up"); Text("Share").font(.caption) }
-                        .frame(maxWidth: .infinity, minHeight: 48)
+                    selectionActionLabel("Share", symbol: "square.and.arrow.up")
                 }
                 Button { albumSheet = true } label: {
-                    VStack(spacing: 4) { Image(systemName: "rectangle.stack.badge.plus"); Text("Add to Album").font(.caption) }
-                        .frame(maxWidth: .infinity, minHeight: 48)
+                    selectionActionLabel("Add to Album", symbol: "rectangle.stack.badge.plus")
                 }
             }
             Button(role: .destructive) { deletion = true } label: {
-                VStack(spacing: 4) { Image(systemName: "trash"); Text("Delete").font(.caption) }
-                    .frame(maxWidth: .infinity, minHeight: 48)
+                selectionActionLabel("Delete", symbol: "trash")
             }
-        }.multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
-            .padding(6).disabled(vault.busy || selection.isEmpty)
+        }.padding(6).disabled(vault.busy || selection.isEmpty)
+    }
+    private func selectionActionLabel(_ title: String, symbol: String) -> some View {
+        let layout = textSize.isAccessibilitySize
+            ? AnyLayout(HStackLayout(spacing: 10)) : AnyLayout(VStackLayout(spacing: 4))
+        return layout {
+            Image(systemName: symbol)
+            Text(title).font(textSize.isAccessibilitySize ? .body : .caption)
+                .fixedSize(horizontal: false, vertical: true)
+        }.frame(maxWidth: .infinity, minHeight: 48)
     }
     private func open(_ item: VaultItem) {
         if selecting { if !selection.insert(item.id).inserted { selection.remove(item.id) } }
@@ -472,6 +487,14 @@ private struct LibraryPane: View {
         NavigationStack {
             AlbumTagEditor(ids: selection) { albumSheet = false; selection = [] }
         }
+    }
+}
+private struct AdaptiveLibraryBar: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var textSize
+    func body(content: Content) -> some View {
+        if textSize.isAccessibilitySize {
+            content.modifier(ArithenGlass(tint: .clear, shape: RoundedRectangle(cornerRadius: 24), interactive: false))
+        } else { content.modifier(FloatingLibraryBar()) }
     }
 }
 #endif

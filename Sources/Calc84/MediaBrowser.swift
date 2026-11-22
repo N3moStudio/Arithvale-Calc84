@@ -87,10 +87,11 @@ struct MediaBrowser: View {
 }
 
 private struct MediaOverlayButtonStyle: ButtonStyle {
+    @Environment(\.arithenTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.system(size: 19, weight: .semibold, design: .rounded))
-            .foregroundStyle(ArithenPalette.color(.text)).frame(width: 44, height: 44)
+            .foregroundStyle(ArithenPalette.color(.text, theme: theme)).frame(width: 44, height: 44)
             .modifier(ArithenGlass(tint: .clear, shape: Circle()))
             .opacity(configuration.isPressed ? 0.72 : 1)
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.94 : 1)
@@ -228,6 +229,11 @@ private struct MediaPage: View {
         }
         .foregroundStyle(.white)
         .onAppear { updatePlayer() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            // Control Center/app switching can cover content before backgrounding.
+            // Preserve position, but require an explicit play action on return.
+            player?.pause()
+        }
         .onChange(of: previews.activeID) { _, _ in updatePlayer() }
         .onChange(of: asset.url) { _, _ in updatePlayer() }
         .onDisappear {

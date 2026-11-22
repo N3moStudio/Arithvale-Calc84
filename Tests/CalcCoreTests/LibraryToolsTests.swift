@@ -22,6 +22,50 @@ final class LibraryToolsTests: XCTestCase {
         let result = VaultRepository(root: directory.appendingPathComponent(UUID().uuidString))
         try result.restore(from: file, password: secret); return result
     }
+    func testBatchChangesPersistTogetherAndRejectMissingIDsWithoutPartialUpdates() throws {
+        let repo = try library(), first = try item(repo, data: "first"), second = try item(repo, data: "second")
+        let credential = try repo.credential()
+        let before = try Data(contentsOf: repo.root.appendingPathComponent("index.enc"))
+        XCTAssertThrowsError(try repo.updateMany(ids: [first.id, UUID()], deleted: true))
+        XCTAssertEqual(try Data(contentsOf: repo.root.appendingPathComponent("index.enc")), before)
+        XCTAssertTrue(repo.items.allSatisfy { $0.deletedAt == nil })
+        try repo.updateMany(ids: [first.id, second.id], album: "Together", deleted: true)
+        repo.lock(); try repo.unlock(credential: credential)
+        XCTAssertTrue(repo.items.allSatisfy { $0.album == "Together" && $0.deletedAt != nil })
+        XCTAssertEqual(repo.items[0].deletedAt, repo.items[1].deletedAt)
+        try repo.updateMany(ids: [first.id, second.id], deleted: false)
+        let copy = try restored(repo)
+        XCTAssertEqual(copy.items.count, 2)
+        XCTAssertEqual(try copy.contents(of: first.id), Data("first".utf8))
+        XCTAssertEqual(try copy.contents(of: second.id), Data("second".utf8))
+        XCTAssertTrue(copy.items.allSatisfy { $0.deletedAt == nil })
+    }
+    func testBatchRemovalCommitsBeforeDeletingAssetsAndPreservesUnselected() throws {
+        let repo = try library(), first = try item(repo, data: "first"), second = try item(repo, data: "second"), keep = try item(repo, data: "keep")
+        let credential = try repo.credential()
+        try repo.removeMany(ids: [first.id, second.id])
+        repo.lock(); try repo.unlock(credential: credential)
+        XCTAssertEqual(repo.items.map(\.id), [keep.id])
+        XCTAssertEqual(try repo.contents(of: keep.id), Data("keep".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: repo.root.appendingPathComponent(first.id.uuidString + ".enc").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: repo.root.appendingPathComponent(second.id.uuidString + ".enc").path))
+        XCTAssertEqual(try restored(repo).items.map(\.id), [keep.id])
+    }
+    func testBatchRemovalWriteFailurePreservesAllAssetsAndInMemoryItems() throws {
+        let repo = try library(), first = try item(repo, data: "first"), second = try item(repo, data: "second")
+        let index = repo.root.appendingPathComponent("index.enc")
+        let held = repo.root.appendingPathComponent("index-held.enc")
+        try FileManager.default.moveItem(at: index, to: held)
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+        defer {
+            try? FileManager.default.removeItem(at: index)
+            try? FileManager.default.moveItem(at: held, to: index)
+        }
+        XCTAssertThrowsError(try repo.removeMany(ids: [first.id, second.id]))
+        XCTAssertEqual(Set(repo.items.map(\.id)), [first.id, second.id])
+        XCTAssertEqual(try repo.contents(of: first.id), Data("first".utf8))
+        XCTAssertEqual(try repo.contents(of: second.id), Data("second".utf8))
+    }
     func testOldSingleAlbumJSONStillDecodesAndSearches() throws {
         let repo = try library(), photo = try item(repo)
         var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(photo)) as? [String: Any])

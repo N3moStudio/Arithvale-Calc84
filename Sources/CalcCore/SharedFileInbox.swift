@@ -21,16 +21,43 @@ public struct SharedFileInbox: Sendable {
         return SymmetricKey(data: data)
     }
     private func folder(_ id: UUID) -> URL { root.appendingPathComponent(id.uuidString, isDirectory: true) }
-    public func entries(key data: Data) throws -> [Entry] {
+    public struct Scan: Sendable {
+        public let entries: [Entry]
+        public let unreadableIDs: [UUID]
+    }
+    /// Enumerate only our receipt names; no metadata or missing device key is needed
+    /// to remove a received copy. Never follow a directory supplied by metadata.
+    public func receivedIDs() throws -> [UUID] {
         guard FileManager.default.fileExists(atPath: root.path) else { return [] }
+        guard try root.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else { throw VaultError.invalidBackup }
+        return try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+            .compactMap { UUID(uuidString: $0.lastPathComponent) }.sorted { $0.uuidString < $1.uuidString }
+    }
+    public func scan(key data: Data) throws -> Scan {
         let key = try key(data)
-        return try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).compactMap { url in
-            guard let id = UUID(uuidString: url.lastPathComponent) else { return nil }
-            return try readEntry(id, key: key)
-        }.sorted { $0.id.uuidString < $1.id.uuidString }
+        var readable: [Entry] = [], unreadable: [UUID] = []
+        for id in try receivedIDs() {
+            try Task.checkCancellation()
+            do { readable.append(try readEntry(id, key: key)) }
+            catch { unreadable.append(id) }
+        }
+        return Scan(entries: readable, unreadableIDs: unreadable)
+    }
+    // Keep strict callers fail-closed; the UI uses scan to expose isolated damage.
+    public func entries(key data: Data) throws -> [Entry] {
+        let result = try scan(key: data)
+        guard result.unreadableIDs.isEmpty else { throw VaultError.invalidBackup }
+        return result.entries
     }
     private func readEntry(_ id: UUID, key: SymmetricKey) throws -> Entry {
-        let metadata = folder(id).appendingPathComponent("metadata")
+        let directory = folder(id)
+        let values = try directory.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard values.isDirectory == true, values.isSymbolicLink != true else { throw VaultError.invalidBackup }
+        for name in ["metadata", "contents"] {
+            let file = try directory.appendingPathComponent(name).resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard file.isRegularFile == true, file.isSymbolicLink != true else { throw VaultError.invalidBackup }
+        }
+        let metadata = directory.appendingPathComponent("metadata")
         let size = try metadata.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max
         guard size <= 4096 else { throw VaultError.invalidBackup }
         let entry = try JSONDecoder().decode(Entry.self, from: VaultCrypto.open(Data(contentsOf: metadata), key: key, context: "incoming/\(id)/metadata"))
@@ -70,6 +97,7 @@ public struct SharedFileInbox: Sendable {
                                 size: entry.bytes, key: key, context: "incoming/\(entry.id)")
     }
     public func discard(_ id: UUID) throws {
+        guard try receivedIDs().contains(id) else { return }
         let url = folder(id)
         if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
     }

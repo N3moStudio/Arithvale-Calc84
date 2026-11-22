@@ -2,17 +2,9 @@
 import SwiftUI
 import CalcCore
 
-struct CloudReceipt: Codable {
-    var objects: Set<String> = []
-    var itemIDs: Set<UUID> = []
-    var saved: Date?
-    var vaultID: UUID?
-    var needsBackup = true
-    var snapshotID: UUID? = nil
-}
-
 @MainActor
 final class CloudBackupModel: ObservableObject {
+    @Published private(set) var libraryID: UUID?
     @Published var connected: Set<CloudProvider> = []
     @Published var receipts: [CloudProvider: CloudReceipt] = [:]
     @Published var phase = "Connect a service to get started."
@@ -29,17 +21,35 @@ final class CloudBackupModel: ObservableObject {
     private var operationID = UUID()
     var wifiOnly: Bool { !AppPreferences.cellular() }
 
+    func setLibrary(_ id: UUID?) {
+        libraryID = id
+        if id != nil { refresh() }
+    }
+    func receipt(for provider: CloudProvider) -> CloudReceipt? {
+        guard let receipt = receipts[provider], receipt.matches(libraryID: libraryID) else { return nil }
+        return receipt
+    }
+    /// Reset local status only. Keep connections and all remote backups available
+    /// for recovery; a fresh library must never inherit their completed status.
+    func resetReceipts() {
+        receipts = [:]
+        for provider in CloudProvider.allCases {
+            UserDefaults.standard.removeObject(forKey: "cloudReceipt." + provider.rawValue)
+        }
+        refresh()
+    }
     func refresh() {
         for provider in CloudProvider.allCases {
             do {
                 if try CloudCredentials.load(provider) != nil { connected.insert(provider) } else { connected.remove(provider) }
                 if let data = UserDefaults.standard.data(forKey: "cloudReceipt." + provider.rawValue),
                    let receipt = try? JSONDecoder().decode(CloudReceipt.self, from: data) { receipts[provider] = receipt }
+                else { receipts[provider] = nil }
             } catch { self.error = "Unlock your phone to access saved cloud connections." }
         }
         if !running, error == nil {
             if connected.isEmpty { phase = "Connect a service to get started." }
-            else if connected.contains(where: { receipts[$0]?.needsBackup != false }) { phase = "Changes waiting for backup" }
+            else if connected.contains(where: { receipt(for: $0)?.needsBackup != false }) { phase = "Changes waiting for backup" }
             else { phase = "Latest backups completed" }
         }
     }
@@ -110,12 +120,12 @@ final class CloudBackupModel: ObservableObject {
     }
     private func start(_ vault: VaultModel, body: @escaping @MainActor () async throws -> Void) {
         guard !running, !vault.busy else { return }
-        running = true; vault.busy = true; error = nil; progress = nil
+        let operationToken = vault.beginOperation(); running = true; error = nil; progress = nil
         operationID = UUID(); let ticket = operationID
         operation = Task {
             defer {
                 if ticket == operationID { running = false; activeProvider = nil; progress = nil; operation = nil }
-                vault.busy = false
+                vault.endOperation(operationToken)
             }
             do { try await body() }
             catch {
@@ -171,7 +181,7 @@ final class CloudBackupModel: ObservableObject {
                     let store = try await self.store(provider)
                     let previous = self.receipts[provider] ?? .init()
                     try await CloudTransfer.upload(plan, store: store, scratch: scratch,
-                        previouslyVerified: verifyAll ? [] : previous.objects,
+                        previouslyVerified: verifyAll || previous.vaultID != plan.snapshot.vaultID ? [] : previous.objects,
                         verified: { name in await self.recordObject(name, provider: provider) },
                         progress: { value in await self.showProgress(value, provider: provider) })
                     try Task.checkCancellation()
@@ -266,7 +276,7 @@ final class CloudBackupModel: ObservableObject {
     }
     func itemStatus(_ item: VaultItem, provider: CloudProvider) -> String {
         guard connected.contains(provider) else { return "Not connected" }
-        guard receipts[provider]?.itemIDs.contains(item.id) == true else { return "Not backed up yet" }
+        guard receipt(for: provider)?.itemIDs.contains(item.id) == true else { return "Not backed up yet" }
         return "Included in last completed backup"
     }
 }

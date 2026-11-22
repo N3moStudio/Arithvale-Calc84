@@ -97,3 +97,7 @@ November 12 integration: Check a Backup stays in main Backups; shared-file guida
 | Recovery | VaultModel + DeviceAccess + encrypted VaultRepository | Keep starter entry and recovery-key authentication; add explicit destructive reset |
 | Start over | New identity-checked repository erase | Recovery detail page; typed ERASE then final confirmation; external copies untouched |
 | Backup help text | No stored preference changes | Short primary screens; detailed instructions remain in Backup Help/disclosures |
+
+## November 21 reliability refinements
+
+No setting/action moved or removed. Existing cloud connections and recovery copies remain; status is now library-specific. Received Files adds explicit confirmed removal of unreadable received copies (SharedFileInbox UUID folders), leaving originals and vault untouched. Check/Import picker cancellation remains retryable; failed replacements cannot act on old selected archives. Appearance defaults and saved controls unchanged.

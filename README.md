@@ -4,7 +4,7 @@
 
 <h1 align="center">Arithen</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.12.5 testing · iOS 17+ · SwiftUI · Source available</p>
+<p align="center">0.12.8 testing · iOS 17+ · SwiftUI · Source available</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
   <a href="CHANGELOG.md#0124--native-settings-presentation">What’s new</a> &nbsp;·&nbsp;
@@ -21,7 +21,7 @@ control over which memories leave your phone. Previously **Arithvale / Calc 84**
 
 The **Native Settings Kit presentation update** adds larger branded appearance cards, theme tiles, simple rows and focused backup detail pages. Existing settings and data are retained. See the [feature map](Docs/SETTINGS-FEATURE-MAP.md) and [validation limits](Docs/SETTINGS-ADOPTION.md).
 
-The current test-build target is **0.12.4, build 20**. It includes the new settings presentation, half-second hold Equals, and daily automatic folder backups with guarded seven-copy retention. It is not a public GitHub release. Update the existing installation to retain its library and calculator code. Native build evidence does not establish physical-device layouts, gestures or provider behavior.
+The current test-build target is **0.12.8, build 24**. It includes the new settings presentation, half-second hold Equals, and daily automatic folder backups with guarded seven-copy retention. It is not a public GitHub release. Update the existing installation to retain its library and calculator code. Native build evidence does not establish physical-device layouts, gestures or provider behavior.
 
 - **Quicker entry.** Type your code and hold Equals for 0.5 seconds. Entry starts while held and reveals the library after verification, without a modal slide. Ordinary taps calculate; existing code security and throttling stay in place.
 

@@ -4,7 +4,7 @@ final class ArithenUITests: XCTestCase {
     private let app = XCUIApplication()
     override func setUpWithError() throws { continueAfterFailure = false }
     override func tearDownWithError() throws {
-        if testRun?.hasSucceeded == false { capture("failure-screen") }
+        if (testRun?.failureCount ?? 0) > 0 { capture("failure-screen") }
     }
 
     private func capture(_ name: String) {
@@ -35,6 +35,14 @@ final class ArithenUITests: XCTestCase {
     }
     private func holdEquals() { app.buttons["Equals"].press(forDuration: 0.65) }
     private func back() { app.navigationBars.buttons.element(boundBy: 0).tap() }
+    private func checkFilesPickerAndCancel() {
+        tap("Choose Backup File")
+        let cancel = app.buttons["Cancel"].firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 15), "System Files picker must remain presented")
+        capture("files-picker-presented")
+        cancel.tap()
+        XCTAssertTrue(app.buttons["Choose Backup File"].waitForExistence(timeout: 10))
+    }
 
     func testCalculatorSetupLibraryAndBackupJourneys() throws {
         app.launch()
@@ -101,15 +109,30 @@ final class ArithenUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Choose Backup File"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Import"].isEnabled)
         capture("05-backup-import")
+        checkFilesPickerAndCancel()
+        XCTAssertFalse(app.buttons["Import"].isEnabled)
         tap("Close")
         tap("Check a Backup")
         XCTAssertTrue(app.buttons["Choose Backup File"].waitForExistence(timeout: 5))
         capture("06-backup-check")
+        checkFilesPickerAndCancel()
         back(); back(); tap("Done")
         tap("Add to Library"); tap("Import from Files")
         XCTAssertTrue(app.buttons["Choose Files"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Import"].isEnabled)
         capture("07-files-import"); tap("Close")
+        tap("Add to Library"); tap("Photos & Videos")
+        let photo = app.images.matching(NSPredicate(format: "label CONTAINS[c] %@", "Photo")).firstMatch
+        let cell = app.cells.firstMatch
+        XCTAssertTrue(photo.waitForExistence(timeout: 10) || cell.waitForExistence(timeout: 5), "Seeded photo must be selectable")
+        if photo.exists { photo.tap() } else { cell.tap() }
+        tap("Add")
+        let imported = app.staticTexts["1 Snap Imported"]
+        XCTAssertTrue(imported.waitForExistence(timeout: 60), "Photo import must commit")
+        capture("photo-import-completed")
+        if app.buttons["Keep Originals"].exists { tap("Keep Originals") } else { tap("Done") }
+        XCTAssertTrue(app.staticTexts["1 Snap"].waitForExistence(timeout: 10))
+        capture("populated-library")
         tap("Lock & Return to Calculator")
         XCTAssertTrue(app.buttons["Equals"].waitForExistence(timeout: 10))
         enter("963852"); holdEquals()

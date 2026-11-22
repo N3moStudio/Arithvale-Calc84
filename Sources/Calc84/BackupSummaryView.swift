@@ -9,8 +9,8 @@ struct BackupSummaryView: View {
     private var destinations: [BackupDestinationStatus] {
         [.init(name: "Files", saved: lastExport > 0 ? Date(timeIntervalSince1970: lastExport) : nil, needsBackup: needsBackup)]
         + CloudProvider.allCases.map { provider in
-            .init(name: provider.title + " selection", saved: cloud.receipts[provider]?.saved,
-                  needsBackup: cloud.receipts[provider]?.needsBackup ?? true, connected: cloud.connected.contains(provider))
+            .init(name: provider.title + " selection", saved: cloud.receipt(for: provider)?.saved,
+                  needsBackup: cloud.receipt(for: provider)?.needsBackup ?? true, connected: cloud.connected.contains(provider))
         }
     }
     var body: some View {

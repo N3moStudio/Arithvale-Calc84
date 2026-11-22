@@ -64,6 +64,11 @@ public actor VaultEngine {
         try repository.update(id: id, favorite: favorite, album: album, deleted: deleted)
         return repository.items
     }
+    public func updateMany(ids: Set<UUID>, album: String? = nil, deleted: Bool? = nil, permanently: Bool = false) throws -> [VaultItem] {
+        if permanently { try repository.removeMany(ids: ids) }
+        else { try repository.updateMany(ids: ids, album: album, deleted: deleted) }
+        return repository.items
+    }
     public func remove(id: UUID) throws -> [VaultItem] {
         try repository.remove(id: id)
         return repository.items

@@ -25,6 +25,8 @@ jobs:
           device=$(cat .build/simulator/device-id.txt)
           xcrun simctl boot "$device" || true
           xcrun simctl bootstatus "$device" -b
+          # A public app icon is disposable media, not a fixture/unlock hook in the app.
+          xcrun simctl addmedia "$device" AppIcon.png
           xcodebuild build-for-testing -project .build/simulator/ArithenSimulator.xcodeproj -scheme Arithen \
             -destination "platform=iOS Simulator,id=$device" \
             -derivedDataPath .build/simulator/DerivedData \

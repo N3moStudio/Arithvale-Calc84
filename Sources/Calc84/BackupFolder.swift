@@ -214,8 +214,8 @@ struct BackupDocumentPicker: UIViewControllerRepresentable {
             picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
         }
         picker.allowsMultipleSelection = false
-        // Selecting the folder itself also works when a host expands the type filter.
-        if case .connectFolder = purpose { picker.allowsMultipleSelection = true }
+        // A saved bookmark belongs to exactly one directory. Multiple selection
+        // changes Files' Open semantics and is not a workaround for signing hosts.
         picker.shouldShowFileExtensions = true
         picker.delegate = context.coordinator
         return picker

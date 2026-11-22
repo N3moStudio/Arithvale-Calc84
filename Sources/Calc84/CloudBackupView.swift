@@ -34,7 +34,7 @@ struct CloudBackupView: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             SettingsRow(provider.title, symbol: "icloud", detail: summary(provider))
-                            if let date = cloud.receipts[provider]?.saved {
+                            if let date = cloud.receipt(for: provider)?.saved {
                                 Text(date, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(ArithenPalette.color(.muted))
                             }
                         }.padding(.vertical, 5)
@@ -56,7 +56,7 @@ struct CloudBackupView: View {
     }
     private func summary(_ provider: CloudProvider) -> String {
         guard cloud.connected.contains(provider) else { return "Not connected" }
-        guard let receipt = cloud.receipts[provider], receipt.saved != nil else { return "Connected · first backup needed" }
+        guard let receipt = cloud.receipt(for: provider), receipt.saved != nil else { return "Connected · first backup needed" }
         return receipt.needsBackup ? "Changes waiting for backup" : "Latest backup completed"
     }
 }
@@ -241,7 +241,7 @@ struct CloudItemStatusView: View {
                                 Task { _ = await vault.saveCloudPolicy(policy, provider: provider) }
                             })).disabled(vault.busy || item.deletedAt != nil || vault.cloudPreferences[provider].blocked.contains(item.id))
                     }
-                    if cloud.receipts[provider]?.itemIDs.contains(item.id) == true, let date = cloud.receipts[provider]?.saved {
+                    if cloud.receipt(for: provider)?.itemIDs.contains(item.id) == true, let date = cloud.receipt(for: provider)?.saved {
                         LabeledContent("Backup saved") { Text(date, format: .dateTime.month().day().hour().minute()) }
                     }
                 }

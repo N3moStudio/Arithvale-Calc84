@@ -5,6 +5,10 @@ import CalcCore
 
 /// The short calculator code gates access on this installation. It is never a portable backup key.
 actor DeviceAccess {
+    struct RetryDelay: LocalizedError {
+        let seconds: Int
+        var errorDescription: String? { "Too many attempts. Try again in \(seconds) seconds." }
+    }
     private struct Record: Codable {
         var credential: VaultCredential
         var salt: Data
@@ -29,21 +33,27 @@ actor DeviceAccess {
         let record = Record(credential: credential, salt: salt, verifier: try VaultCode.verifier(code, salt: salt))
         try save(record)
     }
-    func unlock(code: String, id: UUID) throws -> VaultCredential? {
+    func unlock(code: String, id: UUID, reportThrottle: Bool = false) throws -> VaultCredential? {
         guard var record = try load(), record.credential.id == id else { return nil }
-        guard Date() >= record.nextAttempt else { return nil }
+        let now = Date()
+        guard now >= record.nextAttempt else {
+            // Ordinary calculator holds never advertise a private access attempt.
+            // The explicit Change Code form can explain why retry is unavailable.
+            if reportThrottle { throw RetryDelay(seconds: max(1, Int(ceil(record.nextAttempt.timeIntervalSince(now))))) }
+            return nil
+        }
         let verified = VaultCode.equal(try VaultCode.verifier(code, salt: record.salt), record.verifier)
         if verified {
             record.failures = 0; record.nextAttempt = .distantPast
             try save(record); return record.credential
         }
         record.failures = min(record.failures + 1, 20)
-        if record.failures >= 5 { record.nextAttempt = Date().addingTimeInterval(min(300, 30 * pow(2, Double(record.failures - 5)))) }
+        if let delay = DeviceAccessBackoff.delay(failures: record.failures) { record.nextAttempt = Date().addingTimeInterval(delay) }
         try save(record); return nil
     }
     func change(old: String, new: String, id: UUID) throws {
         guard VaultCode.valid(new) else { throw VaultError.invalidCode }
-        guard let credential = try unlock(code: old, id: id) else { throw VaultError.wrongPasswordOrDamaged }
+        guard let credential = try unlock(code: old, id: id, reportThrottle: true) else { throw VaultError.wrongPasswordOrDamaged }
         try enroll(code: new, credential: credential)
     }
     private func load() throws -> Record? {

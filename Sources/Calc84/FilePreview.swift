@@ -130,16 +130,34 @@ struct ActivitySheet: UIViewControllerRepresentable {
     let urls: [URL]
     let folder: URL
     let finished: (Bool) -> Void
+    func makeCoordinator() -> Coordinator { Coordinator(folder: folder, finished: finished) }
     func makeUIViewController(context: Context) -> UIActivityViewController {
         let controller = UIActivityViewController(activityItems: urls, applicationActivities: nil)
         controller.excludedActivityTypes = [.saveToCameraRoll] // Use our date-preserving Photos path.
-        controller.completionWithItemsHandler = { _, completed, _, _ in
-            try? FileManager.default.removeItem(at: folder)
-            finished(completed)
+        controller.completionWithItemsHandler = { [coordinator = context.coordinator] _, completed, _, _ in
+            coordinator.finish(completed)
         }
         return controller
     }
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+    static func dismantleUIViewController(_ controller: UIActivityViewController, coordinator: Coordinator) {
+        // A parent/lock dismissal need not invoke the activity completion handler.
+        // Release only this export when its actual presentation ends, never all
+        // temporary files merely because a share extension made the app inactive.
+        controller.completionWithItemsHandler = nil
+        DispatchQueue.main.async { coordinator.finish(false) }
+    }
+    final class Coordinator {
+        private let folder: URL
+        private var finished: ((Bool) -> Void)?
+        init(folder: URL, finished: @escaping (Bool) -> Void) { self.folder = folder; self.finished = finished }
+        func finish(_ completed: Bool) {
+            guard let callback = finished else { return }
+            finished = nil
+            try? FileManager.default.removeItem(at: folder)
+            callback(completed)
+        }
+    }
 }
 struct DocumentsExportSheet: UIViewControllerRepresentable {
     let urls: [URL]

@@ -47,7 +47,7 @@ struct CalculatorView: View {
                             .labelStyle(.iconOnly).frame(width: 44, height: 44)
                             .modifier(ArithenGlass(tint: glassTint, shape: Circle()))
                         Spacer(minLength: 2)
-                        Text(AppBrand.name).font(.subheadline.weight(.semibold)).foregroundStyle(ArithenPalette.color(.muted)).lineLimit(1)
+                        if !textSize.isAccessibilitySize { calculatorTitle }
                         Spacer(minLength: 2)
                         Menu {
                             Button(scientific ? "Basic Calculator" : "Scientific Calculator") { scientific.toggle() }
@@ -58,7 +58,8 @@ struct CalculatorView: View {
                         Button("Settings", systemImage: "gearshape") { showingSettings = true }
                             .labelStyle(.iconOnly).frame(width: 44, height: 44)
                             .modifier(ArithenGlass(tint: glassTint, shape: Circle()))
-                    }.padding(.top, 6)
+                    }.font(.system(size: 22)).padding(.top, 6)
+                    if textSize.isAccessibilitySize { calculatorTitle.padding(.top, 8) }
                     Spacer(minLength: 32)
                     VStack(alignment: .trailing, spacing: 6) {
                         Text(expression.isEmpty ? " " : expression).font(.title3).foregroundStyle(ink.opacity(0.52))
@@ -80,7 +81,7 @@ struct CalculatorView: View {
                     VStack(spacing: 7) {
                         HStack(spacing: 7) {
                             HStack(spacing: 0) {
-                                Button { press("⌫") } label: { Image(systemName: "delete.left").font(.title2).frame(width: side, height: side) }
+                                Button { press("⌫") } label: { Image(systemName: "delete.left").font(.system(size: min(27, side * 0.34))).frame(width: side, height: side) }
                                     .accessibilityLabel("Delete last character")
                                 Button("AC") { press("AC") }.font(.system(size: min(27, side * 0.34), design: .rounded)).frame(width: side + 7, height: side).accessibilityLabel("Clear all")
                             }.modifier(ArithenGlass(tint: glassTint, shape: Capsule()))
@@ -110,17 +111,17 @@ struct CalculatorView: View {
                     }.contentMargins(.top, 16, for: .scrollContent)
                         .navigationTitle("Calculator Settings").navigationBarTitleDisplayMode(.inline)
                         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showingSettings = false } } }
-                }.tint(CalcTheme.accent)
+                }.tint(ArithenPalette.color(.accent, theme: theme))
             }
             .sheet(isPresented: $showingHistory) {
                 NavigationStack {
                     ThemedList {
-                        if history.isEmpty { Text("Your calculations appear here.").foregroundStyle(ArithenPalette.color(.muted)) }
+                        if history.isEmpty { Text("Your calculations appear here.").foregroundStyle(ArithenPalette.color(.muted, theme: theme)) }
                         ForEach(history) { item in
                             Button { expression = item.result; result = item.result; didEvaluate = true; showingHistory = false } label: {
                                 VStack(alignment: .trailing, spacing: 6) {
-                                    Text(item.expression).font(.subheadline).foregroundStyle(ArithenPalette.color(.muted))
-                                    Text(item.result).font(.title2).foregroundStyle(ArithenPalette.color(.text))
+                                    Text(item.expression).font(.subheadline).foregroundStyle(ArithenPalette.color(.muted, theme: theme))
+                                    Text(item.result).font(.title2).foregroundStyle(ArithenPalette.color(.text, theme: theme))
                                 }.frame(maxWidth: .infinity, alignment: .trailing)
                             }
                         }
@@ -143,6 +144,11 @@ struct CalculatorView: View {
                     expression = ""; result = "0"; didEvaluate = false; history = []
                 }
             }
+    }
+    private var calculatorTitle: some View {
+        Text(AppBrand.name).font(.subheadline.weight(.semibold))
+            .foregroundStyle(ArithenPalette.color(.muted, theme: theme))
+            .fixedSize(horizontal: false, vertical: true)
     }
     @ViewBuilder private func key(_ value: String, side: CGFloat, utility: Bool = false) -> some View {
         if value == "=" {

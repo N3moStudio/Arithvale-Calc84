@@ -178,13 +178,20 @@ public final class VaultRepository {
         }
     }
     public func update(id: UUID, favorite: Bool? = nil, album: String? = nil, deleted: Bool? = nil) throws {
-        guard let key, let header, var next = manifest, let i = next.items.firstIndex(where: { $0.id == id }) else { throw VaultError.locked }
-        if let favorite { next.items[i].favorite = favorite }
-        if let album {
-            let names = LibraryOrganization.names([album])
-            next.items[i].albums = names; next.items[i].album = names.first
+        try updateMany(ids: [id], favorite: favorite, album: album, deleted: deleted)
+    }
+    public func updateMany(ids: Set<UUID>, favorite: Bool? = nil, album: String? = nil, deleted: Bool? = nil) throws {
+        guard let key, let header, var next = manifest else { throw VaultError.locked }
+        guard !ids.isEmpty, ids.isSubset(of: Set(next.items.map(\.id))) else { throw VaultError.missing }
+        let date = Date()
+        for i in next.items.indices where ids.contains(next.items[i].id) {
+            if let favorite { next.items[i].favorite = favorite }
+            if let album {
+                let names = LibraryOrganization.names([album])
+                next.items[i].albums = names; next.items[i].album = names.first
+            }
+            if let deleted { next.items[i].deletedAt = deleted ? date : nil }
         }
-        if let deleted { next.items[i].deletedAt = deleted ? Date() : nil }
         cleanAlbumCovers(&next)
         try persist(next, key: key, header: header); manifest = next
     }
@@ -270,12 +277,21 @@ public final class VaultRepository {
         return matches.values.filter { $0.count > 1 }.map { DuplicateGroup(ids: $0) }.sorted { $0.id.uuidString < $1.id.uuidString }
     }
     public func remove(id: UUID) throws {
+        try removeMany(ids: [id])
+    }
+    public func removeMany(ids requested: Set<UUID>) throws {
         guard let key, let header, var next = manifest else { throw VaultError.locked }
-        let target = next.items.first { $0.id == id }
-        let ids = Set([id, target?.companionID, target?.thumbnailID].compactMap { $0 })
+        guard !requested.isEmpty else { return }
+        var ids = requested
+        for item in next.items where requested.contains(item.id) {
+            if let companion = item.companionID { ids.insert(companion) }
+            if let thumbnail = item.thumbnailID { ids.insert(thumbnail) }
+        }
         next.items.removeAll { ids.contains($0.id) }
         next.cloudPreferences?.remove(ids)
         cleanAlbumCovers(&next)
+        // Commit the complete selection once before removing encrypted assets.
+        // A failed manifest write leaves all selected files and metadata intact.
         try persist(next, key: key, header: header); manifest = next
         for id in ids { try? fm.removeItem(at: assetURL(id)) }
     }

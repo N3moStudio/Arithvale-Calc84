@@ -73,10 +73,10 @@ struct LibraryStorageView: View {
     }
     private func findDuplicates() {
         guard vault.unlocked, !vault.busy, !scanning else { return }
-        vault.textSearch.pause(); scanning = true; vault.busy = true; scanned = false
+        vault.textSearch.pause(); scanning = true; let operationToken = vault.beginOperation(); scanned = false
         let generation = vault.generation
         scan = Task {
-            defer { scanning = false; vault.busy = false; scan = nil }
+            defer { scanning = false; vault.endOperation(operationToken); scan = nil }
             do {
                 let result = try await vault.engine.duplicates()
                 try Task.checkCancellation()

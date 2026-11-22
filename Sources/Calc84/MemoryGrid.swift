@@ -41,6 +41,9 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
     private var hideMonth: DispatchWorkItem?
     private var lastWidth: CGFloat = 0
     private var currentSection = 0
+    private var measuredMonthText: String?
+    private var measuredMonthFont: UIFont?
+    private var measuredMonthSize = CGSize.zero
     private var restoredVisibility = true
     private var dragSelection: GridDragSelection?
     private var mediaHost: MediaViewerController?
@@ -295,17 +298,23 @@ final class MemoryGridController: UIViewController, UICollectionViewDataSource, 
         scrubber.fraction = fraction
         scrubber.isHidden = model.selecting || model.sections.isEmpty || grid.contentSize.height <= grid.bounds.height
         // Derive the badge from real visible cells, including long months and short sections.
-        let visible = grid.indexPathsForVisibleItems.sorted().filter { path in
+        let firstVisible = grid.indexPathsForVisibleItems.filter { path in
             guard let rect = layout.layoutAttributesForItem(at: path)?.frame else { return false }
             return rect.maxY > grid.contentOffset.y + 1
-        }
-        if let first = visible.first, model.sections.indices.contains(first.section) {
+        }.min()
+        if let first = firstVisible, model.sections.indices.contains(first.section) {
             currentSection = first.section
             let text = model.sections[first.section].date.formatted(.dateTime.month(.abbreviated).year()).uppercased()
             month.text = text; scrubber.accessibilityValue = text
         }
         scrubber.layoutIfNeeded()
-        let size = month.sizeThatFits(CGSize(width: 240, height: 80))
+        // The thumb still tracks every scroll frame; text measurement only
+        // changes with the month or Dynamic Type font.
+        if measuredMonthText != month.text || measuredMonthFont != month.font {
+            measuredMonthText = month.text; measuredMonthFont = month.font
+            measuredMonthSize = month.sizeThatFits(CGSize(width: 240, height: 80))
+        }
+        let size = measuredMonthSize
         let width = min(view.bounds.width - 60, max(120, size.width + 24))
         let height = max(42, size.height + 16)
         month.frame = CGRect(x: view.bounds.width - width - 36, y: max(4, min(view.bounds.height - height - 4, scrubber.thumbCenter - height / 2)), width: width, height: height)

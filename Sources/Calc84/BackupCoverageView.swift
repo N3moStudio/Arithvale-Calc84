@@ -20,7 +20,7 @@ struct BackupCoverageView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Saved to Files", systemImage: "folder").font(.headline)
                 if lastExport > 0, savedLibrary == libraryID?.uuidString {
-                    Text(needsBackup ? "Library changes need a new backup" : "Current library saved; file copy checked")
+                    Text(needsBackup ? "Library changes need a new backup" : "Current library saved; copied bytes verified")
                     Text(filename).font(.caption).textSelection(.enabled)
                     if !folder.isEmpty { Text("Folder: \(folder)").font(.caption).textSelection(.enabled) }
                     Text("Saved \(Date(timeIntervalSince1970: lastExport).formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(ArithenPalette.color(.muted))

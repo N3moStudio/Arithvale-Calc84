@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 import CalcCore
 
 struct AlbumLibraryView: View {
+    @Environment(\.arithenTheme) private var theme
     @EnvironmentObject private var vault: VaultModel
     @Environment(\.dynamicTypeSize) private var textSize
     let items: [VaultItem]
@@ -19,13 +20,18 @@ struct AlbumLibraryView: View {
         }
     }
     var body: some View {
+        // Group once per items update instead of filtering the full library for
+        // every album tile. Thumbnails remain scoped to their visible views.
+        let grouped = items.reduce(into: [String: [VaultItem]]()) { groups, item in
+            for name in item.albumNames { groups[name, default: []].append(item) }
+        }
         ScrollView {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: textSize.isAccessibilitySize ? 1 : 2), alignment: .leading, spacing: 18) {
                 album("All items", values: items, filter: "All")
                 album("Favorites", values: items.filter { $0.favorite == true }, filter: "Favorites")
                 ForEach(names, id: \.self) { name in
                     VStack(alignment: .leading, spacing: 2) {
-                        album(name, values: items.filter { $0.albumNames.contains(name) }, filter: "album:" + name)
+                        album(name, values: grouped[name] ?? [], filter: "album:" + name)
                             .contextMenu { Button("Customize Album", systemImage: "slider.horizontal.3") { editing = .init(name: name) } }
                         Button { editing = .init(name: name) } label: {
                             HStack {
@@ -40,12 +46,12 @@ struct AlbumLibraryView: View {
             Button { open("Recently Deleted") } label: {
                 HStack(spacing: 13) {
                     Image(systemName: "trash").font(.title3).frame(width: 38, height: 38)
-                        .background(ArithenPalette.color(.accent).opacity(0.1), in: RoundedRectangle(cornerRadius: 11))
+                        .background(ArithenPalette.color(.accent, theme: theme).opacity(0.1), in: RoundedRectangle(cornerRadius: 11))
                     Text("Recently Deleted").font(.body.weight(.medium))
                     Spacer()
-                    Text(vault.items.filter { $0.visible && $0.deletedAt != nil }.count.formatted()).foregroundStyle(ArithenPalette.color(.muted))
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(ArithenPalette.color(.muted))
-                }.padding(16).background(ArithenPalette.color(.surface), in: RoundedRectangle(cornerRadius: 20))
+                    Text(vault.items.filter { $0.visible && $0.deletedAt != nil }.count.formatted()).foregroundStyle(ArithenPalette.color(.muted, theme: theme))
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(ArithenPalette.color(.muted, theme: theme))
+                }.padding(16).background(ArithenPalette.color(.surface, theme: theme), in: RoundedRectangle(cornerRadius: 20))
             }.buttonStyle(.plain).padding(15)
             Color.clear.frame(height: 90)
         }
@@ -65,14 +71,14 @@ struct AlbumLibraryView: View {
                         ForEach(0..<4) { index in
                             Group {
                                 if values.indices.contains(index) { LibraryThumbnail(item: values[index], engine: engine) }
-                                else { ArithenPalette.color(.surface).overlay { if index == 0 { Image(systemName: "photo").foregroundStyle(.tertiary) } } }
+                                else { ArithenPalette.color(.surface, theme: theme).overlay { if index == 0 { Image(systemName: "photo").foregroundStyle(.tertiary) } } }
                             }.frame(width: side, height: (geometry.size.height - 1) / 2).clipped()
                         }
                     }
                     }
                 }.aspectRatio(1.18, contentMode: .fit).clipShape(RoundedRectangle(cornerRadius: 13))
-                Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(ArithenPalette.color(.text)).lineLimit(2)
-                Text("\(values.count.formatted()) \(values.count == 1 ? "item" : "items")").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
+                Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(ArithenPalette.color(.text, theme: theme)).lineLimit(2)
+                Text("\(values.count.formatted()) \(values.count == 1 ? "item" : "items")").font(.caption).foregroundStyle(ArithenPalette.color(.muted, theme: theme))
             }
         }.buttonStyle(.plain).accessibilityElement(children: .ignore).accessibilityLabel("\(name), \(values.count.formatted()) \(values.count == 1 ? "item" : "items")")
     }
@@ -80,13 +86,14 @@ struct AlbumLibraryView: View {
 
 /// Small thumbnails only; originals are decoded by the full-screen viewer.
 struct LibraryThumbnail: View {
+    @Environment(\.arithenTheme) private var theme
     let item: VaultItem
     let engine: VaultEngine
     @State private var image: UIImage?
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                ArithenPalette.color(.surface)
+                ArithenPalette.color(.surface, theme: theme)
                 if let image { Image(uiImage: image).resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped() }
                 else { Image(systemName: "photo").foregroundStyle(.tertiary) }
             }

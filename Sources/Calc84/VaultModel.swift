@@ -14,6 +14,7 @@ struct PreparedBackup: Identifiable {
     let url: URL
     let digest: Data
     let generation: UUID
+    let operationToken: UUID
 }
 
 @MainActor
@@ -23,7 +24,8 @@ final class VaultModel: ObservableObject {
     @Published var albumPreferences: [String: AlbumPreference] = [:]
     @Published var unlocked = false
     @Published var exists = false
-    @Published var busy = false
+    @Published private(set) var busy = false
+    private var operationGate = VaultOperationGate()
     @Published var message: String?
     @Published var status = ""
     @Published var progress = 0.0
@@ -50,9 +52,21 @@ final class VaultModel: ObservableObject {
     private var lockTask: Task<Void, Never>?
     private var pendingBackup: PreparedBackup?
 
-    init() {
+    /// Keep ownership through cancellation until the operation has unwound. A
+    /// privacy lock hides content immediately, but must not allow overlapping writes.
+    func beginOperation() -> UUID {
+        precondition(!busy)
+        let token = operationGate.begin()!
+        busy = true
+        return token
+    }
+    func endOperation(_ token: UUID) {
+        if operationGate.end(token) { busy = false }
+    }
+
+    init(engine: VaultEngine? = nil) {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        engine = VaultEngine(root: base.appendingPathComponent("Calc84Library", isDirectory: true))
+        self.engine = engine ?? VaultEngine(root: base.appendingPathComponent("Calc84Library", isDirectory: true))
         Publishers.CombineLatest3($busy, $photoImportReview, $fileImportReview)
             .receive(on: RunLoop.main).sink { [weak self] _ in
                 guard let self else { return }
@@ -74,12 +88,12 @@ final class VaultModel: ObservableObject {
                 }
             }.store(in: &lifecycle)
         }
-        Task { exists = await engine.exists() }
+        Task { exists = await self.engine.exists() }
     }
     /// True means show the library or first-run setup. Wrong codes leave a normal calculator.
     func enter(code: String) async -> Bool {
-        guard !busy else { return false }
-        busy = true; defer { busy = false }
+        guard !busy else { message = "Finishing the previous operation. Try again in a moment."; return false }
+        let operationToken = beginOperation(); defer { endOperation(operationToken) }
         let ticket = generation
         await lockTask?.value
         guard ticket == generation else { return false }
@@ -96,8 +110,9 @@ final class VaultModel: ObservableObject {
             let result = try await engine.unlock(credential: credential)
             guard ticket == generation else { await engine.lock(); return false }
             let preferences = try await engine.cloudPreferences()
+            let libraryIdentifier = try await engine.identifier()
             guard ticket == generation else { await engine.lock(); return false }
-            cloudPreferences = preferences; items = result; unlocked = true; scheduleAutomaticBackup(); return true
+            cloudPreferences = preferences; items = result; cloud.setLibrary(libraryIdentifier); unlocked = true; scheduleAutomaticBackup(); return true
         } catch {
             if ticket == generation { message = error.localizedDescription }
             return false
@@ -105,9 +120,9 @@ final class VaultModel: ObservableObject {
     }
     func open(password: String, code: String, creating: Bool, backups: [QueuedSetupBackup] = []) {
         guard !busy, VaultCode.valid(code) else { message = VaultError.invalidCode.localizedDescription; return }
-        busy = true; let ticket = generation
+        let operationToken = beginOperation(); let ticket = generation
         setupTask = Task {
-            defer { busy = false; setupTask = nil; withExtendedLifetime(backups) {} }
+            defer { endOperation(operationToken); setupTask = nil; withExtendedLifetime(backups) {} }
             await lockTask?.value
             guard ticket == generation else { return }
             do {
@@ -133,8 +148,9 @@ final class VaultModel: ObservableObject {
                 try await deviceAccess.enroll(code: code, credential: engine.credential())
                 guard ticket == generation else { await engine.lock(); return }
                 let preferences = try await engine.cloudPreferences()
+                let libraryIdentifier = try await engine.identifier()
                 guard ticket == generation else { await engine.lock(); return }
-                cloudPreferences = preferences; items = result; unlocked = true; changed()
+                cloudPreferences = preferences; items = result; cloud.setLibrary(libraryIdentifier); unlocked = true; changed()
             } catch {
                 await engine.lock()
                 exists = await engine.exists()
@@ -144,7 +160,7 @@ final class VaultModel: ObservableObject {
     }
     func changeCode(old: String, new: String) async -> Bool {
         guard unlocked, !busy else { return false }
-        busy = true; defer { busy = false }
+        let operationToken = beginOperation(); defer { endOperation(operationToken) }
         let ticket = generation
         do {
             try await deviceAccess.change(old: old, new: new, id: engine.identifier())
@@ -159,7 +175,7 @@ final class VaultModel: ObservableObject {
         folderBackupWork?.cancel(); folderBackupWork = nil; fileDeletionTask?.cancel()
         fileImportReview = nil; failedFileAccess = nil
         failedPhotos = []; failedFiles = []; failedImportCount = 0
-        cloud.lock(); textSearch.lock(); cloudPreferences = .init(); albumPreferences = [:]
+        cloud.lock(); cloud.setLibrary(nil); textSearch.lock(); cloudPreferences = .init(); albumPreferences = [:]
         generation = UUID(); unlocked = false; items = []; status = ""; message = nil; photoImportReview = nil
         if let pendingBackup { finishBackupExport(pendingBackup, destination: nil) }
         lockTask = Task { await engine.lock(); exists = await engine.exists() }
@@ -167,8 +183,8 @@ final class VaultModel: ObservableObject {
     func eraseLockedLibrary(confirmation: String) async -> Bool {
         guard confirmation == "ERASE", exists, !unlocked, !busy, !cloud.running else { return false }
         lock()
-        busy = true
-        defer { busy = false }
+        let operationToken = beginOperation()
+        defer { endOperation(operationToken) }
         let ticket = generation
         await lockTask?.value
         do {
@@ -177,6 +193,7 @@ final class VaultModel: ObservableObject {
             try await engine.erase(expectedID: id)
             exists = false
             TemporaryFiles.clean()
+            cloud.resetReceipts()
             BackupFolder.forget() // Disconnect only; never remove an external copy.
             for key in ["lastBackupDigest", "lastBackupLibraryID", "lastBackupFilename", "lastBackupFolder",
                         "lastEncryptedExport", "backupReminderSnoozedUntil", "libraryNeedsBackup", RecoveryEvidenceStore.key] {
@@ -208,7 +225,7 @@ final class VaultModel: ObservableObject {
     }
     func organize(ids: Set<UUID>, albums: [String], tags: [String], mode: OrganizationMode) async -> Bool {
         guard unlocked, !busy else { return false }
-        busy = true; defer { busy = false }; let ticket = generation
+        let operationToken = beginOperation(); defer { endOperation(operationToken) }; let ticket = generation
         do {
             let result = try await engine.organize(ids: ids, albums: albums, tags: tags, mode: mode)
             let preferences = try await engine.albumPreferences()
@@ -218,7 +235,7 @@ final class VaultModel: ObservableObject {
     }
     func setAlbumPreference(_ value: AlbumPreference, name: String) async -> Bool {
         guard unlocked, !busy else { return false }
-        busy = true; defer { busy = false }; let ticket = generation
+        let operationToken = beginOperation(); defer { endOperation(operationToken) }; let ticket = generation
         do {
             let result = try await engine.setAlbumPreference(value, name: name)
             guard unlocked, ticket == generation else { return false }
@@ -228,10 +245,10 @@ final class VaultModel: ObservableObject {
     func cancelImport() { importTask?.cancel(); status = "Cancelling import…" }
     func addFromBackup(root: URL, credential: VaultCredential, selected: Set<UUID>, completion: @escaping (Result<BackupImportResult, Error>) -> Void) {
         guard unlocked, !busy, !selected.isEmpty else { return }
-        busy = true; importing = true; progress = 0; status = "Adding encrypted items…"
+        let operationToken = beginOperation(); importing = true; progress = 0; status = "Adding encrypted items…"
         let ticket = generation
         importTask = Task {
-            defer { busy = false; importing = false; importTask = nil }
+            defer { endOperation(operationToken); importing = false; importTask = nil }
             do {
                 let result = try await engine.importBackup(from: root, credential: credential, selected: selected)
                 guard ticket == generation else { return }
@@ -261,7 +278,7 @@ final class VaultModel: ObservableObject {
         guard unlocked, !busy, !selections.isEmpty else { return }
         let access = ImportAccess(selections, parent: accessParent ?? failedFileAccess)
         fileImportReview = nil; failedFileAccess = nil
-        busy = true; importing = true; progress = 0; let ticket = generation
+        let operationToken = beginOperation(); importing = true; progress = 0; let ticket = generation
         failedFiles = []; failedPhotos = []; failedImportCount = 0
         importTask = Task {
             var committed = Set<URL>()
@@ -272,7 +289,7 @@ final class VaultModel: ObservableObject {
                 let worker = Task.detached { try ImportFileList.expand(selections) }
                 urls = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
             } catch {
-                busy = false; importing = false; importTask = nil
+                endOperation(operationToken); importing = false; importTask = nil
                 if ticket == generation { message = error.localizedDescription }
                 return
             }
@@ -317,7 +334,7 @@ final class VaultModel: ObservableObject {
                 }
                 progress = Double(position + 1) / Double(max(urls.count, 1))
             }
-            busy = false; importing = false; importTask = nil
+            endOperation(operationToken); importing = false; importTask = nil
             guard ticket == generation, unlocked else { return }
             items = latestItems
             failedFiles = failures; failedImportCount = failures.count
@@ -331,7 +348,7 @@ final class VaultModel: ObservableObject {
     }
     func trashImportedFiles(_ review: FileImportReview) {
         guard unlocked, !busy, fileImportReview?.id == review.id, !review.originals.isEmpty else { return }
-        busy = true; let ticket = generation; let engine = engine
+        let operationToken = beginOperation(); let ticket = generation; let engine = engine
         let worker = Task.detached(priority: .userInitiated) {
             var result = FileTrashResult()
             do {
@@ -352,7 +369,7 @@ final class VaultModel: ObservableObject {
         fileDeletionTask = worker
         Task {
             let result = await worker.value
-            busy = false; fileDeletionTask = nil
+            endOperation(operationToken); fileDeletionTask = nil
             guard ticket == generation, unlocked else { return }
             let remaining = review.originals.filter { !result.removed.contains($0.vaultID) }
             status = "\(result.removed.count) originals moved to Trash. Vault copies remain."
@@ -367,7 +384,7 @@ final class VaultModel: ObservableObject {
     func importPhotos(_ selections: [PhotosPickerItem]) {
         guard unlocked, !busy, !selections.isEmpty else { return }
         photoImportReview = nil; failedPhotos = []; failedFiles = []; failedImportCount = 0
-        busy = true; importing = true; progress = 0; let ticket = generation
+        let operationToken = beginOperation(); importing = true; progress = 0; let ticket = generation
         importTask = Task {
             var completed = 0
             var originals: [ImportedOriginal] = []
@@ -410,7 +427,7 @@ final class VaultModel: ObservableObject {
                 }
                 progress = Double(position + 1) / Double(selections.count)
             }
-            busy = false; importing = false; importTask = nil
+            endOperation(operationToken); importing = false; importTask = nil
             guard ticket == generation, unlocked else { return }
             items = latestItems
             failedPhotos = failures; failedImportCount = failures.count
@@ -425,8 +442,8 @@ final class VaultModel: ObservableObject {
     /// user's explicit choice. PhotoKit supplies the final system confirmation.
     func deleteImportedOriginals(_ review: PhotoImportReview) async -> String? {
         guard unlocked, !busy, photoImportReview?.id == review.id, !review.originals.isEmpty else { return "Unlock the library and try again." }
-        busy = true; let ticket = generation
-        defer { busy = false }
+        let operationToken = beginOperation(); let ticket = generation
+        defer { endOperation(operationToken) }
         do {
             try await engine.verifyImportedCopies(review.originals.map(\.vaultID))
             guard ticket == generation, unlocked else { return nil }
@@ -444,7 +461,7 @@ final class VaultModel: ObservableObject {
     }
     func update(_ item: VaultItem, favorite: Bool? = nil, album: String? = nil, deleted: Bool? = nil, permanently: Bool = false) {
         guard unlocked, !busy else { return }
-        busy = true; let ticket = generation
+        let operationToken = beginOperation(); let ticket = generation
         Task {
             do {
                 let result: [VaultItem]
@@ -460,14 +477,14 @@ final class VaultModel: ObservableObject {
                     }
                 }
             } catch { if ticket == generation { message = error.localizedDescription } }
-            busy = false
+            endOperation(operationToken)
             if ticket == generation { scheduleAutomaticBackup() }
         }
     }
     func saveCloudPolicy(_ policy: CloudBackupPolicy, provider: CloudProvider) async -> Bool {
         guard unlocked, !busy else { return false }
-        busy = true; let ticket = generation
-        defer { busy = false }
+        let operationToken = beginOperation(); let ticket = generation
+        defer { endOperation(operationToken) }
         do {
             try await engine.setCloudPolicy(policy, provider: provider)
             guard ticket == generation, unlocked else { return false }
@@ -533,36 +550,31 @@ final class VaultModel: ObservableObject {
         catch { await engine.lock(); throw error }
         guard ticket == generation, !Task.isCancelled else { await engine.lock(); throw CancellationError() }
         let preferences = try await engine.cloudPreferences()
+        let libraryIdentifier = try await engine.identifier()
         guard ticket == generation, !Task.isCancelled else { await engine.lock(); throw CancellationError() }
-        cloudPreferences = preferences; items = result; unlocked = true; changed()
+        cloudPreferences = preferences; items = result; cloud.setLibrary(libraryIdentifier); unlocked = true; changed()
     }
     func updateMany(_ chosen: [VaultItem], album: String? = nil, deleted: Bool? = nil, permanently: Bool = false) async {
-        guard unlocked, !busy else { return }
-        busy = true; let ticket = generation
+        guard unlocked, !busy, !chosen.isEmpty else { return }
+        let operationToken = beginOperation(); let ticket = generation
+        defer { endOperation(operationToken) }
         do {
-            for item in chosen {
-                guard ticket == generation else { break }
-                let result: [VaultItem]
-                if permanently { result = try await engine.remove(id: item.id) }
-                else { result = try await engine.update(id: item.id, album: album, deleted: deleted) }
-                changed()
-                if ticket == generation {
-                    items = result
-                    let current = Set(result.filter(\.visible).map(\.id))
-                    for provider in CloudProvider.allCases {
-                        cloudPreferences[provider].selected.formIntersection(current)
-                        cloudPreferences[provider].blocked.formIntersection(current)
-                    }
-                }
+            let result = try await engine.updateMany(ids: Set(chosen.map(\.id)), album: album, deleted: deleted, permanently: permanently)
+            changed()
+            guard ticket == generation, unlocked else { return }
+            items = result
+            let current = Set(result.filter(\.visible).map(\.id))
+            for provider in CloudProvider.allCases {
+                cloudPreferences[provider].selected.formIntersection(current)
+                cloudPreferences[provider].blocked.formIntersection(current)
             }
+            scheduleAutomaticBackup()
         } catch { if ticket == generation { message = error.localizedDescription } }
-        busy = false
-        if ticket == generation { scheduleAutomaticBackup() }
     }
     func backup(automatic: Bool = false) async {
         guard unlocked, !busy else { return }
-        busy = true; progress = 0; let ticket = generation
-        defer { if ticket == generation { busy = false; folderBackupWork = nil } }
+        let operationToken = beginOperation(); progress = 0; let ticket = generation
+        defer { endOperation(operationToken); if ticket == generation { folderBackupWork = nil } }
         do {
             let libraryID = try await engine.identifier()
             if automatic {
@@ -623,9 +635,9 @@ final class VaultModel: ObservableObject {
         guard unlocked, !busy else { return }
         let access = url.startAccessingSecurityScopedResource()
         let ticket = generation
-        busy = true; progress = 0; status = "Checking folder access…"
+        let operationToken = beginOperation(); progress = 0; status = "Checking folder access…"
         Task {
-            defer { if access { url.stopAccessingSecurityScopedResource() }; busy = false }
+            defer { if access { url.stopAccessingSecurityScopedResource() }; endOperation(operationToken) }
             do {
                 try await Task.detached(priority: .utility) { try BackupFolder.remember(url) }.value
                 if ticket == generation { status = "Folder connected. Tap Back Up to Connected Folder to save your library." }
@@ -640,7 +652,7 @@ final class VaultModel: ObservableObject {
     /// this snapshot, and dismissing the picker must not set a false 'backed up' state.
     func prepareBackupForFiles() async -> PreparedBackup? {
         guard unlocked, !busy else { return nil }
-        busy = true; progress = 0; let ticket = generation
+        let operationToken = beginOperation(); progress = 0; let ticket = generation
         var source: URL?
         do {
             _ = try TemporaryFiles.fresh(extension: "c84backup")
@@ -652,13 +664,13 @@ final class VaultModel: ObservableObject {
             let digest = try await Task.detached(priority: .utility) { try BackupCopy.digest(url) }.value
             try Task.checkCancellation()
             guard ticket == generation, unlocked else { throw VaultError.locked }
-            let request = PreparedBackup(url: url, digest: digest, generation: ticket)
+            let request = PreparedBackup(url: url, digest: digest, generation: ticket, operationToken: operationToken)
             pendingBackup = request
             status = "Choose where to save, then tap Export or Save in Files."
             return request
         } catch {
             if let source { try? FileManager.default.removeItem(at: source) }
-            busy = false
+            endOperation(operationToken)
             if ticket == generation {
                 if !Task.isCancelled { message = error.localizedDescription }
                 status = Task.isCancelled ? "Backup preparation cancelled." : "Backup not completed."
@@ -675,7 +687,7 @@ final class VaultModel: ObservableObject {
             defer {
                 if access { destination?.stopAccessingSecurityScopedResource() }
                 try? FileManager.default.removeItem(at: request.url)
-                busy = false
+                endOperation(request.operationToken)
             }
             guard request.generation == generation, unlocked else { return }
             guard let destination else { status = "Save cancelled. No new backup was confirmed."; return }
@@ -709,8 +721,8 @@ final class VaultModel: ObservableObject {
     }
     func verifyBackup(url: URL, recovery: String) async -> Bool {
         guard unlocked, !busy else { return false }
-        busy = true; let ticket = generation
-        defer { busy = false }
+        let operationToken = beginOperation(); let ticket = generation
+        defer { endOperation(operationToken) }
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         do {
