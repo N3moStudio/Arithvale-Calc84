@@ -2,7 +2,7 @@
 
 ## November 22 backup replacement
 
-`ArithenBackupArchive` owns the ARITHB03 container, redundant authenticated catalogs, HKDF catalog subkeys and indexed resource copies. `VaultRepository` owns source authentication, strict or explicitly recoverable staged restoration and dependency filtering. `CloudSnapshot` v2 embeds the authenticated envelope; `validateCloudRecovery` binds the public download inventory to it. `BackupImportView` owns explicit partial-recovery confirmation. `AutomaticFolderBackups.Receipt.archiveExtension` preserves legacy filenames while new saves use `.arithenbackup`. `Scripts/recover.py` is an independent reader with explicit salvage reporting. See [design and research](BACKUP-DESIGN-2026-11-22.md); new format work supersedes the earlier no-schema-change statement below.
+`ArithenBackupArchive` owns the ARITHB03 container, redundant authenticated catalogs, HKDF catalog subkeys and indexed resource copies. `VaultRepository` owns source authentication, strict or explicitly recoverable staged restoration and dependency filtering. `CloudSnapshot` v2 embeds the authenticated envelope; `validateCloudRecovery` binds the public download inventory to it. `BackupImportView` / `BackupReviewModel` own explicit partial-recovery confirmation; `BackupReviewTests` exercise its credential gate, cancellation and retry in the simulator. `IndexedBackupRecoveryTests` cover source removal, metadata redundancy, damaged-resource recovery and committed-index export guards. `AutomaticFolderBackups.Receipt.archiveExtension` preserves legacy filenames while new saves use `.arithenbackup`. `Scripts/recover.py` is an independent reader with explicit salvage reporting. See [design and research](BACKUP-DESIGN-2026-11-22.md); new format work supersedes the earlier no-schema-change statement below.
 
 ## November 22 media chronology follow-up
 
@@ -24,7 +24,7 @@ Delivered 0.12.7/build 23 from `ffb987ff` with passing GitHub native and simulat
 
 ## Simulator validation and lifecycle follow-up
 
-- `.github/workflows/ipa.yml`: independent native IPA and arm64 simulator jobs; simulator pins Xcode/iOS 26.2 and creates a fresh disposable device.
+- `.github/workflows/ipa.yml`: core storage/recovery gate followed by independent native IPA and arm64 simulator jobs; simulator pins Xcode/iOS 26.2 and creates a fresh disposable device.
 - `Scripts/prepare_simulator.py`: generated Xcode host built from production app sources and real MEGA dependencies; simulator-only resource adapter under ignored build output.
 - `Tests/ArithenUITests/ArithenUITests.swift`: ordinary setup/authentication, calculator, tabs, backup/import/settings, lock and large-text/theme journey with screenshots.
 - `.github/workflows/simulator-diagnostics.yml`: optional xcresult diagnostics export from an existing simulator artifact.
@@ -32,7 +32,7 @@ Delivered 0.12.7/build 23 from `ffb987ff` with passing GitHub native and simulat
 
 ## 0.12.4 native settings presentation
 
-`SettingsComponents` contains host-themed native row labels, the larger branded appearance card and adaptive theme tiles. `ArithenIdentity` shares the original artwork. `Appearance` keeps the existing root/type/storage policy and refines list surfaces/spacing/selection. `VaultSettingsView` owns the overview and backup export/picker state; `BackupSettingsDetails` provides focused folder, status, reminder and help pages without owning that export state. Calculator/Cloud/About reuse the presentation while retaining original task handlers. See [complete feature map](SETTINGS-FEATURE-MAP.md), [adoption and checks](SETTINGS-ADOPTION.md), and `UI/NativeSettingsKit` for the unlinked reference/notices.
+`SettingsComponents` keeps decorative row symbols within their slots at accessibility sizes while labels retain full Dynamic Type; it contains host-themed native row labels, the larger branded appearance card and adaptive theme tiles. `ArithenIdentity` shares the original artwork. `Appearance` keeps the existing root/type/storage policy and refines list surfaces/spacing/selection. `VaultSettingsView` owns the overview and backup export/picker state; `BackupSettingsDetails` provides focused folder, status, reminder and help pages without owning that export state. Calculator/Cloud/About reuse the presentation while retaining original task handlers. See [complete feature map](SETTINGS-FEATURE-MAP.md), [adoption and checks](SETTINGS-ADOPTION.md), and `UI/NativeSettingsKit` for the unlinked reference/notices.
 
 ## 0.12.3 calculator entry
 

@@ -8,7 +8,7 @@
 - Recover through either intact catalog; report spare-catalog recovery. Add explicit Recover Intact Files with omission counts and confirmation before import. Keep source backups and the current library safe.
 - Authenticate cloud inventory before recovery downloads; reconstruct the new portable format from unchanged encrypted cloud objects. Keep old readers and receipt-owned seven-copy retention.
 - Preserve restored photo/video capture dates, including embedded-date fallback, and include the interruption, inbox, transfer, accessibility and privacy fixes below.
-- Add corruption/partial-recovery tests and independent Python recovery support. Verification for this exact candidate is pending GitHub completion; see Docs/BACKUP-DESIGN-2026-11-22.md.
+- Add corruption/partial-recovery tests and independent Python recovery support. Verified by GitHub run 45008145545: 176 core, 27 independent recovery and 20 simulator tests passed, with native IPA/package verification. See Docs/BACKUP-DESIGN-2026-11-22.md for evidence and device/provider limits.
 
 ## 0.12.8 · Backup and import reliability
 

@@ -1,116 +1,62 @@
 # Get started with Arithen
 
-## First use
+## Open your library
 
-1. Install the test IPA using your installer or existing LiveContainer setup.
-2. Enter **160160**, then **hold = for half a second**. From 0.12.3, recognition starts entry while your finger is still down, and successful entry skips the opening slide animation.
-3. Save the generated recovery key somewhere separate from this app. Confirm its last eight characters.
-4. Choose a personal **6–12 digit calculator code**. Enter that code and hold = to return to the library.
-5. Tap **+ → Photos & Videos**, or **Import from Files**. For Files, share the source to LiveContainer → Arithen first, unlock, then tap **Import**. Try disposable samples first.
+On a fresh installation, enter **160160** and hold **= for half a second**. Save the generated recovery key somewhere separate from the app, confirm its last eight characters, and choose your own 6–12 digit calculator code.
 
-The calculator Help screen contains only calculator help. If you forget the code,
-enter 160160 and hold = to reach the locked recovery form. Your original recovery
-key is still required; the starter code does not decrypt an existing library.
+For normal access, type your own code and hold **=**. A short press evaluates the number; holding an already evaluated result cannot unlock the library. Retype the code. The starter code opens setup/recovery only and never decrypts an existing library.
 
-## Keep a backup outside the app
+Install updates into the same app identity/data container. A normal update keeps the library and its keys. If access is lost, recovery requires the matching recovery key. Erase and Start Over is a separately confirmed destructive action; it does not recover forgotten keys or old photos.
+
+## Add photos, videos and files
+
+Use **+ → Photos & Videos** or **Import from Files**. Choose files directly where supported, or download them in Files and share to Arithen. With LiveContainer, share to **LiveContainer → Arithen**, then unlock the intended library.
+
+After successful import, keeping originals is always an option. Removal is offered only after verification:
+
+- Photos uses the system deletion confirmation. Changed, inaccessible or incomplete originals stay. iCloud Photos can synchronize removal across devices.
+- Files uses the provider's recoverable Trash operation after confirmation. Unsupported or changed originals stay; there is no permanent-delete fallback. Containing folders are not deleted.
+- Failed imports are never included in removal. Folder import skips hidden files, symbolic links and packages.
+
+## Save and check a backup
 
 1. Open **Settings → Backups → Create Backup**.
-2. Save to your own iCloud Drive folder or another Files location outside the app/LiveContainer.
-3. Open **Test Backup**, select the actual `.c84backup` file, and enter its recovery key. If the picker closes, use the sharing route below.
-4. Check the Files provider’s upload status separately. A successful local save is not proof of cloud upload.
+2. Save the `.arithenbackup` outside Arithen/LiveContainer, such as your own Files folder.
+3. Open **Check a Backup**, select that saved file and enter its recovery key. This checks restoration without importing into your library.
+4. Wait for your Files provider to finish uploading. A successful local save is not proof of a completed cloud upload.
 
-The local encrypted library is private app data. It is not a normal Photos album
-or a folder of playable pictures in Files. The `.c84backup` file is your portable,
-encrypted copy. You need that file **and its recovery key** after deletion/reinstall.
+The new format stores encrypted resources with two authenticated recovery catalogs. It is not an ordinary ZIP. The file and its recovery key are both needed after deleting the app; neither can replace the other. Older `.c84backup` readers remain supported. See [backup design and validation](Docs/BACKUP-DESIGN-2026-11-22.md).
 
-## Choose cloud items
+**Connected Folder → Automatic Daily Backup** can save changed libraries while the app is open and unlocked. It keeps seven tracked, checked automatic copies and protects manual/pre-existing copies. It is not a guaranteed background schedule; iOS decides when suspended apps can run. Private backup reminders are on by default and stay inside the unlocked library.
 
-Open **Settings → Cloud Copies**, choose a provider, and
-configure **Manual selection** or **Automatic · all eligible**. Add exclusions in
-**Never Upload**. Sign in, then Back Up to the provider. See [the cloud guide](Docs/CLOUD-BACKUP.md).
+## Import another backup
 
-Cloud selection and exclusions live in **Settings → Cloud Copies → provider**.
-Long-press gallery items for Share, Add to Album, or Delete.
+Open **Settings → Backups → Import Backup** or **+ → From a Backup**. Choose the file directly, or share the downloaded file from Files to Arithen (through LiveContainer when applicable). Unlock, select the received backup, enter that backup's key and tap **Import**.
 
-## Keep or remove originals
+The current library is preserved. Added items are encrypted under its current key; exact duplicate originals are skipped. Source Never Upload exclusions carry over. Newly created libraries, including setup from backups, receive a new key which must be saved separately. Every older archive still needs the key that belongs to it.
 
-Every import review offers **Keep Originals**. Removal is optional for that batch;
-it never becomes an automatic preference.
+If a new-format backup is damaged, **Recover Intact Files** checks for whole authenticated originals. Re-enter the source key and review the counts before choosing **Import Intact Items**. This is explicitly partial recovery; missing or damaged media cannot be recreated. The source backup stays unchanged. If an intact spare catalog restores the whole library, create a fresh backup afterward.
 
-- **Photos:** the app rechecks the encrypted copies and the exact source assets, then requests iOS’s deletion confirmation. Changed, inaccessible, edited, or incomplete-resource originals are kept. iCloud Photos can sync removal to other devices. Check Photos → Recently Deleted.
-- **Files and folders:** the review lists the successfully imported originals and their count. Confirm **Move to Trash** to recheck each source against its imported bytes and request the provider’s recoverable Trash operation. Changed or unsupported files stay in place. There is no permanent-delete fallback, and containing folders are never deleted.
-- Failed imports are never included in removal. Folder import skips hidden files, symbolic links, and packages.
+Removing a received copy only removes the app's extra copy. It does not delete the original in Files. If Files closes or cannot grant access, use sharing; a shared/copied folder cannot establish a persistent backup-folder connection.
 
-Provider Trash behavior and retention need testing with disposable files on your
-device. Save and test an external backup before making the vault your only copy.
+## Cloud copies
 
-## Restore or update
+Open **Settings → Cloud Copies**, choose MEGA or Blomp, and configure manual selection or automatic eligible items. **Never Upload** excludes selected items for that provider. Sign in and start backup. See [the cloud guide](Docs/CLOUD-BACKUP.md).
 
-Install updates into the same app/data container to retain the local library.
-Start from external backups in an **empty installation**. Each source needs its
-old recovery key. Version 0.7.0 creates a new destination key: save and confirm it
-during setup, then use it for all future backups of that destination library.
+Cloud storage holds separate encrypted objects and versioned catalogs, not one continually overwritten portable file. Keep both objects and catalogs. New uploads are checked before the catalog is published. Previously verified objects can be reused after a size check; **Recheck All Remote Files** checks their bytes again. **Test Cloud Recovery** verifies that a snapshot can restore. An independent portable copy protects against losing access to the cloud account.
 
-Setup does not replace an existing library. Old 0.1 backups use their original
-password to read the source. New libraries start with manual/empty cloud choices;
-source Never Upload exclusions are retained. Sign-ins and folder permissions must be
-connected again. See [offline computer recovery](Docs/BUILDING.md#recover-without-the-app).
+## Return an original to Photos
 
+Use **Save to Photos**. Arithen supplies the stored capture date; older items can use embedded EXIF/QuickTime dates. Photos' **Date Captured** ordering uses that date, while **Recently Added** still shows a newly saved asset. Original Photos album membership and asset identity are not recreated. Files with no recoverable date cannot have a historical date reconstructed. [Details](Docs/BACKUP-AND-PHOTOS.md).
 
-## Receive a backup without opening the picker (0.7.0)
+## Find settings and organize
 
-1. Open Apple’s **Files** app yourself. Find the `.c84backup` and download it if it has a cloud icon.
-2. Touch and hold the file → **Share → LiveContainer → Arithen**. Choose the intended data container. Share one downloaded file, not a folder or collaboration link. A directly installed Arithen can be selected instead of LiveContainer.
-3. Arithen still opens as a calculator. Enter your code and hold **=**; an empty installation uses **160160** and hold **=**.
-4. On setup, tap **Use Received Backup**, enter its old key, and tap **Add Backup to Setup**. Save and confirm the **new** recovery key, choose a calculator code, and tap **Create Library from Backups**. For an existing library, use **+ → From a Backup** to add items or **Settings → Backups → Test a Backup** to check a copy without adding it.
-5. Receipt means the encrypted copy arrived; only a successful recovery test or restore authenticates it. **Remove Received Copy** removes this extra copy, not the original in Files or your library. One received backup is retained at a time.
+- Hold a snap to select. Share, Add to Album or Delete; Cancel or deselect all to exit.
+- Albums keeps its own navigation, including Recently Deleted. Reselect Albums to return to its home.
+- Settings → Appearance offers seven themes. Liquid Glass is standard, with accessibility and older-iOS fallbacks; legacy appearance values remain decodable.
+- Settings → Storage shows local storage, largest items and exact duplicates. Nothing is automatically permanently deleted.
+- Privacy & Access contains Change Calculator Code and Photo Indexing. Indexing runs locally after import; busy state, Low Power Mode, heat and inactivity defer work.
+- Backups contains Create, Import, Check, Connected Folder, Backup Status and private reminders. Backup Help includes recovery-key guidance.
+- About shows the current version/build. This guide describes **0.13.0 (25)**.
 
-This path never opens Arithen’s document picker. LiveContainer documents its
-share handoff, but that host-to-app transfer still needs testing on your phone.
-If **No shared backup received yet** remains, the host has not delivered a file.
-If LiveContainer is absent from Share → More, check that its share extension is
-installed/enabled. Keep the original and key; do not delete them to troubleshoot.
-
-The original **Choose Backup File** and **Choose Backup Folder** paths remain
-available. Find the build in calculator Help → About or the Recovery footer:
-**0.10.0 (14)** for this update.
-
-Where file selection works, you may queue several backups with separate old keys
-before creating the new library. In LiveContainer, finish setup before leaving to
-share the next file, then add it through **+ → From a Backup**. Later additions
-keep the current destination key. Raw Photos/files/folders are imported after
-**Create Library**, which already creates and confirms a fresh key.
-
-Updating an existing library never rotates its keys. Libraries restored in 0.6.0
-or earlier still use their original key. **Settings → Privacy & Access → Recovery
-Key** explains this; it cannot reveal or export a forgotten key. Keep the key
-saved during setup. Old archives continue to require their own original key.
-
-
-## Add another backup after setup
-
-Download the backup in Files, then Share → LiveContainer → Arithen. Unlock the
-library and tap **Backup received**, or **+ → From a Backup**. Use the original
-key for that backup, then tap **Import** when its received copy is ready.
-The current library is preserved. Added items use its current recovery key.
-Exact duplicate originals (including Live Photo motion) are skipped. Source
-Never Upload exclusions carry over; check Cloud Copies before uploading.
-
-You can remove a waiting copy from the received card to make room for another.
-Removing it here never removes the original file in Files. **Test a Backup** is
-still available under Settings → Backups when you only want to check a copy.
-
-## Choose a look
-
-Settings → Appearance contains **Theme** and **Surfaces**. Bloom and Theme default are initial/reset choices. All eight themes default to Solid. Liquid Glass has an older-iOS material fallback and respects Reduce Transparency and increased contrast. One theme styles the whole app. Old video/background/layout preferences are ignored; their files are not erased.
-
-## Organize and find things
-
-- Hold a snap to select, then tap **Add to Album**. Cancel or deselect all to exit.
-- **Albums → …:** pin an album or choose its cover.
-- **Privacy & Access → Photo Indexing:** enabled by default; recognizes words locally after imports finish. Turning it off removes its encrypted index and remembers your choice. Low Power Mode, heat, inactivity, and busy operations defer work.
-- **Backups → Storage:** large items, Recently Deleted, and exact duplicates. Nothing is automatically permanently deleted.
-- **Backups:** create, import, test, check provider coverage, or find recovery-key help.
-- **About:** app version, build, and privacy information.
-
-These instructions describe the current source and 0.12.4 build 20 target. Use the matching build verification report for automated results; installation, layouts and live provider transfers require device checks.
+Native compilation and simulator evidence are recorded in the research report. FlareStore signing, actual cloud accounts and real Files-provider permissions still need validation on the intended installation.
