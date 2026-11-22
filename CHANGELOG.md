@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.0 · Recoverable backups
+
+**November 22, 2026 · Build 25 · Test build**
+
+- Replace new portable exports with indexed `.arithenbackup` files containing redundant authenticated catalogs and individually verified encrypted resources. Keep established AES-256-GCM, with per-snapshot HKDF catalog keys.
+- Recover through either intact catalog; report spare-catalog recovery. Add explicit Recover Intact Files with omission counts and confirmation before import. Keep source backups and the current library safe.
+- Authenticate cloud inventory before recovery downloads; reconstruct the new portable format from unchanged encrypted cloud objects. Keep old readers and receipt-owned seven-copy retention.
+- Preserve restored photo/video capture dates, including embedded-date fallback, and include the interruption, inbox, transfer, accessibility and privacy fixes below.
+- Add corruption/partial-recovery tests and independent Python recovery support. Verification for this exact candidate is pending GitHub completion; see Docs/BACKUP-DESIGN-2026-11-22.md.
+
 ## 0.12.8 · Backup and import reliability
 
 **November 22, 2026 · Build 24 · Test build**

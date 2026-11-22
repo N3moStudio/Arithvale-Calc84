@@ -10,10 +10,10 @@ Saved coordinates are retained. New Files imports can read embedded GPS. Missing
 
 | Backup | Stored form |
 | --- | --- |
-| Files / connected folder | One portable `.c84backup` snapshot containing the encrypted catalog and encrypted resources, including Recently Deleted |
+| Files / connected folder | One portable `.arithenbackup` snapshot containing two authenticated catalogs and encrypted resources, including Recently Deleted |
 | MEGA / Blomp | Separate encrypted objects plus versioned recovery catalogs, limited to that provider's eligible items |
 
-The portable backup is a custom `C84B0002` archive, **not an ordinary ZIP**. It packages encrypted data for convenient copying; the extension is not its security mechanism. Resources use authenticated AES-GCM records, and the private catalog is encrypted. Old `C84B0001` archives remain supported.
+The new portable backup is an indexed `ARITHB03` archive, **not an ordinary ZIP**. It packages encrypted data for convenient copying; the extension is not its security mechanism. Resources use authenticated AES-GCM records, and each snapshot has a separate HKDF-derived catalog key. Either authenticated catalog can recover from damage to the other. Old `C84B0001` and `C84B0002` readers remain available.
 
 Cloud uploads reuse previously verified unchanged objects. New objects are downloaded and checked before the final recovery catalog is published; restoring authenticates the encrypted contents with the recovery key. Previously verified objects can be reused after a size check, so a completed status is not continuous monitoring of remote storage. **Recheck All Remote Files** performs a fresh readback check. Phone deletions do not purge old cloud snapshots.
 
@@ -26,4 +26,4 @@ Cloud catalogs contain an encrypted private index and a visible inventory of opa
 - Use **Check a Backup** or **Test Cloud Recovery** to authenticate a saved copy without replacing the current library. A successful copied-file check and an authenticated recovery check are different evidence.
 - Automatic connected-folder backups retain seven checked automatic copies, protect manual/pre-existing files and retain extra copies if pruning cannot be verified. They run while the app is open and unlocked; iOS does not guarantee a daily background run.
 
-Replacing a working encryption system would introduce compatibility and migration risk. This update preserves the existing formats and strengthens interruption handling, received-file recovery, transfer checks and restore tests instead. Exact build results and real-provider/device limits are recorded in [the reliability report](RELIABILITY-2026-11-21.md).
+The user authorized a replacement portable format after the initial reliability pass. It adds catalog redundancy and explicitly confirmed intact-file recovery while retaining established encryption primitives. A damaged media resource still cannot be recreated from missing bytes. Read the [research, new format and validation limits](BACKUP-DESIGN-2026-11-22.md).

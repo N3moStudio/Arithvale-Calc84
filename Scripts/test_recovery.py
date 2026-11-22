@@ -2,13 +2,19 @@
 import json
 import base64
 import hashlib
+import io
 import os
 from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest import mock
+from contextlib import redirect_stdout
 from cryptography.exceptions import InvalidTag
-from recover import recover, block, number, exact
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from recover import recover, block, number, exact, main
 
 SECRET = "C24144AF-B3E94438-97C89127-E373D053-9F19F720-E47CA588-7C38BF10-14C2AF32"
 FIXTURES = Path(os.environ["C84_FIXTURE_DIR"])
@@ -150,6 +156,251 @@ class RecoveryTests(unittest.TestCase):
             recover(FIXTURES / "v2.c84backup", SECRET, output)
         self.assertEqual(keep.read_bytes(), b"existing data")
         self.assertEqual(len(list(output.iterdir())), 1)
+
+
+class RedundantRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.base = Path(self.temp.name)
+        self.data = (FIXTURES / "v3.c84backup").read_bytes()
+        self.envelope_size = struct.unpack(">Q", self.data[8:16])[0]
+        self.raw = self.data[16:16 + self.envelope_size]
+        self.body_start = 16 + self.envelope_size
+        self.footer_start = len(self.data) - 16 - self.envelope_size
+        self.envelope = json.loads(self.raw)
+        # Independent test-only derivation for authenticated malformed fixtures.
+        # The real valid fixture itself is always written by Swift, not Python.
+        header = json.loads(base64.b64decode(self.envelope["vaultHeader"]))
+        compact = SECRET.replace("-", "")
+        wrapping = hashlib.pbkdf2_hmac("sha256", compact.encode(), base64.b64decode(header["salt"]), 600000, 32)
+        sealed = base64.b64decode(header["wrappedKey"])
+        self.key = AESGCM(wrapping).decrypt(sealed[:12], sealed[12:], f'Calc84/v2/{header["id"]}/key'.encode())
+        self.catalog_key = HKDF(algorithm=hashes.SHA256(), length=32, salt=self.envelope["snapshotID"].encode(),
+                                info=b"Arithen/backup/v3/catalog").derive(self.key)
+        self.aad = ("Arithen/backup/v3/" + self.envelope["snapshotID"]).encode()
+        sealed = base64.b64decode(self.envelope["sealedCatalog"])
+        self.catalog = json.loads(AESGCM(self.catalog_key).decrypt(sealed[:12], sealed[12:], self.aad))
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def write(self, data, name="source.c84backup"):
+        source = self.base / name
+        source.write_bytes(data)
+        return source
+
+    def assert_rejected(self, data, salvage=False, secret=SECRET):
+        source = self.write(data)
+        output = self.base / "must-not-exist"
+        with self.assertRaises(Exception):
+            recover(source, secret, output, salvage=salvage)
+        self.assertFalse(output.exists())
+        self.assertFalse(any(path.name.startswith(".arithen-recovery-") for path in self.base.iterdir()))
+
+    def rewritten(self, catalog=None, envelope=None, body=None):
+        envelope = dict(self.envelope if envelope is None else envelope)
+        if catalog is not None:
+            nonce = os.urandom(12)
+            sealed = nonce + AESGCM(self.catalog_key).encrypt(nonce, json.dumps(catalog).encode(), self.aad)
+            envelope["sealedCatalog"] = base64.b64encode(sealed).decode()
+        raw = json.dumps(envelope).encode()
+        body = self.data[self.body_start:self.footer_start] if body is None else body
+        return b"ARITHB03" + struct.pack(">Q", len(raw)) + raw + body + raw + struct.pack(">Q", len(raw)) + b"ARITHEND"
+
+    def test_swift_v3_originals_dates_locations_and_empty_resource(self):
+        output = self.base / "recovered"
+        result = recover(FIXTURES / "v3.c84backup", SECRET.lower(), output)
+        self.assertTrue(result["complete"])
+        self.assertEqual(result["authenticatedRecords"], 3)
+        self.assertEqual(result["metadataCopies"], ["front", "footer"])
+        metadata = json.loads((output / "metadata.json").read_text())
+        photo = next(item for item in metadata if item["name"].endswith("AUX.jpg"))
+        self.assertEqual((output / photo["exportedFilename"]).read_bytes(), b"portable original bytes")
+        self.assertEqual(photo["captureDateUTC"], "2023-03-28T10:40:00.125000+00:00")
+        self.assertEqual((photo["latitude"], photo["longitude"]), (-33.75, -118.25))
+        self.assertEqual(photo["albums"], ["Travel", "Receipts"])
+        self.assertEqual(photo["tags"], ["ticket", "été"])
+        self.assertAlmostEqual((output / photo["exportedFilename"]).stat().st_mtime, 1680000000.125, delta=0.01)
+        video = next(item for item in metadata if item["name"] == "video.mov")
+        self.assertEqual((output / video["exportedFilename"]).read_bytes(), bytes([0xA7]) * (1024 * 1024 + 7))
+        empty = next(item for item in metadata if item["name"] == "empty.bin")
+        self.assertEqual((output / empty["exportedFilename"]).read_bytes(), b"")
+        self.assertTrue(json.loads((output / "recovery-report.json").read_text())["complete"])
+
+    def test_footer_recovers_damaged_front_envelope_magic_and_length(self):
+        for label, data in (("envelope", bytearray(self.data)), ("magic", bytearray(self.data)),
+                            ("length", bytearray(self.data)), ("nonobject-json", bytearray(self.data))):
+            with self.subTest(label=label):
+                if label == "envelope":
+                    data[16] ^= 1
+                elif label == "magic":
+                    data[0] ^= 1
+                elif label == "length":
+                    data[8:16] = struct.pack(">Q", 2**63)
+                else:
+                    data[16:self.body_start] = b"[]" + b" " * (self.envelope_size - 2)
+                result = recover(self.write(data), SECRET)
+                self.assertTrue(result["complete"])
+                self.assertEqual(result["metadataCopies"], ["footer"])
+                self.assertIn("redundancyWarning", result)
+
+    def test_front_recovers_damaged_or_missing_footer(self):
+        damaged = bytearray(self.data)
+        damaged[self.footer_start] ^= 1
+        for data in (damaged, self.data[:-8], self.data[:self.footer_start]):
+            with self.subTest(size=len(data)):
+                result = recover(self.write(data), SECRET)
+                self.assertTrue(result["complete"])
+                self.assertEqual(result["metadataCopies"], ["front"])
+
+    def test_wrong_key_and_both_damaged_copies_never_salvage(self):
+        for salvage in (False, True):
+            self.assert_rejected(self.data, salvage=salvage, secret="wrong key")
+            damaged = bytearray(self.data)
+            damaged[16] ^= 1
+            damaged[self.footer_start] ^= 1
+            self.assert_rejected(damaged, salvage=salvage)
+
+    def test_damaged_resource_strict_rejection_and_explicit_partial_salvage(self):
+        damaged = bytearray(self.data)
+        damaged[self.body_start + self.catalog["records"][0]["bytes"] - 1] ^= 1
+        self.assert_rejected(damaged)
+        output = self.base / "partial"
+        result = recover(self.write(damaged), SECRET, output, salvage=True)
+        self.assertFalse(result["complete"])
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["authenticatedRecords"], 2)
+        self.assertEqual(result["expectedRecords"], 3)
+        self.assertEqual([record["id"] for record in result["omittedRecords"]], [self.catalog["records"][0]["id"]])
+        metadata = json.loads((output / "metadata.json").read_text())
+        self.assertEqual(len(metadata), 2)
+        self.assertNotIn(self.catalog["records"][0]["id"], {item["id"] for item in metadata})
+        self.assertEqual(json.loads((output / "recovery-report.json").read_text())["status"], "partial")
+
+    def test_truncated_body_salvages_only_whole_authenticated_resources(self):
+        last = self.catalog["records"][-1]
+        data = self.data[:self.footer_start - last["bytes"] + last["bytes"] // 2]
+        self.assert_rejected(data)
+        output = self.base / "partial"
+        result = recover(self.write(data), SECRET, output, salvage=True)
+        self.assertFalse(result["complete"])
+        self.assertEqual(result["authenticatedRecords"], 2)
+        self.assertEqual(result["omittedRecords"][0]["id"], last["id"])
+        self.assertFalse(any(path.name.startswith(last["id"]) for path in output.iterdir()))
+
+    def test_disagreeing_authenticated_catalogs_and_extra_bytes_are_rejected(self):
+        second = (FIXTURES / "v3-other.c84backup").read_bytes()
+        size = struct.unpack(">Q", second[-16:-8])[0]
+        ambiguous = self.data[:self.footer_start] + second[-size - 16:]
+        for salvage in (False, True):
+            self.assert_rejected(ambiguous, salvage=salvage)
+            self.assert_rejected(self.data + b"extra", salvage=salvage)
+        altered = json.loads(json.dumps(self.catalog))
+        altered["index"] = base64.b64encode(bytes(28)).decode()
+        damaged_index = self.rewritten(catalog=altered)
+        size = struct.unpack(">Q", damaged_index[-16:-8])[0]
+        # Authentication of both catalogs must be compared before attempting to
+        # decode either index, even when one catalog contains an unusable index.
+        self.assert_rejected(damaged_index[:-size - 16] + self.data[self.footer_start:], salvage=True)
+
+    def test_header_binding_rejects_even_valid_rewrapped_header_json(self):
+        envelope = dict(self.envelope)
+        header = json.loads(base64.b64decode(envelope["vaultHeader"]))
+        header["unrecognizedField"] = "Header bytes must be bound even if decoding ignores this field."
+        envelope["vaultHeader"] = base64.b64encode(json.dumps(header).encode()).decode()
+        self.assert_rejected(self.rewritten(envelope=envelope), salvage=True)
+
+    def test_catalog_hash_and_resource_aead_are_independently_required(self):
+        catalog = json.loads(json.dumps(self.catalog))
+        digest = catalog["records"][0]["sha256"]
+        catalog["records"][0]["sha256"] = ("0" if digest[0] != "0" else "1") + digest[1:]
+        result = recover(self.write(self.rewritten(catalog=catalog)), SECRET, salvage=True)
+        self.assertFalse(result["complete"])
+        self.assertEqual(result["authenticatedRecords"], 2)
+        # A matching outer digest still cannot authenticate corrupted ciphertext.
+        body = bytearray(self.data[self.body_start:self.footer_start])
+        length = self.catalog["records"][0]["bytes"]
+        body[length - 1] ^= 1
+        catalog["records"][0]["sha256"] = hashlib.sha256(body[:length]).hexdigest()
+        result = recover(self.write(self.rewritten(catalog=catalog, body=body)), SECRET, salvage=True)
+        self.assertFalse(result["complete"])
+        self.assertEqual(result["authenticatedRecords"], 2)
+
+    def test_duplicate_inventory_and_oversized_lengths_are_rejected(self):
+        catalog = json.loads(json.dumps(self.catalog))
+        catalog["records"][1] = dict(catalog["records"][0])
+        self.assert_rejected(self.rewritten(catalog=catalog), salvage=True)
+        catalog = json.loads(json.dumps(self.catalog))
+        catalog["records"][0]["bytes"] = 2**63
+        self.assert_rejected(self.rewritten(catalog=catalog), salvage=True)
+
+    def test_salvage_does_not_overwrite_existing_folder_or_accept_legacy(self):
+        output = self.base / "existing"
+        output.mkdir()
+        keep = output / "keep.txt"
+        keep.write_bytes(b"existing data")
+        with self.assertRaises(ValueError):
+            recover(FIXTURES / "v3.c84backup", SECRET, output, salvage=True)
+        self.assertEqual(keep.read_bytes(), b"existing data")
+        with self.assertRaises(ValueError):
+            recover(FIXTURES / "v2.c84backup", SECRET, self.base / "legacy", salvage=True)
+        self.assertFalse((self.base / "legacy").exists())
+
+    def cloud_fixture(self):
+        folder = self.base / "cloud-v2"
+        (folder / "snapshots").mkdir(parents=True)
+        (folder / "objects").mkdir()
+        offset = self.body_start
+        for record in self.catalog["records"]:
+            data = self.data[offset:offset + record["bytes"]]
+            offset += record["bytes"]
+            (folder / "objects" / f'{record["id"]}-{record["sha256"]}.enc').write_bytes(data)
+        header = json.loads(base64.b64decode(self.envelope["vaultHeader"]))
+        catalog = folder / "snapshots" / "portable.c84cloud"
+        catalog.write_text(json.dumps({"version": 2, "vaultID": header["id"],
+            "header": self.envelope["vaultHeader"], "index": self.catalog["index"],
+            "records": self.catalog["records"], "archiveEnvelope": base64.b64encode(self.raw).decode()}))
+        return catalog
+
+    def test_v2_cloud_snapshot_reassembles_redundant_archive_and_preserves_metadata(self):
+        output = self.base / "recovered"
+        result = recover(self.cloud_fixture(), SECRET, output)
+        self.assertEqual(result["formatVersion"], 3)
+        self.assertEqual(result["authenticatedRecords"], 3)
+        self.assertEqual(result["metadataCopies"], ["front", "footer"])
+        self.assertTrue(result["complete"])
+        metadata = json.loads((output / "metadata.json").read_text())
+        photo = next(item for item in metadata if item["name"].endswith("AUX.jpg"))
+        self.assertEqual((output / photo["exportedFilename"]).read_bytes(), b"portable original bytes")
+        self.assertEqual(photo["captureDateUTC"], "2023-03-28T10:40:00.125000+00:00")
+        self.assertEqual((photo["latitude"], photo["longitude"]), (-33.75, -118.25))
+
+    def test_v2_cloud_outer_inventory_tampering_and_missing_objects_leave_no_output(self):
+        catalog = self.cloud_fixture()
+        snapshot = json.loads(catalog.read_text())
+        changed = json.loads(json.dumps(snapshot))
+        changed["records"][0]["sha256"] = "0" * 64
+        catalog.write_text(json.dumps(changed))
+        with self.assertRaises(ValueError):
+            recover(catalog, SECRET, self.base / "output")
+        self.assertFalse((self.base / "output").exists())
+        catalog.write_text(json.dumps(snapshot))
+        next((catalog.parent.parent / "objects").iterdir()).unlink()
+        with self.assertRaises(Exception):
+            recover(catalog, SECRET, self.base / "output")
+        self.assertFalse((self.base / "output").exists())
+
+    def test_salvage_command_reports_partial_recovery_and_nonzero_exit(self):
+        damaged = bytearray(self.data)
+        damaged[self.body_start + self.catalog["records"][0]["bytes"] - 1] ^= 1
+        source = self.write(damaged)
+        output = self.base / "partial"
+        console = io.StringIO()
+        with mock.patch("sys.argv", ["recover.py", str(source), "--output", str(output), "--salvage"]), \
+             mock.patch("recover.getpass.getpass", return_value=SECRET), redirect_stdout(console):
+            self.assertEqual(main(), 2)
+        self.assertIn("PARTIAL RECOVERY ONLY", console.getvalue())
+        self.assertIn('"complete": false', console.getvalue())
 
 
 if __name__ == "__main__":

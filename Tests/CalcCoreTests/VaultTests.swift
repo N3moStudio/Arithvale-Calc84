@@ -63,9 +63,12 @@ final class VaultTests: XCTestCase {
         let wrong = repository("wrong")
         XCTAssertThrowsError(try wrong.restore(from: archive, password: "wrong password"))
         XCTAssertFalse(wrong.exists)
+        let payloadStart = 16 + data[8..<16].reduce(0) { ($0 << 8) | Int($1) }
         var flipped = data
-        flipped[flipped.count - 1] ^= 1
-        for (i, candidate) in [flipped, Data(data.dropLast(10)), data + Data([0]), Data("bad".utf8)].enumerated() {
+        flipped[payloadStart] ^= 1
+        // V3 deliberately survives losing redundant footer metadata. Damage or
+        // truncate the authenticated payload when testing strict rejection.
+        for (i, candidate) in [flipped, Data(data.prefix(payloadStart + 5)), data + Data([0]), Data("bad".utf8)].enumerated() {
             let badFile = temporary.appendingPathComponent("bad\(i)")
             try candidate.write(to: badFile)
             let restore = repository("restore\(i)")

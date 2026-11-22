@@ -177,7 +177,7 @@ final class CloudBackupModel: ObservableObject {
                     let plan = try await vault.engine.cloudPlan(provider: provider)
                     try Task.checkCancellation()
                     guard !plan.itemIDs.isEmpty else { empty.append(provider.title); continue }
-                    try StoragePreflight.require(bytes: Int64(plan.snapshot.records.map(\.bytes).max() ?? 0) + 8 * 1024 * 1024)
+                    try StoragePreflight.require(bytes: Int64(plan.snapshot.records.map(\.bytes).max() ?? 0) + Int64(CloudSnapshot.maximumBytes) * 2)
                     let store = try await self.store(provider)
                     let previous = self.receipts[provider] ?? .init()
                     try await CloudTransfer.upload(plan, store: store, scratch: scratch,
@@ -251,7 +251,7 @@ final class CloudBackupModel: ObservableObject {
             _ = try await Task.detached { try VaultRepository.validateCloudRecovery(snapshot, password: recovery) }.value
             try Task.checkCancellation()
             try StoragePreflight.require(bytes: snapshot.records.reduce(Int64(0)) { $0 + Int64($1.bytes) } * 3)
-            let archive = scratch.appendingPathComponent("recovery.c84backup")
+            let archive = scratch.appendingPathComponent("recovery.arithenbackup")
             try await CloudTransfer.download(snapshot, store: store, scratch: scratch, destination: archive,
                 progress: { value in await self.showProgress(value, provider: provider) })
             try Task.checkCancellation(); self.phase = "Authenticating every recovered file…"

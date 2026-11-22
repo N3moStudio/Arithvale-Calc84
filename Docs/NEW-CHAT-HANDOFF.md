@@ -1,5 +1,9 @@
 # Arithen handoff
 
+## Backup replacement in progress — November 22, 2026
+
+User explicitly authorized replacing backup formats after asking for deeper research; existing backup compatibility is optional, but installed library data must remain intact. Current target **0.13.0/build 25**. See `Docs/BACKUP-DESIGN-2026-11-22.md`. New ARITHB03 `.arithenbackup` container, redundant authenticated catalogs, HKDF catalog subkeys, independently verified encrypted resources, explicit partial-recovery confirmation, cloud catalog v2 authentication and independent Python salvage. New implementation needs its own successful core/native/simulator run before delivery; do not confuse the passing pre-replacement checkpoint with this candidate. Delivery remains only the latest verified IPA in the Desktop project IPA folder. This supersedes the preservation-only scope below.
+
 ## Current reliability build — November 21, 2026
 
 User authorized fixing the two external reviews, GitHub IPA build and expanded simulator testing. Target **0.12.8/build 24**. Read RELIABILITY-2026-11-21.md for each finding/disposition. Preserve formats/keys/identity; no encryption migration. Await current CI artifacts before reporting delivery. Deliver only current verified IPA to Desktop/ipa/My Projects (N3mo Studio), replacing prior Arithen only.

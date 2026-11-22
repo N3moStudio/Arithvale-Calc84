@@ -67,6 +67,17 @@ public struct BackupImportResult: Sendable {
     public let skipped: Int
 }
 
+public struct BackupRecoveryReport: Sendable {
+    public let items: [VaultItem]
+    public let skippedItemCount: Int
+    public let damagedResourceCount: Int
+    public let metadataRecovered: Bool
+}
+public struct BackupVerification: Sendable {
+    public let itemCount: Int
+    public let metadataRecovered: Bool
+}
+
 /// In-memory setup input only. Never persist or log source recovery secrets.
 public struct SetupBackupSource: Sendable {
     public let url: URL

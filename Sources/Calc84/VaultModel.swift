@@ -728,13 +728,16 @@ final class VaultModel: ObservableObject {
         do {
             let bytes = Int64(try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
             try StoragePreflight.require(bytes: bytes * 2)
-            let count = try await engine.verifyBackup(from: url, password: recovery)
+            let verification = try await engine.verifyBackupDetails(from: url, password: recovery)
+            let count = verification.itemCount
             guard ticket == generation else { return false }
             let digest = try await Task.detached(priority: .utility) { try CloudBackup.hash(url) }.value
             guard ticket == generation else { return false }
             recordRecoveryTest(source: "Files", snapshot: url.lastPathComponent + " · SHA-256 " + digest, library: "Contained in the tested archive")
             recordRecoveryEvidence(source: "Files", snapshotID: digest, items: count)
-            status = "Recovery test passed: \(count) items authenticated in a separate temporary library."
+            status = verification.metadataRecovered
+                ? "\(count) items verified using the spare recovery catalog. Create a fresh backup to replace this damaged copy."
+                : "\(count) items verified. Your current library is unchanged."
             return true
         } catch { if ticket == generation { message = error.localizedDescription }; return false }
     }

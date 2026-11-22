@@ -83,6 +83,10 @@ public actor VaultEngine {
         try repository.restore(from: from, password: password)
         return repository.items
     }
+    public func restoreRecoverable(from: URL, password: String) throws -> BackupRecoveryReport {
+        try repository.restoreRecoverable(from: from, password: password)
+    }
+    public func restorationRecoveredMetadata() -> Bool { repository.restorationRecoveredMetadata }
     public func initializeFromBackups(_ sources: [SetupBackupSource], recovery: String,
                                       progress: @Sendable (Int, Int) -> Void = { _, _ in }) throws -> [VaultItem] {
         try repository.initializeFromBackups(sources, recovery: recovery, progress: progress)
@@ -95,10 +99,14 @@ public actor VaultEngine {
         return try repository.importBackup(source, selected: selected)
     }
     public func verifyBackup(from: URL, password: String) throws -> Int {
+        try verifyBackupDetails(from: from, password: password).itemCount
+    }
+    public func verifyBackupDetails(from: URL, password: String) throws -> BackupVerification {
         let temporary = repository.root.deletingLastPathComponent().appendingPathComponent("verify-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: temporary) }
         let verifier = VaultRepository(root: temporary)
         try verifier.restore(from: from, password: password)
-        return verifier.items.filter(\.visible).count
+        return BackupVerification(itemCount: verifier.items.filter(\.visible).count,
+                                  metadataRecovered: verifier.restorationRecoveredMetadata)
     }
 }

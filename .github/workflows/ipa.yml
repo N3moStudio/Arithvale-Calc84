@@ -6,7 +6,26 @@ on:
 permissions:
   contents: read
 jobs:
+  core:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify storage and independent recovery first
+        run: |
+          python3 -m venv .build/core-python
+          .build/core-python/bin/pip install -r Scripts/recovery-requirements.txt
+          python3 Scripts/verify_release.py --python "$PWD/.build/core-python/bin/python"
+      - name: Upload core evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arithen-Core-${{ github.sha }}
+          path: .build/verification/
+          include-hidden-files: true
+          if-no-files-found: error
   simulator:
+    needs: core
     runs-on: macos-26
     timeout-minutes: 60
     env:
@@ -84,6 +103,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
   build:
+    needs: core
     runs-on: macos-26-intel
     timeout-minutes: 60
     steps:

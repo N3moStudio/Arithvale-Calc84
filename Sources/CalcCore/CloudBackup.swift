@@ -10,6 +10,7 @@ public struct CloudRecord: Codable, Equatable, Sendable {
 }
 
 public struct CloudSnapshot: Codable, Sendable {
+    public static let maximumBytes = 32 * 1024 * 1024
     public var version = 1
     public let id: UUID
     public let vaultID: UUID
@@ -17,11 +18,14 @@ public struct CloudSnapshot: Codable, Sendable {
     public let header: Data
     public let index: Data
     public let records: [CloudRecord]
+    public var archiveEnvelope: Data? = nil
     public var prefix: String { "c84/v1/" + vaultID.uuidString + "/" }
-    public var path: String { prefix + "snapshots/" + id.uuidString + ".c84cloud" }
-    public func objectPath(_ record: CloudRecord) -> String { prefix + "objects/" + record.filename }
+    public var path: String { self.prefix + "snapshots/" + id.uuidString + ".c84cloud" }
+    public func objectPath(_ record: CloudRecord) -> String { self.prefix + "objects/" + record.filename }
     public func validate() throws {
-        guard version == 1, created.timeIntervalSince1970.isFinite,
+        guard [1, 2].contains(version), created.timeIntervalSince1970.isFinite,
+              (version == 1 && archiveEnvelope == nil) || (version == 2 && archiveEnvelope != nil),
+              (archiveEnvelope?.count ?? 0) <= ArithenBackupArchive.envelopeLimit,
               header.count <= 4096, index.count <= VaultLimits.manifestBytes,
               records.count <= VaultLimits.itemCount,
               Set(records.map(\.id)).count == records.count,
@@ -33,7 +37,7 @@ public struct CloudSnapshot: Codable, Sendable {
         guard decoded.id == vaultID else { throw VaultError.invalidBackup }
     }
     public static func decode(_ data: Data) throws -> Self {
-        guard data.count <= 8 * 1024 * 1024 else { throw VaultError.limit }
+        guard data.count <= maximumBytes else { throw VaultError.limit }
         let snapshot = try JSONDecoder().decode(Self.self, from: data)
         try snapshot.validate(); return snapshot
     }
@@ -51,6 +55,11 @@ public enum CloudBackup {
     /// The repository's restore then authenticates all bytes with the recovery key.
     public static func assemble(_ snapshot: CloudSnapshot, objects: [UUID: URL], to destination: URL) throws {
         try snapshot.validate()
+        if let envelope = snapshot.archiveEnvelope {
+            let records = snapshot.records.map { ArithenBackupArchive.Record(id: $0.id, bytes: $0.bytes, sha256: $0.sha256) }
+            try ArithenBackupArchive.write(.init(envelope: envelope, records: records), sources: objects, to: destination)
+            return
+        }
         let output = try VaultStream.newFile(destination)
         var finished = false
         defer { try? output.close(); if !finished { try? FileManager.default.removeItem(at: destination) } }
@@ -151,7 +160,7 @@ public enum CloudTransfer {
         try data.write(to: catalog, options: .withoutOverwriting)
         await progress(.init(completed: total - 1, total: total, phase: "Saving recovery catalog", completedBytes: totalBytes, totalBytes: totalBytes))
         try await store.upload(file: catalog, path: plan.snapshot.path)
-        try await store.download(path: plan.snapshot.path, to: readBack, maximum: 8 * 1024 * 1024)
+        try await store.download(path: plan.snapshot.path, to: readBack, maximum: CloudSnapshot.maximumBytes)
         guard try Data(contentsOf: readBack) == data else { throw VaultError.invalidBackup }
         await progress(.init(completed: total, total: total, phase: "Backup verified", completedBytes: totalBytes, totalBytes: totalBytes))
     }

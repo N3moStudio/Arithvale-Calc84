@@ -80,6 +80,19 @@ final class CloudBackupTests: XCTestCase {
         XCTAssertEqual(paths.filter { $0.contains("/objects/") }.count, 2, "Resume should reuse the first object")
         XCTAssertEqual(paths.last, plan.snapshot.path)
     }
+    func testNewCloudCatalogAuthenticatesInventoryBeforeDownload() throws {
+        let repo = try library()
+        _ = try repo.add(data: Data("original".utf8), name: "kept.jpg", contentType: "public.jpeg")
+        let plan = try repo.cloudPlanIncludingAllForTest()
+        XCTAssertEqual(plan.snapshot.version, 2)
+        XCTAssertNotNil(plan.snapshot.archiveEnvelope)
+        XCTAssertEqual(try VaultRepository.validateCloudRecovery(plan.snapshot, password: password), 1)
+        let records = plan.snapshot.records.map { CloudRecord(id: $0.id, bytes: $0.bytes, sha256: String(repeating: "0", count: 64)) }
+        let forged = CloudSnapshot(version: 2, id: plan.snapshot.id, vaultID: plan.snapshot.vaultID,
+            created: plan.snapshot.created, header: plan.snapshot.header, index: plan.snapshot.index,
+            records: records, archiveEnvelope: plan.snapshot.archiveEnvelope)
+        XCTAssertThrowsError(try VaultRepository.validateCloudRecovery(forged, password: password))
+    }
     func testCorruptReadBackDoesNotReportComplete() async throws {
         let repo = try library(); try repo.add(data: Data([1]), name: "a", contentType: "public.data")
         let plan = try repo.cloudPlanIncludingAllForTest(); let store = MemoryCloud(); await store.configure(corruptDownload: true)

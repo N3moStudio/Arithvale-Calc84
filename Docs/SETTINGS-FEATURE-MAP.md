@@ -1,5 +1,9 @@
 # Native Settings Kit adoption — Arithen
 
+## November 22 backup recovery additions
+
+Existing settings keep their locations and saved values. Import Backup adds **Recover Intact Files** only after a failed new-format restore: BackupInputModel owns the selected copy, BackupReviewModel owns temporary staging, VaultEngine authenticates resources, and an explicit results confirmation gates the existing destination-key merge. Cancel/lock clears staged access; partial recovery retains received copies. Check a Backup retains its location and now explains when a spare catalog was needed. No new persistent preference or permission is introduced.
+
 ## November 14 refinement
 
 The [complete journey inventory](REFINEMENT-2026-11-14.md) was written before edits. No settings destination, storage key, default, permission, confirmation or access restriction moves in this pass. Create, Import and Check retain their main Backups positions, with one-line distinctions. Import screens group file choice, key/action, progress and errors separately; models and task ownership are unchanged. Files import gains an in-place Cancel Import button calling the existing handler. The appearance hint advertises only the current theme choice. The seven-theme, fixed-glass decisions below supersede the older eight-theme/surface-picker adoption table.

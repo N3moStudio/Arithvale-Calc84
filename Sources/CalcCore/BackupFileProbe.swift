@@ -17,8 +17,8 @@ public enum BackupFileProbe {
             let resource = try url.resourceValues(forKeys: keys)
             return resource.isRegularFile == true && resource.isSymbolicLink != true
         }.sorted {
-            let left = $0.pathExtension.lowercased() == "c84backup"
-            let right = $1.pathExtension.lowercased() == "c84backup"
+            let left = ["arithenbackup", "c84backup"].contains($0.pathExtension.lowercased())
+            let right = ["arithenbackup", "c84backup"].contains($1.pathExtension.lowercased())
             if left != right { return left }
             return $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
         }
@@ -28,6 +28,7 @@ public enum BackupFileProbe {
         let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
         guard values.isRegularFile == true, values.isSymbolicLink != true,
               let size = values.fileSize, size >= 8, size <= VaultLimits.backupBytes else { throw VaultError.invalidBackup }
+        if try ArithenBackupArchive.hasSignature(url) { return }
         let input = try FileHandle(forReadingFrom: url)
         defer { try? input.close() }
         let magic = try input.read(upToCount: 8)

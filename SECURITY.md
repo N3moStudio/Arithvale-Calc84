@@ -108,6 +108,10 @@ A serial storage actor and UI generation checks prevent stale operations from re
 
 ## Portable format
 
+New exports use **ARITHB03 / `.arithenbackup`**: two authenticated recovery catalogs, a per-snapshot HKDF-SHA256 catalog key, header binding and indexed ciphertext digests. Resource AES-GCM remains independently authenticated before publishing restored data. Ordinary restoration is strict; explicitly requested salvage reports unavailable items and requires import confirmation. See [the full protocol, research and limits](Docs/BACKUP-DESIGN-2026-11-22.md).
+
+### Legacy C84B0001 / C84B0002 readers
+
 All lengths/counts are unsigned 64-bit big-endian.
 
 1. Eight-byte magic: C84B0002 (C84B0001 also accepted).
@@ -144,7 +148,7 @@ The app-switcher cover and background lock need actual device/host tests. The ap
 
 ## Independent recovery
 
-Scripts/recover.py requires Python 3.10+ and cryptography, with a pinned requirements file. It does no network I/O. It supports v1 and v2, authenticates all resources, rejects existing output folders, and stages extraction before publishing a complete output.
+Scripts/recover.py requires Python 3.10+ and cryptography, with a pinned requirements file. It does no network I/O. It supports v1, v2 and ARITHB03, authenticates resources, rejects existing output folders, and stages extraction before publishing. Normal mode requires a complete recovery; explicit `--salvage` for ARITHB03 reports omissions and returns a distinct partial-recovery status.
 
 Recovery writes original bytes under UUID-prefixed sanitized names plus metadata.json, retaining capture dates as file modification dates where supported. A photo app may need the sidecar for metadata absent from original bytes. Recently Deleted is excluded unless --include-deleted is selected. Thumbnail files are authenticated but not exported. Live Photo companions are exported with their primary asset.
 

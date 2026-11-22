@@ -1,5 +1,9 @@
 # Arithen source map
 
+## November 22 backup replacement
+
+`ArithenBackupArchive` owns the ARITHB03 container, redundant authenticated catalogs, HKDF catalog subkeys and indexed resource copies. `VaultRepository` owns source authentication, strict or explicitly recoverable staged restoration and dependency filtering. `CloudSnapshot` v2 embeds the authenticated envelope; `validateCloudRecovery` binds the public download inventory to it. `BackupImportView` owns explicit partial-recovery confirmation. `AutomaticFolderBackups.Receipt.archiveExtension` preserves legacy filenames while new saves use `.arithenbackup`. `Scripts/recover.py` is an independent reader with explicit salvage reporting. See [design and research](BACKUP-DESIGN-2026-11-22.md); new format work supersedes the earlier no-schema-change statement below.
+
 ## November 22 media chronology follow-up
 
 `MediaBridge.metadata` reads EXIF/TIFF capture dates, timezone offsets, subseconds and GPS, plus QuickTime creation dates/ISO6709 coordinates. `detailsForPhotoSave` keeps saved adjustments and recovers missing capture dates from original bytes; it does not explicitly restore absent saved GPS. No encryption or backup schema changes. `MediaMetadataTests`, `PhotosRestoreTests`, and `MediaMetadataRoundTripTests` cover native media fixtures, actual simulator Photos saves after recovery, and restore/merge/re-export metadata retention. See [backup and Photos behavior](BACKUP-AND-PHOTOS.md).

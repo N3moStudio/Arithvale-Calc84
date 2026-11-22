@@ -30,8 +30,8 @@ public enum CloudDiscovery {
         let file = scratch.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: file) }
         guard let size = try await store.size(path: path) else { throw CloudError.missing }
-        guard size > 0, size <= 8 * 1024 * 1024 else { throw VaultError.limit }
-        try await store.download(path: path, to: file, maximum: 8 * 1024 * 1024)
+        guard size > 0, size <= CloudSnapshot.maximumBytes else { throw VaultError.limit }
+        try await store.download(path: path, to: file, maximum: CloudSnapshot.maximumBytes)
         try Task.checkCancellation()
         let snapshot = try CloudSnapshot.decode(Data(contentsOf: file))
         guard snapshot.path == path else { throw VaultError.invalidBackup }

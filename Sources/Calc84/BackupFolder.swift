@@ -22,7 +22,7 @@ final class BackupSelection: @unchecked Sendable {
     static func backupFile(_ source: URL, displayName: String? = nil) throws -> BackupSelection {
         let scope = BackupSelection(source)
         defer { withExtendedLifetime(scope) {} }
-        let copy = try TemporaryFiles.fresh(extension: "c84backup")
+        let copy = try TemporaryFiles.fresh(extension: "arithenbackup")
         var succeeded = false
         defer { if !succeeded { try? FileManager.default.removeItem(at: copy) } }
         var coordinationError: NSError?
@@ -51,7 +51,7 @@ enum BackupFolder {
     static func filename() -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.dateFormat = "yyyy-MM-dd-HHmmss"
-        return "Library-\(formatter.string(from: Date()))-\(UUID().uuidString).c84backup"
+        return "Library-\(formatter.string(from: Date()))-\(UUID().uuidString).arithenbackup"
     }
     /// Keep the old bookmark until a real coordinated write/read/delete succeeds.
     static func remember(_ url: URL) throws {

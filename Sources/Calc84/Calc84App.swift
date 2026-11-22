@@ -20,7 +20,7 @@ struct ArithenApp: App {
                     let access = BackupSelection(url)
                     Task {
                         let isBackup = await Task.detached {
-                            ["c84backup", "calc84backup"].contains(url.pathExtension.lowercased()) || (try? BackupFileProbe.validate(url)) != nil
+                            ["arithenbackup", "c84backup", "calc84backup"].contains(url.pathExtension.lowercased()) || (try? BackupFileProbe.validate(url)) != nil
                         }.value
                         if isBackup { sharedBackup.receive(url) } else { sharedFiles.receive(url) }
                         withExtendedLifetime(access) {}

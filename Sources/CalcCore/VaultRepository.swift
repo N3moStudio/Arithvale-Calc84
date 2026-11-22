@@ -12,6 +12,7 @@ public final class VaultRepository {
     private var key: SymmetricKey?
     private var header: VaultHeader?
     private var manifest: VaultManifest?
+    public private(set) var restorationRecoveredMetadata = false
     public var exists: Bool { fm.fileExists(atPath: root.path) }
     public var isUnlocked: Bool { key != nil }
     public var items: [VaultItem] { manifest?.items ?? [] }
@@ -350,8 +351,13 @@ public final class VaultRepository {
             records.append(CloudRecord(id: item.id, bytes: length, sha256: try CloudBackup.hash(url)))
             sources[item.id] = url
         }
-        return CloudPlan(snapshot: CloudSnapshot(id: UUID(), vaultID: header.id, created: Date(),
-            header: try JSONEncoder().encode(header), index: filteredIndex, records: records), sources: sources, itemIDs: selected)
+        let headerBytes = try JSONEncoder().encode(header)
+        let prepared = try ArithenBackupArchive.prepare(header: headerBytes, index: filteredIndex,
+            records: records.map { .init(id: $0.id, bytes: $0.bytes, sha256: $0.sha256) }, key: key)
+        var snapshot = CloudSnapshot(id: UUID(), vaultID: header.id, created: Date(),
+            header: headerBytes, index: filteredIndex, records: records)
+        snapshot.version = 2; snapshot.archiveEnvelope = prepared.envelope
+        return CloudPlan(snapshot: snapshot, sources: sources, itemIDs: selected)
     }
 
     /// Authenticate the small catalog before trusting its download inventory.
@@ -359,6 +365,12 @@ public final class VaultRepository {
         try snapshot.validate()
         let header = try JSONDecoder().decode(VaultHeader.self, from: snapshot.header)
         let key = try recoveryKey(password, header: header)
+        if let envelope = snapshot.archiveEnvelope {
+            let authenticated = try ArithenBackupArchive.authenticateEnvelope(envelope) { _ in key }
+            guard authenticated.header == snapshot.header, authenticated.index == snapshot.index,
+                  authenticated.records == snapshot.records.map({ .init(id: $0.id, bytes: $0.bytes, sha256: $0.sha256) })
+            else { throw VaultError.invalidBackup }
+        }
         let manifest = try decodeManifest(snapshot.index, header: header, key: key)
         let records = Dictionary(uniqueKeysWithValues: snapshot.records.map { ($0.id, $0) })
         guard records.count == manifest.items.count, manifest.items.allSatisfy({ item in
@@ -368,6 +380,21 @@ public final class VaultRepository {
     }
 
     public func exportBackup(to url: URL) throws {
+        guard let header, let key, manifest != nil else { throw VaultError.locked }
+        var resources: [UUID: URL] = [:]
+        for item in items {
+            try Task.checkCancellation()
+            try authenticateResource(item, at: assetURL(item.id), key: key, header: header)
+            resources[item.id] = assetURL(item.id)
+        }
+        let prepared = try ArithenBackupArchive.prepare(header: JSONEncoder().encode(header),
+            index: Self.read(root.appendingPathComponent("index.enc"), limit: VaultLimits.manifestBytes),
+            resources: resources, orderedIDs: items.map(\.id), key: key)
+        try ArithenBackupArchive.write(prepared, sources: resources, to: url)
+    }
+
+    // Kept for interoperability fixtures; all app exports use the new container.
+    func exportLegacyBackup(to url: URL) throws {
         guard let header, let key, manifest != nil else { throw VaultError.locked }
         let handle = try VaultStream.newFile(url)
         var completed = false
@@ -393,6 +420,11 @@ public final class VaultRepository {
     /// All authentication completes in staging, then one rename commits. Existing libraries are never replaced.
     public func restore(from backup: URL, password: String) throws {
         guard !exists else { throw VaultError.exists }
+        restorationRecoveredMetadata = false
+        if try ArithenBackupArchive.hasSignature(backup) {
+            _ = try restoreIndexedBackup(from: backup, password: password, allowDamagedResources: false)
+            return
+        }
         let size = try backup.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max
         guard size <= VaultLimits.backupBytes else { throw VaultError.limit }
         let input = try FileHandle(forReadingFrom: backup)
@@ -433,6 +465,98 @@ public final class VaultRepository {
         guard (try input.read(upToCount: 1) ?? Data()).isEmpty else { throw VaultError.invalidBackup }
         try fm.moveItem(at: stage, to: root)
         key = candidateKey; header = candidate; manifest = index
+    }
+
+    /// Explicit salvage is separate from ordinary restoration; callers must show
+    /// the omissions and obtain confirmation before merging this temporary vault.
+    public func restoreRecoverable(from backup: URL, password: String) throws -> BackupRecoveryReport {
+        guard !exists else { throw VaultError.exists }
+        restorationRecoveredMetadata = false
+        return try restoreIndexedBackup(from: backup, password: password, allowDamagedResources: true)
+    }
+
+    private func restoreIndexedBackup(from backup: URL, password: String,
+                                      allowDamagedResources: Bool) throws -> BackupRecoveryReport {
+        let opened = try ArithenBackupArchive.read(backup, allowIncompletePayload: allowDamagedResources) { bytes in
+            let candidate = try JSONDecoder().decode(VaultHeader.self, from: bytes)
+            try candidate.validate()
+            return try Self.recoveryKey(password, header: candidate)
+        }
+        let candidate = try JSONDecoder().decode(VaultHeader.self, from: opened.header)
+        var index = try Self.decodeManifest(opened.index, header: candidate, key: opened.key)
+        let originalItems = index.items
+        let lookup = Dictionary(uniqueKeysWithValues: index.items.map { ($0.id, $0) })
+        guard opened.records.count == lookup.count, opened.records.allSatisfy({ record in
+            guard let item = lookup[record.id] else { return false }
+            return record.bytes == (item.storageVersion == 2 ? VaultStream.encryptedSize(item.byteCount) : item.byteCount + 28)
+        }) else { throw VaultError.invalidBackup }
+        let stage = try stagingDirectory()
+        defer { try? fm.removeItem(at: stage) }
+        var intact = Set<UUID>()
+        for record in opened.records {
+            try Task.checkCancellation()
+            let destination = stage.appendingPathComponent(record.id.uuidString + ".enc")
+            do {
+                try ArithenBackupArchive.copyResource(from: backup, opened: opened, record: record, to: destination)
+                try authenticateResource(lookup[record.id]!, at: destination, key: opened.key, header: candidate)
+                intact.insert(record.id)
+            } catch let error as VaultError where allowDamagedResources &&
+                (error == .invalidBackup || error == .wrongPasswordOrDamaged) {
+                // Only authenticated-data damage is recoverable. Cancellation,
+                // destination permissions and out-of-space errors still abort.
+                if fm.fileExists(atPath: destination.path) { try fm.removeItem(at: destination) }
+            }
+        }
+        let damaged = originalItems.count - intact.count
+        if allowDamagedResources && damaged > 0 {
+            var retained = Set<UUID>()
+            var replacements: [UUID: VaultItem] = [:]
+            for var item in originalItems where item.visible && intact.contains(item.id) {
+                // A Live Photo remains a pair; a missing preview can be rebuilt.
+                guard item.companionID.map({ intact.contains($0) }) ?? true else { continue }
+                retained.insert(item.id)
+                if let companion = item.companionID { retained.insert(companion) }
+                if let thumbnail = item.thumbnailID {
+                    if intact.contains(thumbnail) { retained.insert(thumbnail) }
+                    else { item.thumbnailID = nil }
+                }
+                replacements[item.id] = item
+            }
+            index.items = originalItems.filter { retained.contains($0.id) }.map { replacements[$0.id] ?? $0 }
+            let removed = Set(originalItems.map(\.id)).subtracting(retained)
+            index.cloudPreferences?.remove(removed)
+            index.albumPreferences = index.albumPreferences?.mapValues { preference in
+                AlbumPreference(pinned: preference.pinned,
+                    coverID: preference.coverID.flatMap { retained.contains($0) ? $0 : nil })
+            }
+            for id in intact.subtracting(retained) { try fm.removeItem(at: stage.appendingPathComponent(id.uuidString + ".enc")) }
+            guard !index.items.isEmpty else { throw VaultError.invalidBackup }
+        }
+        try LibraryOrganization.validate(index)
+        try index.cloudPreferences?.validate(items: index.items)
+        let encodedIndex = damaged == 0 ? opened.index : try VaultCrypto.seal(JSONEncoder().encode(index),
+            key: opened.key, context: Self.context(candidate, "manifest"))
+        try Self.write(opened.header, to: stage.appendingPathComponent("header.json"))
+        try Self.write(encodedIndex, to: stage.appendingPathComponent("index.enc"))
+        try Task.checkCancellation()
+        try fm.moveItem(at: stage, to: root)
+        key = opened.key; header = candidate; manifest = index
+        restorationRecoveredMetadata = opened.metadataRecovered
+        let originalActive = originalItems.filter { $0.visible && $0.deletedAt == nil }.count
+        let restoredActive = index.items.filter { $0.visible && $0.deletedAt == nil }.count
+        return BackupRecoveryReport(items: index.items, skippedItemCount: originalActive - restoredActive,
+            damagedResourceCount: damaged, metadataRecovered: opened.metadataRecovered)
+    }
+
+    private func authenticateResource(_ item: VaultItem, at url: URL, key: SymmetricKey, header: VaultHeader) throws {
+        if item.storageVersion == 2 {
+            try VaultStream.decrypt(url, to: nil, size: item.byteCount, key: key,
+                                    context: Self.context(header, item.id.uuidString))
+        } else {
+            let plain = try VaultCrypto.open(Self.read(url, limit: VaultLimits.memoryBytes + 28), key: key,
+                                             context: Self.context(header, item.id.uuidString))
+            guard plain.count == item.byteCount else { throw VaultError.invalidBackup }
+        }
     }
     /// New-install setup always creates independent keys. Source restore remains
     /// unchanged for archive verification, preview and legacy interoperability.

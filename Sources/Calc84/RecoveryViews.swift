@@ -43,7 +43,10 @@ struct RecoveryTestView: View {
                     if let backup = backupInput.backup { Task { passed = await vault.verifyBackup(url: backup.url, recovery: secret); secret = "" } }
                 }.disabled(backupInput.backup == nil || secret.isEmpty || vault.busy || backupInput.working)
                 if vault.busy { ProgressView("Authenticating backup…") }
-                if passed { Label("Recovery test passed", systemImage: "checkmark.shield.fill") }
+                if passed {
+                    Label("Recovery test passed", systemImage: "checkmark.shield.fill")
+                    Text(vault.status).font(.footnote).fixedSize(horizontal: false, vertical: true)
+                }
             }
             Section { LabeledContent(AppBrand.name, value: AppBrand.version) }
         }.backupPicker(backupInput).navigationTitle("Check a Backup")

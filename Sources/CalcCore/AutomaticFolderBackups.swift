@@ -23,7 +23,8 @@ public struct AutomaticFolderBackups: Sendable {
         let id: UUID
         let digest: Data
         var saved: Date
-        var filename: String { "Automatic-\(id.uuidString).c84backup" }
+        var archiveExtension: String? = nil
+        var filename: String { "Automatic-\(id.uuidString).\(archiveExtension ?? "c84backup")" }
     }
     struct Journal: Codable {
         var version = 1
@@ -53,7 +54,7 @@ public struct AutomaticFolderBackups: Sendable {
                      coordinate: Coordinate = { url, _, action in try action(url) }) throws -> Saved {
         var journal = try load()
         try Task.checkCancellation()
-        var receipt = Receipt(id: UUID(), digest: try BackupCopy.digest(source), saved: now ?? Date())
+        var receipt = Receipt(id: UUID(), digest: try BackupCopy.digest(source), saved: now ?? Date(), archiveExtension: "arithenbackup")
         let destination = folder.appendingPathComponent(receipt.filename)
         try coordinate(destination, .write) { try BackupCopy.copy(source, to: $0, expected: receipt.digest) }
         receipt.saved = now ?? Date()
@@ -121,7 +122,8 @@ public struct AutomaticFolderBackups: Sendable {
         guard journal.version == 1, journal.library == library, journal.folder == folder.absoluteString,
               journal.receipts.count <= 10_000,
               Set(journal.receipts.map(\.id)).count == journal.receipts.count,
-              journal.receipts.allSatisfy({ $0.digest.count == 32 && $0.saved.timeIntervalSince1970.isFinite })
+              journal.receipts.allSatisfy({ $0.digest.count == 32 && $0.saved.timeIntervalSince1970.isFinite
+                  && ($0.archiveExtension == nil || ["c84backup", "arithenbackup"].contains($0.archiveExtension!)) })
         else { throw VaultError.invalidBackup }
         return journal
     }
