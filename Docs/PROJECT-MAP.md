@@ -1,5 +1,9 @@
 # Arithen source map
 
+## November 22 media chronology follow-up
+
+`MediaBridge.metadata` reads EXIF/TIFF capture dates, timezone offsets, subseconds and GPS, plus QuickTime creation dates/ISO6709 coordinates. `detailsForPhotoSave` keeps saved adjustments and recovers missing capture dates from original bytes; it does not explicitly restore absent saved GPS. No encryption or backup schema changes. `MediaMetadataTests`, `PhotosRestoreTests`, and `MediaMetadataRoundTripTests` cover native media fixtures, actual simulator Photos saves after recovery, and restore/merge/re-export metadata retention. See [backup and Photos behavior](BACKUP-AND-PHOTOS.md).
+
 ## November 21 reliability changes
 
 `VaultOperationGate` owns serial work; VaultModel/CloudBackupModel/shared preparation release only their token. `CloudReceipt.matches` scopes status to library identity. `SharedFileInbox.scan` isolates unreadable entries, `DownloadLength` checks bounded transfer lengths. `VaultRepository.updateMany/removeMany` commit selections once. `DeviceAccessBackoff` preserves existing cooldown policy. `Tests/ArithenAppTests` runs production app-model/picker/coordination tests in the generated simulator host; `ArithenUITests` exercises normal UI. See RELIABILITY-2026-11-21.md.

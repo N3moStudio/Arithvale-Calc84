@@ -1,6 +1,6 @@
 # Your cloud, your choices
 
-Open **Settings → Backup & Recovery → MEGA & Blomp**. The two providers have
+Open **Settings → Cloud Copies → MEGA or Blomp**. The two providers have
 independent selections, automatic settings, and Never Upload lists.
 
 | Mode | Included in the next backup |
@@ -13,19 +13,22 @@ In manual mode, tap **Choose Items**, select or drag across thumbnails, and tap
 **Save**. Then tap **Back Up to…**. Choosing items alone does not start a manual
 upload. Automatic mode queues a backup after changes while the app stays open and
 unlocked. Connecting a service alone does not upload; automatic jobs also run on
-the next unlock/change. Wi-Fi is the default; cellular is optional.
+the next unlock/change. Cellular data is enabled by default for new preferences;
+an existing explicit opt-out is preserved. Turn it off under Cloud Copies for Wi-Fi only.
 
 **Never Upload** uses the same selection grid. Checked items are blocked. Blocking
 removes them from manual selection. Unblocking in automatic mode makes them
 eligible again; in manual mode they must be selected again. Choices take effect
 on Save. Controls are disabled during a transfer—pause it before changing them.
 
-From the main gallery, Select → cloud button applies bulk choices. An individual
-item’s cloud/backup status sheet has the same controls. Newly imported duplicate
+Manage these choices in each provider's Choose Items and Never Upload screens. Newly imported duplicate
 copies have new identities; a block applies to the existing library item, not to
 all future files with similar content or names.
 
 ## What leaves the phone
+
+The cloud stores separate encrypted objects and recovery catalogs, rather than
+one portable `.c84backup` file. [Archive formats, restored dates and safeguards](BACKUP-AND-PHOTOS.md).
 
 Only eligible originals and their own thumbnails/Live Photo companions go into a
 provider’s snapshot. Its encrypted catalog excludes other items’ filenames,

@@ -36,6 +36,11 @@ jobs:
           plutil -convert xml1 -o .build/simulator/built-app-info.plist "$app/Info.plist"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = studio.n3mo.calc84
           codesign --verify "$app"
+          # Only this disposable simulator receives access. Native restore tests
+          # save synthetic dated photos/videos and inspect the resulting assets.
+          xcrun simctl install "$device" "$app"
+          xcrun simctl privacy "$device" grant photos studio.n3mo.calc84
+          xcrun simctl privacy "$device" grant photos-add studio.n3mo.calc84
           xcodebuild test-without-building -project .build/simulator/ArithenSimulator.xcodeproj -scheme Arithen \
             -destination "platform=iOS Simulator,id=$device" \
             -derivedDataPath .build/simulator/DerivedData \

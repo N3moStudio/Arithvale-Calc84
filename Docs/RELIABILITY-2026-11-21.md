@@ -20,6 +20,7 @@ Target: Arithen 0.12.8/build 24. Preserve bundle identity, recovery keys, C84B00
 | Misleading backup checks | Distinguish verified copied bytes from optional authenticated recovery check. |
 | README drift | Correct version/build to 0.12.8/24. |
 | Failed replacement selection | Clear previous prepared backup before preparing replacement; an invalid new file cannot leave old archive actionable. |
+| Restored media chronology | Stored capture dates win; older items recover embedded EXIF/QuickTime dates instead of being assigned the vault import date. Parse offset/subsecond/GPS for new file imports. Do not explicitly resurrect absent saved GPS. Native JPEG/MOV and real Photos restore tests added November 22. |
 
 ## File picker / FlareStore research
 
@@ -36,6 +37,6 @@ FlareStore documents signing/installing and editable app identity; it does not e
 
 ## Validation plan and limits
 
-GitHub runs fresh core and independent recovery tests, device compilation/package checks, plus real-source simulator app-host tests and UI journeys. App-host tests exercise coordinated backup staging, actual authenticated recovery/wrong key, corrupt replacement, cancellation/retry, stale picker callbacks, real interrupted backup ownership and export cleanup. UI tests open/cancel the real Files picker, import a disposable seeded photo, and retain setup/auth/calculator/tab/settings/large-text/theme checks. Test-only code lives in Tests and generated simulator host, not the IPA.
+GitHub runs fresh core and independent recovery tests, device compilation/package checks, plus real-source simulator app-host tests and UI journeys. App-host tests exercise coordinated backup staging, actual authenticated recovery/wrong key, corrupt replacement, cancellation/retry, stale picker callbacks, real interrupted backup ownership and export cleanup. Media fixtures cover EXIF offsets/subseconds/GPS and QuickTime metadata; actual simulator Photos writes check restored photo/video capture dates after source files/vaults are removed. Only this disposable simulator receives pregranted Photos permissions. UI tests open/cancel the real Files picker, import a disposable seeded photo, and retain setup/auth/calculator/tab/settings/large-text/theme checks. Test-only code lives in Tests and generated simulator host, not the IPA.
 
 Await current CI result before claiming success. Live MEGA/Blomp accounts, FlareStore-signed installation, real provider selection/connection and physical-device media/performance remain separate acceptance checks. Existing core recovery fixtures cover legacy/wrong-key/tampered/truncated inputs, retention and destination-key imports; no real user media was used.

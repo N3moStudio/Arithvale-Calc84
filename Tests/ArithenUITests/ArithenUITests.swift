@@ -146,7 +146,8 @@ final class ArithenUITests: XCTestCase {
         XCTAssertTrue(imported.waitForExistence(timeout: 60), "Photo import must commit: \(app.debugDescription)\nSystem: \(springboard.debugDescription)")
         capture("photo-import-completed")
         if app.buttons["Keep Originals"].exists { tap("Keep Originals") } else { tap("Done") }
-        XCTAssertTrue(app.staticTexts["1 Snap"].waitForExistence(timeout: 10))
+        // The count is a button that clears the active filter, not static text.
+        XCTAssertTrue(app.buttons["1 Snap"].waitForExistence(timeout: 10), app.debugDescription)
         capture("populated-library")
         tap("Lock & Return to Calculator")
         XCTAssertTrue(app.buttons["Equals"].waitForExistence(timeout: 10))

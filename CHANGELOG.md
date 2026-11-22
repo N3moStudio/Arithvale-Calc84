@@ -2,12 +2,13 @@
 
 ## 0.12.8 · Backup and import reliability
 
-**November 21, 2026 · Build 24 · Test build**
+**November 22, 2026 · Build 24 · Test build**
 
 - Fix interrupted backup operation ownership, stale cloud status after vault reset, damaged received-file recovery and failed replacement selection. Preserve existing encryption and backup formats.
 - Verify Blomp transfer lengths, clean owned export files on teardown, and batch library changes into atomic manifest updates.
 - Improve accessibility layouts, theme refresh, inactive video pause and explicit code-change cooldown feedback; reduce repeated album/scroll computations.
 - Expand GitHub simulator coverage with native backup/recovery/lock/picker tests and a populated Photos import journey. See Docs/RELIABILITY-2026-11-21.md for dispositions and validation limits.
+- Preserve captured dates when saving older restored items to Photos by reading original EXIF/QuickTime metadata before falling back to Photos' defaults. Add timezone/subsecond and GPS parsing for file imports; saved Photos adjustments take priority. Test real photo/video saves after archive recovery in the disposable simulator.
 
 ## 0.12.7 · Library and backup refinement
 

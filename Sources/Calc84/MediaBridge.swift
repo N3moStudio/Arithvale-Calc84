@@ -106,26 +106,93 @@ enum MediaBridge {
             return await Task.detached(priority: .utility) {
                 guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
                       let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return MediaDetails() }
-                let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any]
-                let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
-                let raw = exif?[kCGImagePropertyExifDateTimeOriginal] as? String ?? tiff?[kCGImagePropertyTIFFDateTime] as? String
-                let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX")
-                formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-                if let offset = exif?["OffsetTimeOriginal" as CFString] as? String {
-                    let f = DateFormatter(); f.locale = formatter.locale; f.dateFormat = "yyyy:MM:dd HH:mm:ssXXXXX"
-                    return MediaDetails(captured: raw.flatMap { f.date(from: $0 + offset) })
-                }
-                return MediaDetails(captured: raw.flatMap { formatter.date(from: $0) })
+                return imageDetails(properties)
             }.value
         }
         if UTType(type)?.conforms(to: .movie) == true {
             let asset = AVURLAsset(url: url)
             let duration = try? await asset.load(.duration).seconds
             let creation = try? await asset.load(.creationDate)
-            let date = try? await creation?.load(.dateValue)
-            return MediaDetails(captured: date ?? nil, duration: duration?.isFinite == true ? duration : nil)
+            var date = try? await creation?.load(.dateValue)
+            var coordinates: CLLocationCoordinate2D?
+            let metadata = (try? await asset.load(.metadata)) ?? []
+            for item in metadata {
+                if item.identifier == .quickTimeMetadataLocationISO6709 || item.identifier == .quickTimeUserDataLocationISO6709,
+                   let value = try? await item.load(.stringValue), let location = locationISO6709(value) {
+                    coordinates = location
+                }
+                if date == nil, item.identifier == .quickTimeMetadataCreationDate,
+                   let value = try? await item.load(.stringValue) {
+                    let formatter = ISO8601DateFormatter()
+                    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    date = formatter.date(from: value)
+                    if date == nil { formatter.formatOptions = [.withInternetDateTime]; date = formatter.date(from: value) }
+                }
+            }
+            return MediaDetails(captured: date ?? nil, duration: duration?.isFinite == true ? duration : nil,
+                latitude: coordinates?.latitude, longitude: coordinates?.longitude)
         }
         return MediaDetails()
+    }
+    static func imageDetails(_ properties: [CFString: Any]) -> MediaDetails {
+        let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any] ?? [:]
+        let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any] ?? [:]
+        let candidates: [(String?, String?, String?)] = [
+            (exif[kCGImagePropertyExifDateTimeOriginal] as? String, exif["OffsetTimeOriginal" as CFString] as? String, exif[kCGImagePropertyExifSubsecTimeOriginal] as? String),
+            (exif[kCGImagePropertyExifDateTimeDigitized] as? String, exif["OffsetTimeDigitized" as CFString] as? String, exif[kCGImagePropertyExifSubsecTimeDigitized] as? String),
+            (tiff[kCGImagePropertyTIFFDateTime] as? String, exif["OffsetTime" as CFString] as? String, exif[kCGImagePropertyExifSubsecTime] as? String)
+        ]
+        var captured: Date?
+        for (raw, offset, fraction) in candidates {
+            guard let raw else { continue }
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.isLenient = false
+            // Without an embedded offset, preserve the historical local-time
+            // interpretation. There is no reliable camera timezone to invent.
+            formatter.dateFormat = offset == nil ? "yyyy:MM:dd HH:mm:ss" : "yyyy:MM:dd HH:mm:ssXXXXX"
+            guard let base = formatter.date(from: raw + (offset ?? "")) else { continue }
+            let digits = fraction?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let subsecond = !digits.isEmpty && digits.utf8.allSatisfy { (48...57).contains($0) }
+                ? Double("0." + String(digits.prefix(9))) ?? 0 : 0
+            captured = base.addingTimeInterval(subsecond); break
+        }
+        let gps = properties[kCGImagePropertyGPSDictionary] as? [CFString: Any] ?? [:]
+        func coordinate(_ value: CFString, _ reference: CFString, positive: String, negative: String, limit: Double) -> Double? {
+            guard let number = (gps[value] as? NSNumber)?.doubleValue, number.isFinite, (0...limit).contains(number),
+                  let ref = (gps[reference] as? String)?.uppercased(), ref == positive || ref == negative else { return nil }
+            return ref == negative ? -number : number
+        }
+        let latitude = coordinate(kCGImagePropertyGPSLatitude, kCGImagePropertyGPSLatitudeRef, positive: "N", negative: "S", limit: 90)
+        let longitude = coordinate(kCGImagePropertyGPSLongitude, kCGImagePropertyGPSLongitudeRef, positive: "E", negative: "W", limit: 180)
+        return MediaDetails(captured: captured, latitude: longitude == nil ? nil : latitude, longitude: latitude == nil ? nil : longitude)
+    }
+    static func locationISO6709(_ raw: String) -> CLLocationCoordinate2D? {
+        // QuickTime stores signed decimal degrees, optionally followed by altitude.
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let regex = try? NSRegularExpression(pattern: #"^([+-]\d{2}(?:\.\d+)?)([+-]\d{3}(?:\.\d+)?)(?:[+-]\d+(?:\.\d+)?)?/?$"#),
+              let match = regex.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)),
+              let latRange = Range(match.range(at: 1), in: value), let lonRange = Range(match.range(at: 2), in: value),
+              let latitude = Double(value[latRange]), let longitude = Double(value[lonRange]),
+              latitude.isFinite, longitude.isFinite else { return nil }
+        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        return CLLocationCoordinate2DIsValid(coordinate) ? coordinate : nil
+    }
+    static func detailsForPhotoSave(item: VaultItem, original: URL) async -> MediaDetails {
+        // Photos adjustments saved in the vault win over embedded originals.
+        // Old backups may lack these fields; read original bytes before falling
+        // back, without rewriting the file or changing the encrypted schema.
+        let storedLocation: CLLocationCoordinate2D? = {
+            guard let latitude = item.latitude, let longitude = item.longitude else { return nil }
+            let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            return CLLocationCoordinate2DIsValid(coordinate) ? coordinate : nil
+        }()
+        let embedded = item.captured == nil ? await metadata(original, type: item.contentType) : MediaDetails()
+        // Older manifests cannot distinguish absent GPS from a location the user
+        // deliberately cleared in Photos. Do not explicitly fill absent saved GPS.
+        return MediaDetails(captured: item.captured ?? embedded.captured, duration: item.duration ?? embedded.duration,
+            latitude: storedLocation?.latitude, longitude: storedLocation?.longitude)
     }
     static func thumbnail(_ url: URL, type: String) async -> Data? {
         await Task.detached(priority: .utility) {
@@ -153,14 +220,16 @@ enum MediaBridge {
         }
         let isVideo = UTType(item.contentType)?.conforms(to: .movie) == true
         guard isVideo || UTType(item.contentType)?.conforms(to: .image) == true else { throw failure("This file can be exported to Files.") }
+        let details = await detailsForPhotoSave(item: item, original: main)
+        try Task.checkCancellation()
         try await PHPhotoLibrary.shared().performChanges { @Sendable in
             let request = PHAssetCreationRequest.forAsset()
             let options = PHAssetResourceCreationOptions()
             options.originalFilename = item.name; options.uniformTypeIdentifier = item.contentType
             request.addResource(with: isVideo ? .video : .photo, fileURL: main, options: options)
             if let companion { request.addResource(with: .pairedVideo, fileURL: companion, options: nil) }
-            request.creationDate = item.captured ?? item.added
-            if let latitude = item.latitude, let longitude = item.longitude {
+            if let captured = details.captured { request.creationDate = captured }
+            if let latitude = details.latitude, let longitude = details.longitude {
                 request.location = CLLocation(latitude: latitude, longitude: longitude)
             }
         }
