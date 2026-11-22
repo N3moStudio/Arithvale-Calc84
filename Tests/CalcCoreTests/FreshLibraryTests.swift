@@ -87,7 +87,9 @@ final class FreshLibraryTests: XCTestCase {
         let good = try archive(a), second = try archive(b)
         let goodBytes = try Data(contentsOf: good), secondBytes = try Data(contentsOf: second)
         let damaged = directory.appendingPathComponent("damaged.c84backup")
-        var corrupt = secondBytes; corrupt[corrupt.count - 1] ^= 1; try corrupt.write(to: damaged)
+        // Damage an original, not the recoverable redundant footer.
+        let payloadStart = 16 + secondBytes[8..<16].reduce(0) { ($0 << 8) | Int($1) }
+        var corrupt = secondBytes; corrupt[payloadStart] ^= 1; try corrupt.write(to: damaged)
         for bad in [SetupBackupSource(url: second, recovery: VaultCode.generateRecovery()), .init(url: damaged, recovery: secondKey)] {
             let destination = repo()
             XCTAssertThrowsError(try destination.initializeFromBackups([.init(url: good, recovery: firstKey), bad], recovery: VaultCode.generateRecovery()))

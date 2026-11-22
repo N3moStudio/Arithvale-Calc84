@@ -3,7 +3,7 @@ import SwiftUI
 import CalcCore
 
 @MainActor
-private final class BackupReviewModel: ObservableObject {
+final class BackupReviewModel: ObservableObject {
     let root: URL
     let engine: VaultEngine
     @Published private(set) var items: [VaultItem] = []

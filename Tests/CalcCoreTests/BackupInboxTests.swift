@@ -69,7 +69,10 @@ final class BackupInboxTests: XCTestCase {
     func testHeaderRecognitionDoesNotClaimAuthentication() throws {
         let source = try fixture(), inbox = BackupInbox(root: directory.appendingPathComponent("inbox"))
         var bytes = try Data(contentsOf: source)
-        bytes[bytes.count - 1] ^= 1
+        // V3 can recover a damaged footer; corrupt media to test that receiving
+        // a byte-for-byte copy does not establish cryptographic authenticity.
+        let payloadStart = 16 + bytes[8..<16].reduce(0) { ($0 << 8) | Int($1) }
+        bytes[payloadStart] ^= 1
         try bytes.write(to: source)
         // Receipt verifies the copy, not the key or cryptographic authenticity.
         let entry = try inbox.receive(source)

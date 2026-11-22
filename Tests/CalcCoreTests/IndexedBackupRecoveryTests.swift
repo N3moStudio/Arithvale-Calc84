@@ -42,6 +42,39 @@ final class IndexedBackupRecoveryTests: XCTestCase {
         XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath: root.path).contains { $0.hasPrefix("stage-") }, file: file, line: line)
     }
 
+    func testExportRejectsCorruptedCommittedIndexBeforePublishingBackup() throws {
+        let source = try library(), item = try add(source, name: "readable original")
+        let index = source.root.appendingPathComponent("index.enc")
+        var damaged = try Data(contentsOf: index); damaged[damaged.count - 1] ^= 1
+        try damaged.write(to: index)
+        let output = root.appendingPathComponent("must-not-exist.arithenbackup")
+        XCTAssertThrowsError(try source.exportBackup(to: output))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
+        XCTAssertEqual(try source.contents(of: item.id), Data("readable original".utf8))
+        XCTAssertEqual(try Data(contentsOf: index), damaged)
+        try assertNoStages()
+    }
+
+    func testExportRejectsAuthenticatedButStaleCommittedIndex() throws {
+        let source = try library()
+        let index = source.root.appendingPathComponent("index.enc")
+        let oldIndex = try Data(contentsOf: index)
+        let item = try add(source, name: "new item")
+        let currentIndex = try Data(contentsOf: index)
+        try oldIndex.write(to: index)
+        let output = root.appendingPathComponent("stale-must-not-exist.arithenbackup")
+        XCTAssertThrowsError(try source.exportBackup(to: output)) { error in
+            guard let error = error as? VaultError, error == .changed else { return XCTFail("Expected stale index rejection") }
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
+        XCTAssertEqual(try source.contents(of: item.id), Data("new item".utf8))
+        try currentIndex.write(to: index)
+        try source.exportBackup(to: output)
+        let restored = destination(); try restored.restore(from: output, password: secret)
+        XCTAssertEqual(try restored.contents(of: item.id), Data("new item".utf8))
+        try assertNoStages()
+    }
+
     func testDefaultArchiveRestoresExactMetadataAndBytesAfterSourceRemoval() throws {
         let source = try library()
         let original = root.appendingPathComponent("photo.jpg")

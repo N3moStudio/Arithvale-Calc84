@@ -380,7 +380,14 @@ public final class VaultRepository {
     }
 
     public func exportBackup(to url: URL) throws {
-        guard let header, let key, manifest != nil else { throw VaultError.locked }
+        guard let header, let key, let manifest else { throw VaultError.locked }
+        // Authenticate the committed index before blessing a new backup. Media
+        // can remain readable in memory even if its on-disk index was damaged.
+        let index = try Self.read(root.appendingPathComponent("index.enc"), limit: VaultLimits.manifestBytes)
+        let committed = try Self.decodeManifest(index, header: header, key: key)
+        guard committed.version == manifest.version, committed.items == manifest.items,
+              committed.cloudPreferences == manifest.cloudPreferences,
+              committed.albumPreferences == manifest.albumPreferences else { throw VaultError.changed }
         var resources: [UUID: URL] = [:]
         for item in items {
             try Task.checkCancellation()
@@ -388,8 +395,7 @@ public final class VaultRepository {
             resources[item.id] = assetURL(item.id)
         }
         let prepared = try ArithenBackupArchive.prepare(header: JSONEncoder().encode(header),
-            index: Self.read(root.appendingPathComponent("index.enc"), limit: VaultLimits.manifestBytes),
-            resources: resources, orderedIDs: items.map(\.id), key: key)
+            index: index, resources: resources, orderedIDs: items.map(\.id), key: key)
         try ArithenBackupArchive.write(prepared, sources: resources, to: url)
     }
 
