@@ -52,7 +52,7 @@ final class PhotosRestoreTests: XCTestCase {
 
     private func roundTrip(_ original: URL, type: String, details: MediaDetails, importIntoNewVault: Bool) async throws {
         guard PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized else {
-            throw fixtureError("CI must pregrant Photos read/write to the installed app before tests")
+            throw fixtureError("The preceding UI journey must grant Photos full access before native restoration tests; status=\(PHPhotoLibrary.authorizationStatus(for: .readWrite).rawValue)")
         }
         let originalBytes = try Data(contentsOf: original)
         let name = "arithen-restore-" + UUID().uuidString + "." + original.pathExtension
