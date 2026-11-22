@@ -9,13 +9,17 @@ import UniformTypeIdentifiers
 import ImageIO
 
 struct PrivateSpaceView: View {
+    @Environment(\.arithenTheme) private var theme
     @EnvironmentObject private var vault: VaultModel
     let close: () -> Void
     var body: some View {
         Group {
             if vault.unlocked { LibraryView(close: close) }
             else { NavigationStack { AccessView(close: close) } }
-        }.tint(CalcTheme.accent)
+        }.tint(ArithenPalette.color(.accent, theme: theme))
+            // The library is a separate full-screen presentation. Updating only
+            // the calculator's window preference can leave its status bar stale.
+            .preferredColorScheme(theme.colorMode == "system" ? nil : theme.colorMode == "dark" ? .dark : .light)
             .onChange(of: vault.unlocked) { old, new in if old && !new { close() } }
     }
 }

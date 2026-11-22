@@ -70,6 +70,9 @@ struct SettingsScreen: ViewModifier {
             .listSectionSpacing(24).environment(\.defaultMinListRowHeight, 52)
             .toolbarBackground(ArithenPalette.color(.surface, theme: theme), for: .navigationBar)
             .toolbarBackground(glass ? .automatic : .visible, for: .navigationBar)
+            // Sheets intercept this preference; keep native chrome in sync with
+            // the themed surface without replacing navigation or its active work.
+            .preferredColorScheme(theme.colorMode == "system" ? nil : theme.colorMode == "dark" ? .dark : .light)
     }
 }
 extension View {
