@@ -128,11 +128,15 @@ final class ArithenUITests: XCTestCase {
         // iOS 26 exposes grid assets as AX images, not collection-view cells.
         let photo = picker.images.matching(identifier: "PXGGridLayout-Info").firstMatch
         XCTAssertTrue(photo.waitForExistence(timeout: 15), "System photo must be selectable: \(picker.debugDescription)")
-        photo.tap()
+        // The system picker reports visible image frames but an invalid native
+        // hit point (-1, -1) on this runtime. Tap the observed frame's center.
+        XCTAssertGreaterThan(photo.frame.width, 0)
+        XCTAssertGreaterThan(photo.frame.height, 0)
+        photo.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let add = picker.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label == %@", "Add", "Done")).firstMatch
         XCTAssertTrue(add.waitForExistence(timeout: 10), "System confirm button: \(picker.debugDescription)")
         XCTAssertTrue(add.isEnabled)
-        add.tap()
+        add.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         // Import requests Photos access for original metadata/deletion. Exercise
         // the real permission prompt in this disposable simulator library.
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
