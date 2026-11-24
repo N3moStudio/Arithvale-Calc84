@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 final class ArithenUITests: XCTestCase {
     private let app = XCUIApplication()
@@ -34,20 +35,61 @@ final class ArithenUITests: XCTestCase {
         for digit in digits { tap(String(digit)) }
     }
     private func holdEquals() { app.buttons["Equals"].press(forDuration: 0.65) }
-    private func tapPickerFrame(_ element: XCUIElement) {
-        // Read the remote service's screen frame, but send the touch through
-        // Arithen's foreground window. Targeting a service-owned coordinate
-        // makes XCTest try to activate the unlaunchable picker service.
-        let frame = element.frame
-        XCTAssertGreaterThan(frame.width, 0)
-        XCTAssertGreaterThan(frame.height, 0)
-        let center = CGPoint(x: frame.midX, y: frame.midY)
-        let window = app.windows.allElementsBoundByIndex.first { $0.frame.contains(center) }
-        guard let window else { XCTFail("Picker control is outside the host window: \(frame)"); return }
-        XCTAssertEqual(app.state, .runningForeground)
-        let origin = window.frame.origin
-        window.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: center.x - origin.x, dy: center.y - origin.y)).tap()
+    private func selectSeededPhoto() throws {
+        let picker = XCUIApplication(bundleIdentifier: "com.apple.mobileslideshow.photospicker")
+        let photo = picker.images.matching(identifier: "PXGGridLayout-Info").firstMatch
+        let add = picker.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label == %@", "Add", "Done")).firstMatch
+        XCTAssertTrue(photo.waitForExistence(timeout: 15), picker.debugDescription)
+        XCTAssertTrue(add.waitForExistence(timeout: 10), picker.debugDescription)
+        XCTAssertFalse(add.isEnabled, "Picker must begin with zero selected items")
+        let iconURL = try XCTUnwrap(Bundle(for: ArithenUITests.self).url(forResource: "AppIcon", withExtension: "png"))
+        let iconImage = try XCTUnwrap(UIImage(contentsOfFile: iconURL.path)?.cgImage)
+        let icon = try XCTUnwrap(PickerScreenshot(iconImage, width: 72))
+        let window = app.windows.firstMatch
+        func screenshot() throws -> PickerScreenshot {
+            let image = try XCTUnwrap(app.screenshot().image.cgImage)
+            return try XCTUnwrap(PickerScreenshot(image))
+        }
+        var before = try screenshot()
+        var matchedTile = before.thumbnail(matching: icon)
+        let loadDeadline = Date().addingTimeInterval(6)
+        while matchedTile == nil && Date() < loadDeadline {
+            Thread.sleep(forTimeInterval: 0.2)
+            before = try screenshot()
+            matchedTile = before.thumbnail(matching: icon)
+        }
+        let tile = try XCTUnwrap(matchedTile, "Seeded AppIcon thumbnail missing from visible picker")
+        let appFrame = app.frame, windowFrame = window.frame
+        func tapImagePoint(_ point: CGPoint) {
+            let x = appFrame.minX + point.x * appFrame.width / CGFloat(before.width)
+            let y = appFrame.minY + point.y * appFrame.height / CGFloat(before.height)
+            window.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: x - windowFrame.minX, dy: y - windowFrame.minY)).tap()
+        }
+        let photoFrame = photo.frame
+        tapImagePoint(CGPoint(x: tile.midX, y: tile.midY))
+        // A single tap from an empty picker must enable Add; never toggle the tile again.
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: add)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 10), .completed, picker.debugDescription)
+        let button = add.frame
+        let scale = tile.width / photoFrame.width
+        XCTAssertTrue(scale.isFinite && scale > 0)
+        let radius = min(button.width, button.height) * scale / 2
+        let screenPoint = add.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).screenPoint
+        let resolved = CGPoint(x: (screenPoint.x - appFrame.minX) / appFrame.width * CGFloat(before.width),
+                               y: (screenPoint.y - appFrame.minY) / appFrame.height * CGFloat(before.height))
+        let predicted = CGPoint(x: tile.midX + (button.midX - photoFrame.midX) * scale,
+                                y: tile.midY + (button.midY - photoFrame.midY) * scale)
+        var target: CGPoint?
+        let tintDeadline = Date().addingTimeInterval(5)
+        repeat {
+            let after = try screenshot()
+            target = [resolved, predicted].filter { $0.y < tile.minY }.compactMap {
+                before.confirmation(after: after, near: $0, radius: radius)
+            }.first ?? before.changedHeaderButton(after: after, above: tile, radius: radius)
+            if target == nil { Thread.sleep(forTimeInterval: 0.2) }
+        } while target == nil && Date() < tintDeadline
+        tapImagePoint(try XCTUnwrap(target, "Enabled picker checkmark missing from the visible header"))
     }
     private func back() { app.navigationBars.buttons.element(boundBy: 0).tap() }
     private func checkFilesPickerAndCancel() {
@@ -161,19 +203,7 @@ final class ArithenUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Import"].isEnabled)
         capture("07-files-import"); tap("Close")
         tap("Add to Library"); tap("Photos & Videos")
-        // PhotosPicker is a separate system process. The covered library's
-        // photo.on.rectangle / Add controls remain in Arithen's AX hierarchy.
-        let picker = XCUIApplication(bundleIdentifier: "com.apple.mobileslideshow.photospicker")
-        // iOS 26 exposes grid assets as AX images, not collection-view cells.
-        let photo = picker.images.matching(identifier: "PXGGridLayout-Info").firstMatch
-        XCTAssertTrue(photo.waitForExistence(timeout: 15), "System photo must be selectable: \(picker.debugDescription)")
-        // The system picker reports visible image frames but an invalid native
-        // hit point (-1, -1) on this runtime. Tap the observed frame's center.
-        tapPickerFrame(photo)
-        let add = picker.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label == %@", "Add", "Done")).firstMatch
-        XCTAssertTrue(add.waitForExistence(timeout: 10), "System confirm button: \(picker.debugDescription)")
-        XCTAssertTrue(add.isEnabled)
-        tapPickerFrame(add)
+        try selectSeededPhoto()
         // Import requests Photos access for original metadata/deletion. Exercise
         // the real permission prompt in this disposable simulator library.
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
