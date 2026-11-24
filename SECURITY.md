@@ -132,7 +132,7 @@ New storageVersion=2 resources:
 - Context: Calc84/v<header version>/<vault UUID>/<item UUID>/chunk/<zero-based index>/<total original bytes>.
 - The position and total length in authentication prevent successful chunk reordering/truncation/substitution.
 
-Maximum 4 GiB per new file, below 64 GiB per library/backup, 5,000 records including companions/thumbnails. Legacy resources have a 128 MiB bound. The encrypted format adds 16 bytes per file plus 36 bytes per chunk beyond plaintext. Total backup headroom is reserved on import.
+Maximum 64 GiB per new file and 1 TiB per backup. Library admission reserves 128 MiB within that budget for archive overhead, 5,000 records including companions/thumbnails. Legacy resources have a 128 MiB bound. The encrypted format adds 16 bytes per file plus 36 bytes per chunk beyond plaintext. Total backup headroom is reserved on import.
 
 Restore verifies versions, bounded parameters, unique IDs, exact record membership/count, lengths, authentication, and EOF. Archive-supplied original names are not used as storage paths.
 

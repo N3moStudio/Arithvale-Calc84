@@ -114,6 +114,7 @@ enum VaultStream {
         var result = Data()
         while result.count < count {
             guard let chunk = try handle.read(upToCount: min(1024 * 1024, count - result.count)), !chunk.isEmpty else { throw VaultError.invalidBackup }
+            if result.isEmpty && chunk.count == count { return chunk }
             result.append(chunk)
         }
         return result

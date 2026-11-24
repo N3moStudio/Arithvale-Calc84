@@ -19,8 +19,8 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 CHUNK = 1024 * 1024
-MAX_FILE = 4 * 1024**3
-MAX_BACKUP = 64 * 1024**3
+MAX_FILE = 64 * 1024**3
+MAX_BACKUP = 1024 * 1024**3
 APPLE_EPOCH = 978307200
 V3_MAGIC = b"ARITHB03"
 V3_END = b"ARITHEND"

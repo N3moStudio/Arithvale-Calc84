@@ -25,6 +25,10 @@ public actor VaultEngine {
     }
     public func add(file: URL, name: String, contentType: String, details: MediaDetails = .init(),
                     companion: URL? = nil, companionType: String? = nil, thumbnail: Data? = nil) throws -> [VaultItem] {
+        if companion == nil && thumbnail == nil {
+            try repository.add(file: file, name: name, contentType: contentType, details: details)
+            return repository.items
+        }
         var created: [UUID] = []
         do {
             let primary = try repository.add(file: file, name: name, contentType: contentType, details: details, pending: true)

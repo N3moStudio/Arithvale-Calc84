@@ -131,7 +131,7 @@ private struct LibraryPane: View {
                 }
             }
         }
-        .photosPicker(isPresented: $photoPicker, selection: $photos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current, photoLibrary: .shared())
+        .photosPicker(isPresented: $photoPicker, selection: $photos, maxSelectionCount: 250, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current, photoLibrary: .shared())
         .onChange(of: photos) { _, value in if !value.isEmpty { vault.importPhotos(value); photos = [] } }
         .onChange(of: selection) { _, value in if value.isEmpty { selecting = false } }
         .onChange(of: search) { _, _ in selection = [] }

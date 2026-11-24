@@ -1,0 +1,121 @@
+name: Arithen media QA
+on:
+  push:
+    branches: [codex/media-capacity-qa]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      ARITHEN_CAPACITY_QA: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify storage and independent recovery first
+        run: |
+          python3 -m venv .build/core-python
+          .build/core-python/bin/pip install -r Scripts/recovery-requirements.txt
+          python3 Scripts/verify_release.py --python "$PWD/.build/core-python/bin/python"
+      - name: Upload core evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arithen-Core-${{ github.sha }}
+          path: .build/verification/
+          include-hidden-files: true
+          if-no-files-found: error
+  simulator:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+      ARITHEN_SIMULATOR_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-26-2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare real app simulator host
+        run: |
+          brew install xcodegen
+          python3 Scripts/prepare_mega.py --simulator
+          command -v ffmpeg >/dev/null || brew install ffmpeg
+          for rate in 30 60; do
+            ffmpeg -hide_banner -loglevel error -f lavfi -i "color=c=blue:s=3840x2160:r=$rate" -t 1 -c:v libx264 -threads 2 -preset ultrafast -crf 34 -pix_fmt yuv420p -g "$rate" "$RUNNER_TEMP/clip-$rate.mp4"
+            ffmpeg -hide_banner -loglevel error -stream_loop -1 -i "$RUNNER_TEMP/clip-$rate.mp4" -t 1800 -c copy -movflags +faststart "Tests/ArithenAppTests/qa-$rate.mp4"
+            ffprobe -v error -show_entries stream=width,height,r_frame_rate,duration -of json "Tests/ArithenAppTests/qa-$rate.mp4"
+          done
+          python3 Scripts/prepare_simulator.py
+      - name: Run simulator journeys and capture screenshots
+        run: |
+          set -o pipefail
+          device=$(cat .build/simulator/device-id.txt)
+          xcrun simctl boot "$device" || true
+          xcrun simctl bootstatus "$device" -b
+          # A public app icon is disposable media, not a fixture/unlock hook in the app.
+          xcrun simctl addmedia "$device" AppIcon.png
+          xcodebuild build-for-testing -project .build/simulator/ArithenSimulator.xcodeproj -scheme Arithen \
+            -destination "platform=iOS Simulator,id=$device" \
+            -derivedDataPath .build/simulator/DerivedData \
+            CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES \
+            > .build/simulator/xcodebuild.log 2>&1 || { tail -n 100 .build/simulator/xcodebuild.log; exit 1; }
+          app=.build/simulator/DerivedData/Build/Products/Debug-iphonesimulator/Arithen.app
+          plutil -convert xml1 -o .build/simulator/built-app-info.plist "$app/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = studio.n3mo.calc84
+          codesign --verify "$app"
+          xcrun simctl install "$device" .build/simulator/DerivedData/Build/Products/Debug-iphonesimulator/FilesSampleExporter.app
+          # Run the real permission/import journey first. On this iOS 26 runtime,
+          # simctl's successful Photos grant did not authorize PhotoKit read/write.
+          # The journey accepts the system dialog; native tests verify that actual
+          # authorization before saving synthetic restored media into Photos.
+          ui_status=0
+          xcodebuild test-without-building -project .build/simulator/ArithenSimulator.xcodeproj -scheme Arithen \
+            -destination "platform=iOS Simulator,id=$device" \
+            -derivedDataPath .build/simulator/DerivedData \
+            -only-testing:ArithenUITests -resultBundlePath .build/simulator/UI.xcresult \
+            -parallel-testing-enabled NO CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES \
+            >> .build/simulator/xcodebuild.log 2>&1 || ui_status=$?
+          integration_status=0
+          xcodebuild test-without-building -project .build/simulator/ArithenSimulator.xcodeproj -scheme Arithen \
+            -destination "platform=iOS Simulator,id=$device" \
+            -derivedDataPath .build/simulator/DerivedData \
+            -only-testing:ArithenAppTests -resultBundlePath .build/simulator/Integration.xcresult \
+            -parallel-testing-enabled NO CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES \
+            >> .build/simulator/xcodebuild.log 2>&1 || integration_status=$?
+          xcrun xcresulttool merge .build/simulator/UI.xcresult .build/simulator/Integration.xcresult \
+            --output-path .build/simulator/Journeys.xcresult
+          if [ "$ui_status" -ne 0 ] || [ "$integration_status" -ne 0 ]; then
+            tail -n 100 .build/simulator/xcodebuild.log
+            exit 1
+          fi
+      - name: Report benchmark measurements
+        if: always()
+        run: |
+          for result in .build/simulator/Integration.xcresult; do
+            if [ -d "$result" ]; then
+              xcrun xcresulttool export diagnostics --path "$result" --output-path "$RUNNER_TEMP/media-diagnostics"
+              grep -Rha 'MEDIA_QA ' "$RUNNER_TEMP/media-diagnostics" | head -100 || true
+            fi
+          done
+      - name: Export simulator evidence
+        if: always()
+        run: |
+          if [ -d .build/simulator/Journeys.xcresult ]; then
+            xcrun xcresulttool export attachments --path .build/simulator/Journeys.xcresult --output-path .build/simulator/screenshots
+            xcrun xcresulttool get test-results summary --path .build/simulator/Journeys.xcresult > .build/simulator/test-summary.json
+          fi
+      - name: Upload simulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arithen-Simulator-${{ github.sha }}
+          path: |
+            .build/simulator/device.json
+            .build/simulator/built-app-info.plist
+            .build/simulator/xcodebuild.log
+            .build/simulator/test-summary.json
+            .build/simulator/screenshots/
+            .build/simulator/Journeys.xcresult/
+            .build/simulator/UI.xcresult/
+            .build/simulator/Integration.xcresult/
+          include-hidden-files: true
+          if-no-files-found: error

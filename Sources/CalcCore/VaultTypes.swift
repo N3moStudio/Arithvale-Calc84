@@ -8,7 +8,7 @@ public enum VaultError: Error, LocalizedError {
         case .invalidRecovery: return "Save the new generated recovery key. It must be different from every source backup’s key."
         case .wrongPasswordOrDamaged: return "The password is incorrect, or the encrypted data is damaged."
         case .invalidBackup: return "This backup is incomplete or unsupported. Your current files have not changed."
-        case .limit: return "This version supports files up to 4 GB, libraries up to 64 GB, and 5,000 stored resources including thumbnails and Live Photo videos. Check available storage too."
+        case .limit: return "This version supports files up to 64 GiB, libraries up to about 1 TiB, and 5,000 stored resources including thumbnails and Live Photo videos. Check available storage too."
         case .exists: return "A library already exists. Restore is available only in an empty installation."
         case .locked: return "Unlock your library again."
         case .missing: return "The encrypted file could not be found."
@@ -142,8 +142,10 @@ struct VaultHeader: Codable {
 }
 
 public enum VaultLimits {
-    public static let fileBytes = 4 * 1024 * 1024 * 1024
-    public static let backupBytes = 64 * 1024 * 1024 * 1024
+    public static let fileBytes = 64 * 1024 * 1024 * 1024
+    public static let backupBytes = 1024 * 1024 * 1024 * 1024
+    // Covers two 12 MiB envelopes and chunk headers for a full 1 TiB archive.
+    static let libraryBytes = backupBytes - 128 * 1024 * 1024
     public static let memoryBytes = 128 * 1024 * 1024
     public static let chunkBytes = 1024 * 1024
     public static let manifestBytes = 4 * 1024 * 1024

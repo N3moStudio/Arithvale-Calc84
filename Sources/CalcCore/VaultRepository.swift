@@ -91,7 +91,7 @@ public final class VaultRepository {
     public func add(data: Data, name: String, contentType: String, details: MediaDetails = .init(), pending: Bool = false) throws -> VaultItem {
         guard let key, let header, var next = manifest else { throw VaultError.locked }
         guard data.count <= VaultLimits.memoryBytes, next.items.count < VaultLimits.itemCount,
-              next.items.reduce(0, { $0 + $1.byteCount }) + data.count < VaultLimits.backupBytes - 32 * 1024 * 1024 else { throw VaultError.limit }
+              next.items.reduce(0, { $0 + $1.byteCount }) + data.count < VaultLimits.libraryBytes else { throw VaultError.limit }
         var item = VaultItem(id: UUID(), name: String(name.prefix(180)), contentType: String(contentType.prefix(120)), byteCount: data.count, added: Date())
         item.captured = details.captured; item.duration = details.duration
         item.latitude = details.latitude; item.longitude = details.longitude; item.storageVersion = 2; item.pendingImport = pending
@@ -111,7 +111,7 @@ public final class VaultRepository {
         guard let key, let header, var next = manifest else { throw VaultError.locked }
         let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max
         guard size >= 0, size <= VaultLimits.fileBytes, next.items.count < VaultLimits.itemCount,
-              next.items.reduce(0, { $0 + $1.byteCount }) + size < VaultLimits.backupBytes - 32 * 1024 * 1024 else { throw VaultError.limit }
+              next.items.reduce(0, { $0 + $1.byteCount }) + size < VaultLimits.libraryBytes else { throw VaultError.limit }
         var item = VaultItem(id: UUID(), name: String(name.prefix(180)), contentType: String(contentType.prefix(120)), byteCount: size, added: Date())
         item.captured = details.captured; item.duration = details.duration
         item.latitude = details.latitude; item.longitude = details.longitude; item.storageVersion = 2; item.pendingImport = pending
@@ -684,7 +684,7 @@ public final class VaultRepository {
                 continue
             }
             guard next.items.count + resources.count <= VaultLimits.itemCount,
-                  next.items.reduce(0, { $0 + $1.byteCount }) + resources.reduce(0, { $0 + $1.byteCount }) < VaultLimits.backupBytes - 32 * 1024 * 1024 else { throw VaultError.limit }
+                  next.items.reduce(0, { $0 + $1.byteCount }) + resources.reduce(0, { $0 + $1.byteCount }) < VaultLimits.libraryBytes else { throw VaultError.limit }
             let ids = Dictionary(uniqueKeysWithValues: resources.map { ($0.id, UUID()) })
             for resource in resources {
                 try Task.checkCancellation()
