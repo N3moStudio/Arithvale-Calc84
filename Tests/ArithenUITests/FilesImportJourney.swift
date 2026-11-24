@@ -46,7 +46,11 @@ extension ArithenUITests {
             let inline = host.textViews["DOC.inlineRenameField"]
             if inline.waitForExistence(timeout: 5) {
                 // Files selects the initial name and focuses this inline editor.
-                inline.typeText("Downloads\n")
+                inline.typeText("Downloads")
+                let done = host.keyboards.buttons["Done"].firstMatch
+                XCTAssertTrue(done.waitForExistence(timeout: 5), host.debugDescription)
+                done.tap()
+                XCTAssertTrue(inline.waitForNonExistence(timeout: 10), host.debugDescription)
             } else {
                 let field = host.textFields.firstMatch
                 XCTAssertTrue(field.waitForExistence(timeout: 5), host.debugDescription)
