@@ -242,7 +242,7 @@ struct SharedFilesImportView: View {
             } onCancellation: { pickerError = nil }
             .fileDialogBrowserOptions(.displayFileExtensions)
             .navigationDestination(isPresented: $showingBackup) {
-                BackupImportView(preparedSelection: backup)
+                BackupImportView(preparedSelection: backup, onViewLibrary: { dismiss() })
             }
             .onDisappear { inspection?.cancel() }
             .onChange(of: showingBackup) { _, shown in if !shown { backup = nil } }
@@ -256,6 +256,7 @@ struct SharedFilesImportView: View {
     }
     private func inspect(_ urls: [URL]) {
         guard !urls.isEmpty, inspection == nil, vault.unlocked else { return }
+        guard urls.count <= VaultLimits.itemCount else { pickerError = VaultError.limit.localizedDescription; return }
         let selections = urls.map { BackupSelection($0) }
         let generation = vault.generation
         inspection = Task {

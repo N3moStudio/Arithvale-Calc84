@@ -137,11 +137,18 @@ extension ArithenUITests {
         authenticate()
         app.buttons["backup.apply"].tap()
         XCTAssertTrue(app.buttons["View Library"].waitForExistence(timeout: 30), app.debugDescription)
+        tap("View Library")
+        XCTAssertTrue(app.buttons["2 Snaps"].waitForExistence(timeout: 10), app.debugDescription)
+        tap("Add to Library"); tap("Import from Files"); tap("Import")
+        selectSample("River-reading-52.txt", until: app.staticTexts["River-reading-52.txt"])
+        app.buttons["files.apply"].tap()
+        XCTAssertTrue(app.staticTexts["1 file imported"].waitForExistence(timeout: 30), app.debugDescription)
         app.terminate(); app.launch()
         enter("963852"); holdEquals()
-        XCTAssertTrue(app.buttons["2 Snaps"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(app.buttons["3 Snaps"].waitForExistence(timeout: 15), app.debugDescription)
         let orchard = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Orchard-rain-47.txt")).firstMatch
         XCTAssertTrue(orchard.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "River-reading-52.txt")).firstMatch.exists)
         capture("files-relaunched-library")
     }
 }

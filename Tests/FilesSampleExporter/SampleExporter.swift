@@ -29,7 +29,9 @@ private struct SampleView: View {
                     try FileManager.default.copyItem(at: original, to: generic)
                     let invalid = dir.appendingPathComponent("Invalid-sample.arithenbackup")
                     try Data("Invalid archive sample".utf8).write(to: invalid)
-                    files = [original, generic, invalid]
+                    let note = dir.appendingPathComponent("River-reading-52.txt")
+                    try Data("Gauge 52".utf8).write(to: note)
+                    files = [original, generic, invalid, note]
                     exporting = true
                 } catch { self.error = error.localizedDescription }
             }

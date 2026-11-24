@@ -86,6 +86,7 @@ final class BackupReviewModel: ObservableObject {
 
 struct BackupImportView: View {
     var preparedSelection: BackupSelection? = nil
+    var onViewLibrary: (() -> Void)? = nil
     @EnvironmentObject private var vault: VaultModel
     @EnvironmentObject private var shared: SharedBackupModel
     @Environment(\.dismiss) private var dismiss
@@ -105,7 +106,7 @@ struct BackupImportView: View {
                 } description: {
                     Text("\(result.added) items added · \(result.skipped) exact duplicates skipped\nYour current recovery key stays the same.")
                     if let resultNotice { Text(resultNotice) }
-                } actions: { Button("View Library") { dismiss() }.buttonStyle(.borderedProminent) }
+                } actions: { Button("View Library") { if let onViewLibrary { onViewLibrary() } else { dismiss() } }.buttonStyle(.borderedProminent) }
             } else {
                 ThemedForm {
                     Section("Backup File") {
