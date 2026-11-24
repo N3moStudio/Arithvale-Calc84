@@ -1,51 +1,57 @@
 import SwiftUI
-import UIKit
+import UniformTypeIdentifiers
 import CalcCore
 
-// Separate simulator-only application. It can hand disposable samples to Files,
-// but has no access to Arithen's sandbox and never supplies a URL to Arithen.
+/// Only this disposable simulator app exposes its Documents folder in Files.
 @main
 struct SampleExporter: App {
     var body: some Scene { WindowGroup { SampleView() } }
 }
 
 private struct SampleView: View {
-    @State private var files: [URL] = []
-    @State private var exporting = false
-    @State private var error: String?
+    @State private var choosing = false
+    @State private var ready = false
+    @State private var status = ""
+    private let downloads = URL.documentsDirectory.appendingPathComponent("Downloads", isDirectory: true)
+
     var body: some View {
         VStack {
-            Button("Save samples to Files") {
-                do {
-                    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-                    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-                    let repo = VaultRepository(root: dir.appendingPathComponent("source"))
-                    try repo.create(password: "orchard-rain-test-key")
-                    _ = try repo.add(data: Data("Rain gauge reading 47".utf8),
-                                     name: "Orchard-rain-47.txt", contentType: "public.plain-text")
-                    let downloads = dir.appendingPathComponent("Downloads", isDirectory: true)
-                    try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
-                    let original = dir.appendingPathComponent("Orchard-sample.arithenbackup")
-                    try repo.exportBackup(to: original)
-                    let generic = downloads.appendingPathComponent("Generic-sample.bin")
-                    try FileManager.default.copyItem(at: original, to: generic)
-                    let invalid = dir.appendingPathComponent("Invalid-sample.arithenbackup")
-                    try Data("Invalid archive sample".utf8).write(to: invalid)
-                    let note = downloads.appendingPathComponent("River-reading-52.txt")
-                    try Data("Gauge 52".utf8).write(to: note)
-                    files = [original, invalid, downloads]
-                    exporting = true
-                } catch { self.error = error.localizedDescription }
-            }
-            if let error { Text(error) }
-        }.sheet(isPresented: $exporting) { ExportPicker(files: files) }
+            Button("Export samples to folder") { choosing = true }.disabled(!ready)
+            Text(status)
+        }.task {
+            do {
+                try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+                try Data("Local simulator samples".utf8).write(to: downloads.appendingPathComponent("Readme.txt"))
+                ready = true
+            } catch { status = error.localizedDescription }
+        }
+        .fileDialogDefaultDirectory(downloads)
+        .fileImporter(isPresented: $choosing, allowedContentTypes: [.folder]) { result in
+            do {
+                let folder = try result.get()
+                let access = folder.startAccessingSecurityScopedResource()
+                defer { if access { folder.stopAccessingSecurityScopedResource() } }
+                let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                let repo = VaultRepository(root: root)
+                try repo.create(password: "orchard-rain-test-key")
+                _ = try repo.add(data: Data("Rain gauge reading 47".utf8),
+                                 name: "Orchard-rain-47.txt", contentType: "public.plain-text")
+                var failure: NSError?
+                var written: Result<Void, Error>?
+                NSFileCoordinator().coordinate(writingItemAt: folder, options: [], error: &failure) { target in
+                    written = Result {
+                        let archive = target.appendingPathComponent("Orchard-sample.arithenbackup")
+                        try repo.exportBackup(to: archive)
+                        try FileManager.default.copyItem(at: archive, to: target.appendingPathComponent("Generic-sample.bin"))
+                        try Data("Invalid archive sample".utf8).write(to: target.appendingPathComponent("Invalid-sample.arithenbackup"))
+                        try Data("Gauge 52".utf8).write(to: target.appendingPathComponent("River-reading-52.txt"))
+                    }
+                }
+                if let failure { throw failure }
+                guard let written else { throw CocoaError(.fileWriteUnknown) }
+                try written.get()
+                status = "Saved four samples to " + folder.lastPathComponent
+            } catch { status = error.localizedDescription }
+        }
     }
-}
-
-private struct ExportPicker: UIViewControllerRepresentable {
-    let files: [URL]
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        UIDocumentPickerViewController(forExporting: files, asCopy: true)
-    }
-    func updateUIViewController(_ controller: UIDocumentPickerViewController, context: Context) {}
 }

@@ -30,28 +30,40 @@ extension ArithenUITests {
                                                name, stem, stem + ",")).firstMatch
     }
 
+    private func openSampleDownloads(_ host: XCUIApplication) {
+        let bar = filesNavigation(host)
+        XCTAssertTrue(bar.waitForExistence(timeout: 30), host.debugDescription)
+        func title(_ name: String) -> XCUIElement {
+            bar.descendants(matching: .any).matching(NSPredicate(
+                format: "identifier != 'BackButton' AND (label == %@ OR label BEGINSWITH %@)", name, name + ",")).firstMatch
+        }
+        if title("Downloads").waitForExistence(timeout: 3) { return }
+        if !title("Arithen Samples").exists {
+            openLocalRoot(host)
+            let samples = fileCell("Arithen Samples", in: host)
+            XCTAssertTrue(samples.waitForExistence(timeout: 25), host.debugDescription)
+            samples.tap()
+        }
+        let folder = fileCell("Downloads", in: host)
+        XCTAssertTrue(folder.waitForExistence(timeout: 15), host.debugDescription)
+        folder.tap()
+        XCTAssertTrue(title("Downloads").waitForExistence(timeout: 15), host.debugDescription)
+    }
+
     func saveSamples() {
-        // Let the system export picker host Files. Launching the standalone
-        // Documents app introduces an unrelated foreground-app handoff.
         let exporter = XCUIApplication(bundleIdentifier: "studio.n3mo.files-sample-exporter")
         exporter.launch()
-        exporter.buttons["Save samples to Files"].tap()
-        openLocalRoot(exporter)
-        let bar = filesNavigation(exporter)
-        let save = bar.buttons.matching(NSPredicate(format: "label == 'Save' OR label == 'Export' OR label == 'Move'")).firstMatch
-        XCTAssertTrue(save.waitForExistence(timeout: 10), exporter.debugDescription)
-        save.tap()
-        XCTAssertTrue(bar.waitForNonExistence(timeout: 20), exporter.debugDescription)
+        exporter.buttons["Export samples to folder"].tap()
+        openSampleDownloads(exporter)
+        let open = filesNavigation(exporter).buttons["Open"].firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout: 10) && open.isEnabled, exporter.debugDescription)
+        open.tap()
+        XCTAssertTrue(exporter.staticTexts["Saved four samples to Downloads"].waitForExistence(timeout: 30), exporter.debugDescription)
         exporter.terminate()
     }
 
-    private func selectSample(_ name: String, inDownloads: Bool = false, until destination: XCUIElement) {
-        openLocalRoot(app)
-        if inDownloads {
-            let folder = fileCell("Downloads", in: app)
-            XCTAssertTrue(folder.waitForExistence(timeout: 15), app.debugDescription)
-            folder.tap()
-        }
+    private func selectSample(_ name: String, until destination: XCUIElement) {
+        openSampleDownloads(app)
         let cell = fileCell(name, in: app)
         XCTAssertTrue(cell.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertTrue(cell.isEnabled)
@@ -97,14 +109,14 @@ extension ArithenUITests {
         // The ordinary Files entrance must also recognize an archive that a
         // provider presents as generic binary data.
         tap("Add to Library"); tap("Import from Files"); tap("Import")
-        selectSample("Generic-sample.bin", inDownloads: true, until: app.staticTexts["Generic-sample.bin"])
+        selectSample("Generic-sample.bin", until: app.staticTexts["Generic-sample.bin"])
         authenticate()
         app.buttons["backup.apply"].tap()
         XCTAssertTrue(app.buttons["View Library"].waitForExistence(timeout: 30), app.debugDescription)
         tap("View Library")
         XCTAssertTrue(app.buttons["2 Snaps"].waitForExistence(timeout: 10), app.debugDescription)
         tap("Add to Library"); tap("Import from Files"); tap("Import")
-        selectSample("River-reading-52.txt", inDownloads: true, until: app.staticTexts["River-reading-52.txt"])
+        selectSample("River-reading-52.txt", until: app.staticTexts["River-reading-52.txt"])
         app.buttons["files.apply"].tap()
         XCTAssertTrue(app.staticTexts["1 file imported"].waitForExistence(timeout: 30), app.debugDescription)
         app.terminate(); app.launch()

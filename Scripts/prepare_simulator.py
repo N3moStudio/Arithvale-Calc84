@@ -48,6 +48,13 @@ info.update(CFBundleIdentifier='$(PRODUCT_BUNDLE_IDENTIFIER)', CFBundleExecutabl
 with (output / 'Info.plist').open('wb') as stream:
     plistlib.dump(info, stream)
 
+sample_info = dict(CFBundleIdentifier='$(PRODUCT_BUNDLE_IDENTIFIER)', CFBundleExecutable='$(EXECUTABLE_NAME)',
+                   CFBundleName='FilesSampleExporter', CFBundleDisplayName='Arithen Samples', CFBundlePackageType='APPL',
+                   CFBundleInfoDictionaryVersion='6.0', CFBundleShortVersionString='1.0', CFBundleVersion='1',
+                   UILaunchScreen={}, UIFileSharingEnabled=True, LSSupportsOpeningDocumentsInPlace=True)
+with (output / 'SampleInfo.plist').open('wb') as stream:
+    plistlib.dump(sample_info, stream)
+
 settings = {'SWIFT_VERSION': '5.0', 'IPHONEOS_DEPLOYMENT_TARGET': '17.0',
             'CODE_SIGN_IDENTITY': '-', 'CODE_SIGNING_ALLOWED': 'YES', 'TARGETED_DEVICE_FAMILY': '1,2'}
 spec = {'name': 'ArithenSimulator', 'options': {'deploymentTarget': {'iOS': '17.0'}},
@@ -65,8 +72,7 @@ spec = {'name': 'ArithenSimulator', 'options': {'deploymentTarget': {'iOS': '17.
                 'sources': [str(root / 'Tests/FilesSampleExporter')],
                 'dependencies': [{'package': 'Engine', 'product': 'Engine'}],
                 'settings': {'base': {'PRODUCT_BUNDLE_IDENTIFIER': 'studio.n3mo.files-sample-exporter',
-                                     'INFOPLIST_KEY_UILaunchScreen_Generation': 'YES',
-                                     'GENERATE_INFOPLIST_FILE': 'YES'}}},
+                                     'INFOPLIST_FILE': str(output / 'SampleInfo.plist')}}},
             'ArithenAppTests': {'type': 'bundle.unit-test', 'platform': 'iOS',
                 'sources': [str(root / 'Tests/ArithenAppTests')],
                 'dependencies': [{'target': 'Arithen'}, {'package': 'Engine', 'product': 'Engine'}],
