@@ -18,6 +18,9 @@ jobs:
           python3 -m venv .build/core-python
           .build/core-python/bin/pip install -r Scripts/recovery-requirements.txt
           python3 Scripts/verify_release.py --python "$PWD/.build/core-python/bin/python"
+      - name: Report completed storage stages
+        if: always()
+        run: grep 'MEDIA_QA' .build/verification/*/core-tests.log || true
       - name: Upload core evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -74,6 +77,21 @@ jobs:
             -only-testing:ArithenUITests -resultBundlePath .build/simulator/UI.xcresult \
             -parallel-testing-enabled NO CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES \
             >> .build/simulator/xcodebuild.log 2>&1 || ui_status=$?
+          # Generate a real coded stream over 4 GiB without encoding 108,000 distinct frames.
+          free_kib=$(df -Pk "$RUNNER_TEMP" | awk 'END {print $4}')
+          if [ "$free_kib" -gt 29360128 ]; then
+            ffmpeg -hide_banner -loglevel error -f lavfi -i 'color=c=green:s=3840x2160:r=30' -t 2 -c:v libx264 -threads 2 -preset ultrafast -pix_fmt yuv420p -b:v 22M -minrate 22M -maxrate 22M -bufsize 3M -x264-params 'nal-hrd=cbr:force-cfr=1' -g 30 "$RUNNER_TEMP/heavy-seed.mp4"
+            heavy="$RUNNER_TEMP/arithen-qa-heavy-4k30.mp4"
+            ffmpeg -hide_banner -loglevel error -stream_loop -1 -i "$RUNNER_TEMP/heavy-seed.mp4" -t 1800 -c copy -metadata creation_time=2025-11-17T04:05:06Z "$heavy"
+            info=$(xcrun simctl get_app_container "$device" studio.n3mo.calc84 data)/Documents/qa-heavy.txt
+            shasum -a 256 "$heavy" | cut -d ' ' -f 1 > "$info"
+            stat -f %z "$heavy" >> "$info"
+            ffprobe -v error -show_entries stream=width,height,r_frame_rate,duration -of json "$heavy"
+            xcrun simctl addmedia "$device" "$heavy"
+            rm "$heavy"
+          else
+            echo "MEDIA_QA high-bitrate fixture skipped with $free_kib KiB free"
+          fi
           integration_status=0
           xcodebuild test-without-building -project .build/simulator/ArithenSimulator.xcodeproj -scheme Arithen \
             -destination "platform=iOS Simulator,id=$device" \
@@ -90,12 +108,12 @@ jobs:
       - name: Report benchmark measurements
         if: always()
         run: |
-          for result in .build/simulator/Integration.xcresult; do
-            if [ -d "$result" ]; then
-              xcrun xcresulttool export diagnostics --path "$result" --output-path "$RUNNER_TEMP/media-diagnostics"
-              grep -Rha 'MEDIA_QA ' "$RUNNER_TEMP/media-diagnostics" | head -100 || true
-            fi
-          done
+          device=$(cat .build/simulator/device-id.txt)
+          data=$(xcrun simctl get_app_container "$device" studio.n3mo.calc84 data)
+          if [ -f "$data/Documents/qa-measurements.txt" ]; then
+            cp "$data/Documents/qa-measurements.txt" .build/simulator/
+            cat .build/simulator/qa-measurements.txt
+          fi
       - name: Export simulator evidence
         if: always()
         run: |
@@ -109,6 +127,7 @@ jobs:
         with:
           name: Arithen-Simulator-${{ github.sha }}
           path: |
+            .build/simulator/qa-measurements.txt
             .build/simulator/device.json
             .build/simulator/built-app-info.plist
             .build/simulator/xcodebuild.log

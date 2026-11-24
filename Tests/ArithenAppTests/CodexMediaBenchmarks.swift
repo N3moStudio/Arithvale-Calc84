@@ -13,6 +13,14 @@ import CalcCore
 /// Opt-in fixtures are generated and bundled only in the dedicated QA workflow.
 @MainActor
 final class CodexMediaBenchmarks: XCTestCase {
+    private func measure(_ message: String) throws {
+        let docs = try XCTUnwrap(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first)
+        let file = docs.appendingPathComponent("qa-measurements.txt")
+        let previous = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+        try (previous + message + "\n").write(to: file, atomically: true, encoding: .utf8)
+        print(message)
+    }
+
     func testLastWeeksPhotosAndThirtyMinuteVideosAcrossRepeatedBatches() async throws {
         let bundle = Bundle(for: Self.self)
         guard let movie30 = bundle.url(forResource: "qa-30", withExtension: "mp4"),
@@ -74,7 +82,7 @@ final class CodexMediaBenchmarks: XCTestCase {
             let review = try XCTUnwrap(model.photoImportReview)
             XCTAssertEqual(review.imported, batch, review.importError ?? "")
             XCTAssertEqual(model.items.filter(\.visible).count, prior + batch)
-            print("MEDIA_QA batch=\(batch) committed=\(review.imported) submittedSeconds=\(queued) committedSeconds=\(ProcessInfo.processInfo.systemUptime-start) fixturePNGBytes=\(screenshot.count)")
+            try measure("MEDIA_QA batch=\(batch) committed=\(review.imported) submittedSeconds=\(queued) committedSeconds=\(ProcessInfo.processInfo.systemUptime-start) fixturePNGBytes=\(screenshot.count)")
         }
         await engine.lock()
         let reopened = try await engine.unlock(password: password).filter(\.visible)
@@ -97,7 +105,59 @@ final class CodexMediaBenchmarks: XCTestCase {
             try await PhotoResource.write(resource, to: returned)
             let expected = try Data(contentsOf: input, options: .mappedIfSafe)
             XCTAssertEqual(SHA256.hash(data: try Data(contentsOf: returned, options: .mappedIfSafe)), SHA256.hash(data: expected))
-            print("MEDIA_QA export=\(index) bytes=\(expected.count) date=\(captured.timeIntervalSince1970) duration=\(saved.duration) verifiedOriginal=true")
+            try measure("MEDIA_QA export=\(index) bytes=\(expected.count) date=\(captured.timeIntervalSince1970) duration=\(saved.duration) verifiedOriginal=true")
         }
     }
+    func testMultiGigabyteThirtyMinutePhotoLibraryMovie() async throws {
+        let docs = try XCTUnwrap(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first)
+        let probe = docs.appendingPathComponent("qa-heavy.txt")
+        guard FileManager.default.fileExists(atPath: probe.path) else { throw XCTSkip("Heavy fixture requires 28 GiB free on the disposable runner.") }
+        let manifest = try String(contentsOf: probe, encoding: .utf8).split(whereSeparator: \.isNewline)
+        XCTAssertEqual(manifest.count, 2)
+        guard manifest.count == 2 else { return }
+        let bytes = try XCTUnwrap(Int(manifest[1]))
+        XCTAssertGreaterThan(bytes, 4 * 1024 * 1024 * 1024)
+        func movies() -> [PHAsset] {
+            var result: [PHAsset] = []
+            PHAsset.fetchAssets(with: .video, options: nil).enumerateObjects { asset, _, _ in
+                if PHAssetResource.assetResources(for: asset).contains(where: { $0.originalFilename == "arithen-qa-heavy-4k30.mp4" }) { result.append(asset) }
+            }
+            return result
+        }
+        let source = try XCTUnwrap(movies().first)
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let engine = VaultEngine(root: dir.appendingPathComponent("vault"))
+        let password = "temporary heavy fixture vault"
+        _ = try await engine.create(password: password)
+        let model = VaultModel(engine: engine)
+        model.unlocked = true
+        let start = ProcessInfo.processInfo.systemUptime
+        model.importPhotos([PhotosPickerItem(itemIdentifier: source.localIdentifier)])
+        while model.photoImportReview == nil && ProcessInfo.processInfo.systemUptime - start < 900 {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let review = try XCTUnwrap(model.photoImportReview)
+        XCTAssertEqual(review.imported, 1, review.importError ?? "")
+        let elapsed = ProcessInfo.processInfo.systemUptime - start
+        await engine.lock()
+        let reopened = try await engine.unlock(password: password)
+        let item = try XCTUnwrap(reopened.first(where: \.visible))
+        XCTAssertEqual(item.byteCount, bytes)
+        let output = dir.appendingPathComponent("verified.mp4")
+        try await engine.materialize(id: item.id, to: output)
+        let expected = String(manifest[0])
+        XCTAssertEqual(try BackupCopy.digest(output).map { String(format: "%02x", $0) }.joined(), expected)
+        try await MediaBridge.saveToPhotos(item: item, main: output, companion: nil)
+        try FileManager.default.removeItem(at: output)
+        let copy = try XCTUnwrap(movies().first { $0.localIdentifier != source.localIdentifier })
+        XCTAssertEqual(copy.creationDate, source.creationDate)
+        XCTAssertEqual(copy.duration, 1800, accuracy: 0.2)
+        let original = try XCTUnwrap(PHAssetResource.assetResources(for: copy).first { $0.type == .video })
+        try await PhotoResource.write(original, to: output)
+        XCTAssertEqual(try BackupCopy.digest(output).map { String(format: "%02x", $0) }.joined(), expected)
+        try measure("MEDIA_QA highBitrateOriginalBytes=\(bytes) committedSeconds=\(elapsed) duration=\(copy.duration) sha256=\(expected) preserved=true")
+    }
+
 }
