@@ -85,6 +85,7 @@ final class BackupReviewModel: ObservableObject {
 }
 
 struct BackupImportView: View {
+    var preparedSelection: BackupSelection? = nil
     @EnvironmentObject private var vault: VaultModel
     @EnvironmentObject private var shared: SharedBackupModel
     @Environment(\.dismiss) private var dismiss
@@ -108,8 +109,8 @@ struct BackupImportView: View {
             } else {
                 ThemedForm {
                     Section("Backup File") {
-                        Button("Choose Backup File", systemImage: "doc") {
-                            usedReceipt = nil; key = ""; input.choose(.file)
+                        Button("Import", systemImage: "doc") {
+                            input.choose(.file)
                         }.disabled(input.working || review.working || review.recoveryReport != nil || vault.busy)
                         if let backup = input.backup {
                             Label(backup.displayName, systemImage: "doc.badge.checkmark").font(.subheadline)
@@ -123,22 +124,33 @@ struct BackupImportView: View {
                             }
                         }
                     }
-                    Section {
-                        SecureField("Backup recovery key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
-                            .disabled(input.working || review.working || review.recoveryReport != nil || vault.busy)
-                        Button("Import") {
-                            if let backup = input.backup { review.prepare(backup, key: key); key = "" }
-                        }.buttonStyle(ImportButtonStyle())
-                            .disabled(input.backup == nil || key.isEmpty || shared.working || input.working || review.working || review.recoveryReport != nil || vault.busy)
-                        if review.canRecover {
-                            Button("Recover Intact Files") {
-                                if let backup = input.backup { review.prepare(backup, key: key, recoverIntact: true); key = "" }
-                            }.disabled(input.backup == nil || key.isEmpty || input.working || review.working || vault.busy)
-                            Text("Re-enter this backup’s key to check for intact files. You’ll review what can be recovered before anything is added.")
-                                .font(.footnote).fixedSize(horizontal: false, vertical: true)
+                    if review.readyToImport {
+                        Section("Review Backup") {
+                            Text("\(review.items.count.formatted()) active items in this backup. New items will be added. Exact duplicates keep one copy and combine their albums and tags.")
+                            ForEach(review.items.prefix(10)) { item in Text(item.name) }
+                            if review.items.count > 10 { Text("And \(review.items.count - 10) more") }
+                            Button("Add to Library") { importPreparedBackup() }
+                                .accessibilityIdentifier("backup.apply").buttonStyle(ImportButtonStyle()).disabled(review.items.isEmpty || vault.busy || input.working)
+                            Button("Cancel Review", role: .cancel) { review.clear() }.disabled(vault.busy)
                         }
-                    } header: { Text("Recovery Key") } footer: {
-                        Text("Use this backup’s key. Your current library keeps its own key.")
+                    } else {
+                        Section {
+                            SecureField("Backup recovery key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
+                                .disabled(input.working || review.working || review.recoveryReport != nil || vault.busy)
+                            Button("Review Backup") {
+                                if let backup = input.backup { review.prepare(backup, key: key); key = "" }
+                            }.buttonStyle(ImportButtonStyle())
+                                .disabled(input.backup == nil || key.isEmpty || shared.working || input.working || review.working || review.recoveryReport != nil || vault.busy)
+                            if review.canRecover {
+                                Button("Recover Intact Files") {
+                                    if let backup = input.backup { review.prepare(backup, key: key, recoverIntact: true); key = "" }
+                                }.disabled(input.backup == nil || key.isEmpty || input.working || review.working || vault.busy)
+                                Text("Re-enter this backup’s key to check for intact files. You’ll review what can be recovered before anything is added.")
+                                    .font(.footnote).fixedSize(horizontal: false, vertical: true)
+                            }
+                        } header: { Text("Recovery Key") } footer: {
+                            Text("Use this backup’s key. Your current library keeps its own key.")
+                        }
                     }
                     if let report = review.recoveryReport, !review.working {
                         Section("Recovery Results") {
@@ -182,13 +194,14 @@ struct BackupImportView: View {
         } }
         .interactiveDismissDisabled(vault.importing)
         .task {
-            if input.backup == nil, let entry = shared.entry {
+            if let preparedSelection, input.backup == nil {
+                input.usePrepared(preparedSelection)
+            } else if input.backup == nil, let entry = shared.entry {
                 usedReceipt = entry.url; input.prepare(entry.url, displayName: entry.displayName)
             }
         }
         .onChange(of: input.backup?.url) { _, _ in key = ""; review.clear() }
         .onChange(of: shared.entry?.url) { _, _ in receiveBackup() }
-        .onChange(of: review.readyToImport) { _, ready in if ready { importPreparedBackup() } }
         .onChange(of: vault.unlocked) { _, unlocked in if !unlocked { review.clear(); key = ""; dismiss() } }
         .onDisappear { key = ""; if vault.importing { vault.cancelImport() }; review.clear() }
         .confirmationDialog("Remove received copy?", isPresented: $removeReceived, titleVisibility: .visible) {
@@ -214,7 +227,8 @@ struct BackupImportView: View {
                 }
                 // Keep a damaged received backup available for another recovery
                 // attempt. A partial recovery must not silently discard it.
-                if !partial, shared.entry?.url == usedReceipt { shared.discard() }
+                if !partial, let usedReceipt, shared.entry?.url == usedReceipt,
+                   input.backup?.sourceURL == usedReceipt { shared.discard() }
                 review.clear()
             case .failure(let error): importError = error.localizedDescription; review.clear()
             }

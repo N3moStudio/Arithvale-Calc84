@@ -3,6 +3,8 @@ import Foundation
 /// File selection is based on archive bytes, not a host app's UTI registration.
 /// Full authentication still happens in VaultRepository.restore/verifyBackup.
 public enum BackupFileProbe {
+    public static let extensions = ["arithenbackup", "c84backup", "calc84backup"]
+
     /// List candidates without reading their bytes or depending on a custom UTI.
     /// A cloud placeholder is downloaded only when the user selects that file.
     public static func files(in folder: URL) throws -> [URL] {
@@ -17,8 +19,8 @@ public enum BackupFileProbe {
             let resource = try url.resourceValues(forKeys: keys)
             return resource.isRegularFile == true && resource.isSymbolicLink != true
         }.sorted {
-            let left = ["arithenbackup", "c84backup"].contains($0.pathExtension.lowercased())
-            let right = ["arithenbackup", "c84backup"].contains($1.pathExtension.lowercased())
+            let left = extensions.contains($0.pathExtension.lowercased())
+            let right = extensions.contains($1.pathExtension.lowercased())
             if left != right { return left }
             return $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
         }

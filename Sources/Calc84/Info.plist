@@ -5,9 +5,9 @@
 	<key>CFBundleDisplayName</key>
 	<string>Arithen</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.13.2</string>
+	<string>0.14.0</string>
 	<key>CFBundleVersion</key>
-	<string>27</string>
+	<string>28</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Arithen imports your selected photos and videos with their original dates and Live Photo resources. After verified import, you can choose to delete those originals from Photos with your confirmation.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
@@ -45,6 +45,7 @@
 				<array>
 					<string>arithenbackup</string>
 					<string>c84backup</string>
+					<string>calc84backup</string>
 				</array>
 			</dict>
 		</dict>

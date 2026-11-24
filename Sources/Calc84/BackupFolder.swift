@@ -4,14 +4,15 @@ import CalcCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Keep the picker's temporary permission alive until its sheet has finished
-/// dismissing. Only then start validation and show any result/error.
+/// Owns provider access for the lifetime of a read, or a private staged archive.
 final class BackupSelection: @unchecked Sendable {
     let url: URL
+    let sourceURL: URL
     let displayName: String
     private let access: Bool
     private let owned: Bool
-    init(_ url: URL, owned: Bool = false, displayName: String? = nil) {
+    init(_ url: URL, owned: Bool = false, displayName: String? = nil, sourceURL: URL? = nil) {
+        self.sourceURL = sourceURL ?? url
         self.url = url; self.owned = owned; self.displayName = displayName ?? url.lastPathComponent
         access = url.startAccessingSecurityScopedResource()
     }
@@ -19,8 +20,8 @@ final class BackupSelection: @unchecked Sendable {
         if access { url.stopAccessingSecurityScopedResource() }
         if owned { try? FileManager.default.removeItem(at: url) }
     }
-    static func backupFile(_ source: URL, displayName: String? = nil) throws -> BackupSelection {
-        let scope = BackupSelection(source)
+    static func backupFile(_ scope: BackupSelection, displayName: String? = nil) throws -> BackupSelection {
+        let source = scope.url
         defer { withExtendedLifetime(scope) {} }
         let copy = try TemporaryFiles.fresh(extension: "arithenbackup")
         var succeeded = false
@@ -41,7 +42,7 @@ final class BackupSelection: @unchecked Sendable {
         if let coordinationError { throw coordinationError }
         guard let result else { throw VaultError.invalidBackup }
         try result.get(); succeeded = true
-        return BackupSelection(copy, owned: true, displayName: displayName ?? source.lastPathComponent)
+        return BackupSelection(copy, owned: true, displayName: displayName ?? source.lastPathComponent, sourceURL: source)
     }
 }
 
@@ -190,7 +191,7 @@ enum BackupFolder {
 
 /// Cancel and interactive dismissal never count as a successful save.
 struct BackupDocumentPicker: UIViewControllerRepresentable {
-    enum Purpose { case folder, connectFolder, openBackup, save(URL) }
+    enum Purpose { case folder, connectFolder, save(URL) }
     let purpose: Purpose
     let finished: (URL?) -> Void
     var failure: ((String) -> Void)? = nil
@@ -205,11 +206,6 @@ struct BackupDocumentPicker: UIViewControllerRepresentable {
             picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
             picker.title = "Choose Folder, Then Tap Open"
             // Do not force Files to reopen a stale provider URL.
-        case .openBackup:
-            // LiveContainer may not register the guest app's exported UTI. The archive
-            // reader still authenticates the content; the picker must not hide the file.
-            picker = UIDocumentPickerViewController(forOpeningContentTypes: [.data], asCopy: true)
-            picker.title = "Import Backup File"
         case .save(let url):
             picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
         }

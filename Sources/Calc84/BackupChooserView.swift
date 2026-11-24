@@ -1,6 +1,18 @@
 #if os(iOS)
 import SwiftUI
 import CalcCore
+import UniformTypeIdentifiers
+
+enum BackupImportTypes {
+    static let files: [UTType] = {
+        let registered = BackupFileProbe.extensions.flatMap {
+            UTType.types(tag: $0, tagClass: .filenameExtension, conformingTo: nil)
+        }
+        var seen = Set<String>()
+        return (registered + [UTType(exportedAs: "studio.n3mo.calc84.backup"), .data, .item])
+            .filter { seen.insert($0.identifier).inserted }
+    }()
+}
 
 /// The form owns this state and its sheet. A recycled Section never owns a picker.
 @MainActor
@@ -10,41 +22,38 @@ final class BackupInputModel: ObservableObject {
         let id = UUID()
         let kind: Kind
     }
-    @Published var request: Request?
+    @Published private(set) var request: Request?
+    @Published var isChoosing = false
     @Published private(set) var backup: BackupSelection?
     @Published private(set) var folder: BackupSelection?
     @Published private(set) var entries: [URL] = []
     @Published private(set) var working = false
     @Published private(set) var error: String?
     @Published private(set) var notice: String?
-    private var pending: (Kind, BackupSelection)?
-    private var receivedDelegateResult = false
     private var preparation: Task<Void, Never>?
 
     func choose(_ kind: Kind) {
         guard request == nil, !working else { return }
-        pending = nil; receivedDelegateResult = false; error = nil; notice = nil
+        error = nil; notice = nil
         request = Request(kind: kind)
+        isChoosing = true
     }
-    func picked(_ url: URL?, for presented: Request) {
-        // Ignore late callbacks from an older presentation after a retry.
+    func picked(_ result: Result<[URL], Error>, for presented: Request) {
         guard request?.id == presented.id else { return }
-        receivedDelegateResult = true
-        pending = url.map { (presented.kind, BackupSelection($0)) }
-        if url == nil { notice = "Files closed without a selection. Your backup has not changed." }
         request = nil
-    }
-    func dismissed() {
-        // Interactive dismissal is handled here, never by representable teardown.
-        guard let value = pending else {
-            if !receivedDelegateResult {
-                notice = "Files closed before returning a selection. Try again, or share the backup from Files to Arithen. In LiveContainer, share to LiveContainer, then choose Arithen."
-            }
-            return
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { selectionCancelled(); return }
+            let access = BackupSelection(url)
+            if presented.kind == .folder { browse(access) }
+            else { prepare(url, scope: access) }
+        case .failure(let failure):
+            error = failure.localizedDescription
         }
-        pending = nil
-        if value.0 == .folder { browse(value.1) }
-        else { prepare(value.1.url, scope: value.1) }
+    }
+    func selectionCancelled() {
+        request = nil
+        notice = "No file selected."
     }
     func cancelPreparation() { preparation?.cancel() }
     func clearSelection() {
@@ -75,6 +84,9 @@ final class BackupInputModel: ObservableObject {
             }
         }
     }
+    func usePrepared(_ selection: BackupSelection) {
+        backup = selection; entries = []; folder = nil; error = nil; notice = nil
+    }
     func prepare(_ url: URL, scope: BackupSelection? = nil, displayName: String? = nil) {
         guard !working else { return }
         // A failed replacement must never leave the previous archive actionable
@@ -85,12 +97,12 @@ final class BackupInputModel: ObservableObject {
             defer { working = false }
             let worker = Task.detached(priority: .userInitiated) {
                 defer { withExtendedLifetime(access) {}; withExtendedLifetime(parent) {} }
-                return try BackupSelection.backupFile(url, displayName: displayName)
+                return try BackupSelection.backupFile(access, displayName: displayName)
             }
             do {
                 let value = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
                 try Task.checkCancellation()
-                backup = value; entries = []; folder = nil
+                usePrepared(value)
             } catch {
                 if !Task.isCancelled {
                     self.error = "Couldn’t prepare this backup. Your original file is unchanged. " + error.localizedDescription
@@ -146,11 +158,15 @@ struct BackupInputSection: View {
 private struct BackupPickerPresentation: ViewModifier {
     @ObservedObject var input: BackupInputModel
     func body(content: Content) -> some View {
-        content.sheet(item: $input.request, onDismiss: input.dismissed) { request in
-            BackupDocumentPicker(purpose: request.kind == .file ? .openBackup : .folder) { url in
-                input.picked(url, for: request)
-            }.id(request.id)
+        let request = input.request
+        let types = request?.kind == .folder ? [UTType.folder] : BackupImportTypes.files
+        content.fileImporter(isPresented: $input.isChoosing, allowedContentTypes: types,
+                             allowsMultipleSelection: false) { result in
+            if let request { input.picked(result, for: request) }
+        } onCancellation: {
+            if let request, input.request?.id == request.id { input.selectionCancelled() }
         }
+        .fileDialogBrowserOptions(.displayFileExtensions)
         .onDisappear { input.cancelPreparation() }
     }
 }

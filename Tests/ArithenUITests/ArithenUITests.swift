@@ -2,13 +2,13 @@ import XCTest
 import UIKit
 
 final class ArithenUITests: XCTestCase {
-    private let app = XCUIApplication()
+    let app = XCUIApplication()
     override func setUpWithError() throws { continueAfterFailure = false }
     override func tearDownWithError() throws {
         if (testRun?.failureCount ?? 0) > 0 { capture("failure-screen") }
     }
 
-    private func capture(_ name: String) {
+    func capture(_ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }
@@ -19,7 +19,7 @@ final class ArithenUITests: XCTestCase {
         }
         XCTAssertTrue(element.isHittable, "Not reachable: \(element)")
     }
-    private func tap(_ label: String) {
+    func tap(_ label: String) {
         let matches = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", label))
         XCTAssertTrue(matches.firstMatch.waitForExistence(timeout: 10), "Missing button: \(label)")
         // Full-screen covers can leave the calculator in the AX tree. Interact
@@ -30,11 +30,11 @@ final class ArithenUITests: XCTestCase {
         XCTAssertTrue(button.isEnabled, "Disabled button: \(label)")
         button.tap()
     }
-    private func enter(_ digits: String) {
+    func enter(_ digits: String) {
         tap("Clear all")
         for digit in digits { tap(String(digit)) }
     }
-    private func holdEquals() { app.buttons["Equals"].press(forDuration: 0.65) }
+    func holdEquals() { app.buttons["Equals"].press(forDuration: 0.65) }
     private func selectSeededPhoto() throws {
         let picker = XCUIApplication(bundleIdentifier: "com.apple.mobileslideshow.photospicker")
         let photo = picker.images.matching(identifier: "PXGGridLayout-Info").firstMatch
@@ -92,13 +92,13 @@ final class ArithenUITests: XCTestCase {
         tapImagePoint(try XCTUnwrap(target, "Enabled picker checkmark missing from the visible header"))
     }
     private func back() { app.navigationBars.buttons.element(boundBy: 0).tap() }
-    private func checkFilesPickerAndCancel() {
-        tap("Choose Backup File")
+    private func checkFilesPickerAndCancel(_ title: String = "Choose Backup File") {
+        tap(title)
         let cancel = app.buttons["Cancel"].firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout: 15), "System Files picker must remain presented")
         capture("files-picker-presented")
         cancel.tap()
-        XCTAssertTrue(app.buttons["Choose Backup File"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons[title].waitForExistence(timeout: 10))
     }
 
     func testCalculatorAcceptsOffCenterAndRapidKeypadTaps() {
@@ -215,11 +215,11 @@ final class ArithenUITests: XCTestCase {
         tap("Backups")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Create Backup")).firstMatch.exists)
         tap("Import Backup")
-        XCTAssertTrue(app.buttons["Choose Backup File"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Import"].isEnabled)
+        XCTAssertTrue(app.buttons["Import"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Review Backup"].isEnabled)
         capture("05-backup-import")
-        checkFilesPickerAndCancel()
-        XCTAssertFalse(app.buttons["Import"].isEnabled)
+        checkFilesPickerAndCancel("Import")
+        XCTAssertFalse(app.buttons["Review Backup"].isEnabled)
         tap("Close")
         tap("Check a Backup")
         XCTAssertTrue(app.buttons["Choose Backup File"].waitForExistence(timeout: 5))
@@ -227,8 +227,8 @@ final class ArithenUITests: XCTestCase {
         checkFilesPickerAndCancel()
         back(); back(); tap("Done")
         tap("Add to Library"); tap("Import from Files")
-        XCTAssertTrue(app.buttons["Choose Files"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Import"].isEnabled)
+        XCTAssertTrue(app.buttons["Import"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["files.apply"].isEnabled)
         capture("07-files-import"); tap("Close")
         tap("Add to Library"); tap("Photos & Videos")
         try selectSeededPhoto()
@@ -264,5 +264,7 @@ final class ArithenUITests: XCTestCase {
         tap("Done"); tap("Lock & Return to Calculator")
         XCTAssertTrue(app.buttons["Equals"].waitForExistence(timeout: 10))
         capture("11-calculator-ion-accessibility")
+
+        try verifyNativeFilesImport()
     }
 }

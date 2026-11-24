@@ -61,6 +61,11 @@ spec = {'name': 'ArithenSimulator', 'options': {'deploymentTarget': {'iOS': '17.
                 'dependencies': [{'package': 'Engine', 'product': 'Engine'}],
                 'settings': {'base': {'PRODUCT_BUNDLE_IDENTIFIER': 'studio.n3mo.calc84',
                                      'INFOPLIST_FILE': str(output / 'Info.plist')}}},
+            'FilesSampleExporter': {'type': 'application', 'platform': 'iOS',
+                'sources': [str(root / 'Tests/FilesSampleExporter')],
+                'dependencies': [{'package': 'Engine', 'product': 'Engine'}],
+                'settings': {'base': {'PRODUCT_BUNDLE_IDENTIFIER': 'studio.n3mo.files-sample-exporter',
+                                     'GENERATE_INFOPLIST_FILE': 'YES'}}},
             'ArithenAppTests': {'type': 'bundle.unit-test', 'platform': 'iOS',
                 'sources': [str(root / 'Tests/ArithenAppTests')],
                 'dependencies': [{'target': 'Arithen'}, {'package': 'Engine', 'product': 'Engine'}],
@@ -73,7 +78,7 @@ spec = {'name': 'ArithenSimulator', 'options': {'deploymentTarget': {'iOS': '17.
                 'dependencies': [{'target': 'Arithen'}],
                 'settings': {'base': {'PRODUCT_BUNDLE_IDENTIFIER': 'studio.n3mo.calc84.uitests',
                                      'GENERATE_INFOPLIST_FILE': 'YES', 'TEST_TARGET_NAME': 'Arithen'}}}},
-        'schemes': {'Arithen': {'build': {'targets': {'Arithen': 'all', 'ArithenUITests': ['test'], 'ArithenAppTests': ['test']}},
+        'schemes': {'Arithen': {'build': {'targets': {'Arithen': 'all', 'FilesSampleExporter': ['test'], 'ArithenUITests': ['test'], 'ArithenAppTests': ['test']}},
                     'test': {'targets': ['ArithenAppTests', 'ArithenUITests'], 'gatherCoverageData': False}}}}
 (output / 'project.json').write_text(json.dumps(spec, indent=2))
 subprocess.run(['xcodegen', 'generate', '--spec', str(output / 'project.json'), '--project', str(output)], check=True)

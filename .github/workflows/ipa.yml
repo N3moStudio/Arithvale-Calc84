@@ -55,6 +55,7 @@ jobs:
           plutil -convert xml1 -o .build/simulator/built-app-info.plist "$app/Info.plist"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = studio.n3mo.calc84
           codesign --verify "$app"
+          xcrun simctl install "$device" .build/simulator/DerivedData/Build/Products/Debug-iphonesimulator/FilesSampleExporter.app
           # Run the real permission/import journey first. On this iOS 26 runtime,
           # simctl's successful Photos grant did not authorize PhotoKit read/write.
           # The journey accepts the system dialog; native tests verify that actual

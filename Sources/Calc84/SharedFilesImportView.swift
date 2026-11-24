@@ -47,6 +47,7 @@ private actor SharedFilesStorage {
             result = Result {
                 for url in try ImportFileList.expand([source]) {
                     let bytes = Int64(try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+                    guard bytes >= 0, bytes <= VaultLimits.fileBytes else { throw VaultError.limit }
                     try StoragePreflight.require(bytes: bytes * 2)
                     _ = try inbox.receive(url, key: data)
                 }
@@ -115,7 +116,10 @@ final class SharedFilesModel: ObservableObject {
     }
     func receive(_ url: URL) {
         guard url.isFileURL else { error = "Share the downloaded file itself, not a link."; return }
-        let access = BackupSelection(url), previous = receipt
+        receive(BackupSelection(url))
+    }
+    func receive(_ access: BackupSelection) {
+        let previous = receipt
         importedCount = nil
         receiving += 1
         receipt = Task {
@@ -186,12 +190,15 @@ struct SharedFilesImportView: View {
     @State private var removing = false
     @State private var removingUnreadable = false
     @State private var choosing = false
-    @State private var selectedFiles: [BackupSelection] = []
+    @State private var backup: BackupSelection?
+    @State private var showingBackup = false
+    @State private var pickerError: String?
+    @State private var inspection: Task<Void, Never>?
     var body: some View {
         ThemedForm {
             Section("Files") {
-                Button("Choose Files", systemImage: "doc.on.doc") { choosing = true }
-                    .disabled(shared.working || vault.busy)
+                Button("Import", systemImage: "doc.on.doc") { pickerError = nil; choosing = true }
+                    .disabled(inspection != nil || shared.working || vault.busy)
                 DisclosureGroup("Or share from Files") {
                     SharedImportInstructions().foregroundStyle(ArithenPalette.color(.muted))
                 }
@@ -199,9 +206,11 @@ struct SharedFilesImportView: View {
             Section {
                 if !shared.entries.isEmpty { Label("\(shared.entries.count.formatted()) \(shared.entries.count == 1 ? "file received" : "files received")", systemImage: "doc.on.doc") }
                 if let count = shared.importedCount, count > 0 { Label("\(count.formatted()) \(count == 1 ? "file imported" : "files imported")", systemImage: "checkmark.circle") }
-                Button("Import") { shared.importPending(vault: vault) }
-                    .buttonStyle(ImportButtonStyle()).disabled(shared.entries.isEmpty || shared.working || vault.busy)
+                ForEach(shared.entries, id: \.id) { entry in Text(entry.name) }
+                Button("Add to Library") { shared.importPending(vault: vault) }
+                    .accessibilityIdentifier("files.apply").buttonStyle(ImportButtonStyle()).disabled(shared.entries.isEmpty || inspection != nil || shared.working || vault.busy)
             }
+            if inspection != nil { Section { ProgressView("Reading selected files…") } }
             if shared.working {
                 Section {
                     OperationProgressView(title: vault.importing ? "Importing Files" : "Preparing Files",
@@ -210,7 +219,7 @@ struct SharedFilesImportView: View {
                     if vault.importing { Button("Cancel Import") { vault.cancelImport() }.frame(minHeight: 44) }
                 }
             }
-            if let error = shared.error {
+            if let error = pickerError ?? shared.error {
                 Section { Label(error, systemImage: "exclamationmark.circle").font(.subheadline).fixedSize(horizontal: false, vertical: true) }
             }
             if !shared.unreadableIDs.isEmpty {
@@ -224,17 +233,19 @@ struct SharedFilesImportView: View {
                 Section { Button("Remove Received Copies", role: .destructive) { removing = true }.disabled(shared.working || vault.busy) }
             }
         }.navigationTitle("Import from Files").navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $choosing, onDismiss: {
-                // Hold temporary access until the encrypted inbox takes ownership.
-                let pending = selectedFiles; selectedFiles = []
-                for selection in pending { shared.receive(selection.url) }
-                withExtendedLifetime(pending) {}
-            }) {
-                SelectedFilesPicker { urls in
-                    selectedFiles = urls.map { BackupSelection($0) }
-                    choosing = false
+            .fileImporter(isPresented: $choosing, allowedContentTypes: BackupImportTypes.files,
+                          allowsMultipleSelection: true) { result in
+                switch result {
+                case .success(let urls): inspect(urls)
+                case .failure(let error): pickerError = error.localizedDescription
                 }
+            } onCancellation: { pickerError = nil }
+            .fileDialogBrowserOptions(.displayFileExtensions)
+            .navigationDestination(isPresented: $showingBackup) {
+                BackupImportView(preparedSelection: backup)
             }
+            .onDisappear { inspection?.cancel() }
+            .onChange(of: showingBackup) { _, shown in if !shown { backup = nil } }
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
             .confirmationDialog("Remove unreadable received copies?", isPresented: $removingUnreadable, titleVisibility: .visible) {
                 Button("Remove Unreadable Copies", role: .destructive) { shared.discard(unreadableOnly: true) }
@@ -243,31 +254,45 @@ struct SharedFilesImportView: View {
                 Button("Remove Copies", role: .destructive) { shared.discard() }
             } message: { Text("The originals in Files stay where they are.") }
     }
-}
-
-/// Direct installations use the system picker; sharing remains available for hosts
-/// that cannot deliver document selections. Both routes use the encrypted inbox.
-private struct SelectedFilesPicker: UIViewControllerRepresentable {
-    let finished: ([URL]) -> Void
-    func makeCoordinator() -> Coordinator { Coordinator(finished) }
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.data], asCopy: true)
-        picker.allowsMultipleSelection = true
-        picker.shouldShowFileExtensions = true
-        picker.delegate = context.coordinator
-        return picker
-    }
-    func updateUIViewController(_ controller: UIDocumentPickerViewController, context: Context) {}
-    static func dismantleUIViewController(_ controller: UIDocumentPickerViewController, coordinator: Coordinator) {
-        controller.delegate = nil; coordinator.finished = nil
-    }
-    final class Coordinator: NSObject, UIDocumentPickerDelegate {
-        var finished: (([URL]) -> Void)?
-        init(_ finished: @escaping ([URL]) -> Void) { self.finished = finished }
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { complete(urls) }
-        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { complete([]) }
-        private func complete(_ urls: [URL]) {
-            let callback = finished; finished = nil; callback?(urls)
+    private func inspect(_ urls: [URL]) {
+        guard !urls.isEmpty, inspection == nil, vault.unlocked else { return }
+        let selections = urls.map { BackupSelection($0) }
+        let generation = vault.generation
+        inspection = Task {
+            defer { inspection = nil }
+            do {
+                let classifier = Task.detached(priority: .userInitiated) {
+                    try selections.filter { selection in
+                        try Task.checkCancellation()
+                        if BackupFileProbe.extensions.contains(selection.url.pathExtension.lowercased()) { return true }
+                        var failure: NSError?
+                        var isBackup = false
+                        NSFileCoordinator().coordinate(readingItemAt: selection.url, options: [], error: &failure) { url in
+                            isBackup = (try? BackupFileProbe.validate(url)) != nil
+                        }
+                        if let failure { throw failure }
+                        return isBackup
+                    }
+                }
+                let archives = try await withTaskCancellationHandler { try await classifier.value } onCancel: { classifier.cancel() }
+                try Task.checkCancellation()
+                guard vault.unlocked, vault.generation == generation else { return }
+                if let archive = archives.first {
+                    guard selections.count == 1 else {
+                        pickerError = "Choose one encrypted backup at a time, separately from other files."
+                        return
+                    }
+                    let staging = Task.detached(priority: .userInitiated) {
+                        try BackupSelection.backupFile(archive)
+                    }
+                    let staged = try await withTaskCancellationHandler { try await staging.value } onCancel: { staging.cancel() }
+                    try Task.checkCancellation()
+                    guard vault.unlocked, vault.generation == generation else { return }
+                    backup = staged; showingBackup = true
+                } else {
+                    for selection in selections { shared.receive(selection) }
+                }
+            } catch { if !Task.isCancelled { pickerError = error.localizedDescription } }
         }
     }
 }
