@@ -23,15 +23,17 @@ private struct SampleView: View {
                     try repo.create(password: "orchard-rain-test-key")
                     _ = try repo.add(data: Data("Rain gauge reading 47".utf8),
                                      name: "Orchard-rain-47.txt", contentType: "public.plain-text")
+                    let downloads = dir.appendingPathComponent("Downloads", isDirectory: true)
+                    try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
                     let original = dir.appendingPathComponent("Orchard-sample.arithenbackup")
                     try repo.exportBackup(to: original)
-                    let generic = dir.appendingPathComponent("Generic-sample.bin")
+                    let generic = downloads.appendingPathComponent("Generic-sample.bin")
                     try FileManager.default.copyItem(at: original, to: generic)
                     let invalid = dir.appendingPathComponent("Invalid-sample.arithenbackup")
                     try Data("Invalid archive sample".utf8).write(to: invalid)
-                    let note = dir.appendingPathComponent("River-reading-52.txt")
+                    let note = downloads.appendingPathComponent("River-reading-52.txt")
                     try Data("Gauge 52".utf8).write(to: note)
-                    files = [original, generic, invalid, note]
+                    files = [original, invalid, downloads]
                     exporting = true
                 } catch { self.error = error.localizedDescription }
             }
