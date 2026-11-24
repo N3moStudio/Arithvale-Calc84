@@ -34,6 +34,21 @@ final class ArithenUITests: XCTestCase {
         for digit in digits { tap(String(digit)) }
     }
     private func holdEquals() { app.buttons["Equals"].press(forDuration: 0.65) }
+    private func tapPickerFrame(_ element: XCUIElement) {
+        // Read the remote service's screen frame, but send the touch through
+        // Arithen's foreground window. Targeting a service-owned coordinate
+        // makes XCTest try to activate the unlaunchable picker service.
+        let frame = element.frame
+        XCTAssertGreaterThan(frame.width, 0)
+        XCTAssertGreaterThan(frame.height, 0)
+        let center = CGPoint(x: frame.midX, y: frame.midY)
+        let window = app.windows.allElementsBoundByIndex.first { $0.frame.contains(center) }
+        guard let window else { XCTFail("Picker control is outside the host window: \(frame)"); return }
+        XCTAssertEqual(app.state, .runningForeground)
+        let origin = window.frame.origin
+        window.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: center.x - origin.x, dy: center.y - origin.y)).tap()
+    }
     private func back() { app.navigationBars.buttons.element(boundBy: 0).tap() }
     private func checkFilesPickerAndCancel() {
         tap("Choose Backup File")
@@ -154,13 +169,11 @@ final class ArithenUITests: XCTestCase {
         XCTAssertTrue(photo.waitForExistence(timeout: 15), "System photo must be selectable: \(picker.debugDescription)")
         // The system picker reports visible image frames but an invalid native
         // hit point (-1, -1) on this runtime. Tap the observed frame's center.
-        XCTAssertGreaterThan(photo.frame.width, 0)
-        XCTAssertGreaterThan(photo.frame.height, 0)
-        photo.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        tapPickerFrame(photo)
         let add = picker.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label == %@", "Add", "Done")).firstMatch
         XCTAssertTrue(add.waitForExistence(timeout: 10), "System confirm button: \(picker.debugDescription)")
         XCTAssertTrue(add.isEnabled)
-        add.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        tapPickerFrame(add)
         // Import requests Photos access for original metadata/deletion. Exercise
         // the real permission prompt in this disposable simulator library.
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
