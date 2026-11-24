@@ -101,6 +101,34 @@ final class ArithenUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Choose Backup File"].waitForExistence(timeout: 10))
     }
 
+    func testCalculatorAcceptsOffCenterAndRapidKeypadTaps() {
+        app.launch()
+        let one = app.buttons["1"]
+        XCTAssertTrue(one.waitForExistence(timeout: 15))
+        let six = app.buttons["6"]
+        let display = app.descendants(matching: .any).matching(identifier: "Calculator display").firstMatch
+        // Use the regular key grid to target the AC half of the shared capsule,
+        // even if its accessibility frame regresses to the size of the letters.
+        let acCenter = app.buttons["Clear all"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let acEdge = acCenter.withOffset(CGVector(dx: one.frame.width * 0.33, dy: one.frame.height * 0.15))
+        let digitEdge = CGVector(dx: 0.82, dy: 0.66)
+        one.tap()
+        XCTAssertEqual(display.value as? String, "1")
+        acEdge.tap()
+        XCTAssertEqual(display.value as? String, "0")
+        one.coordinate(withNormalizedOffset: digitEdge).tap()
+        six.coordinate(withNormalizedOffset: digitEdge).tap()
+        XCTAssertEqual(display.value as? String, "16")
+        six.coordinate(withNormalizedOffset: digitEdge).doubleTap()
+        XCTAssertEqual(display.value as? String, "1666")
+        app.buttons["Add"].tap()
+        one.tap()
+        app.buttons["Equals"].tap()
+        XCTAssertEqual(display.value as? String, "1667")
+        acEdge.tap()
+        XCTAssertEqual(display.value as? String, "0")
+    }
+
     func testCalculatorSetupLibraryAndBackupJourneys() throws {
         app.launch()
         XCTAssertTrue(app.buttons["Equals"].waitForExistence(timeout: 15))

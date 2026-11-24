@@ -43,8 +43,7 @@ struct CalculatorView: View {
         GeometryReader { geometry in
             let availableWidth = min(geometry.size.width - 36, 390)
             let side = max(44, min((availableWidth - 21) / 4, (geometry.size.height - 215) / 5))
-            ScrollView {
-                ArithenGlassGroup {
+            let panel = ArithenGlassGroup {
                 VStack(spacing: 0) {
                     HStack(spacing: 8) {
                         Button("History", systemImage: "clock.arrow.circlepath") { showingHistory = true }
@@ -76,9 +75,13 @@ struct CalculatorView: View {
                     if scientific {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 7), count: 4), spacing: 7) {
                             ForEach(["sin", "cos", "tan", "sqrt", "ln", "log", "π", "^", "(", ")", "e", degrees ? "DEG" : "RAD"], id: \.self) { key in
-                                Button(key == "sqrt" ? "√" : key) {
+                                Button {
                                     if key == "DEG" || key == "RAD" { degrees.toggle() } else { press(key) }
-                                }.font(.headline).frame(maxWidth: .infinity, minHeight: 44).modifier(ArithenGlass(tint: glassTint, shape: Capsule()))
+                                } label: {
+                                    Text(key == "sqrt" ? "√" : key).font(.headline)
+                                        .frame(maxWidth: .infinity, minHeight: 44)
+                                        .contentShape(Rectangle())
+                                }.modifier(ArithenGlass(tint: glassTint, shape: Capsule()))
                             }
                         }.padding(.bottom, 8)
                     }
@@ -87,8 +90,11 @@ struct CalculatorView: View {
                             HStack(spacing: 0) {
                                 Button { press("⌫") } label: { Image(systemName: "delete.left").font(.system(size: min(27, side * 0.34))).frame(width: side, height: side) }
                                     .accessibilityLabel("Delete last character")
-                                Button("AC") { press("AC") }.font(.system(size: min(27, side * 0.34), design: .rounded)).frame(width: side + 7, height: side).accessibilityLabel("Clear all")
-                            }.modifier(ArithenGlass(tint: glassTint, shape: Capsule()))
+                                Button { press("AC") } label: {
+                                    Text("AC").font(.system(size: min(27, side * 0.34), design: .rounded))
+                                        .frame(width: side + 7, height: side)
+                                }.accessibilityLabel("Clear all")
+                            }.modifier(ArithenGlass(tint: glassTint, shape: Capsule(), interactive: false))
                                 .contextMenu { Button("Clear Current Entry") { press("C") } }
                             key("%", side: side, utility: true)
                             key("÷", side: side)
@@ -100,7 +106,11 @@ struct CalculatorView: View {
                 // Keep the header and display readable when short windows shrink the keys.
                 }.foregroundStyle(ink).frame(width: availableWidth, alignment: .center)
                     .frame(minHeight: geometry.size.height, alignment: .bottom).frame(maxWidth: .infinity)
-                }
+            }
+            // A keypad that fits receives taps directly. Short windows can still scroll.
+            ViewThatFits(in: .vertical) {
+                panel.fixedSize(horizontal: false, vertical: true)
+                ScrollView { panel }
             }.background { ArithenPalette.color(.canvas, theme: theme).ignoresSafeArea() }
         }
             .sheet(isPresented: $showingSettings) {
@@ -247,6 +257,7 @@ struct CalcKeyStyle: ButtonStyle {
             .opacity(configuration.isPressed ? 0.65 : 1)
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
             .animation(reduceMotion ? nil : .spring(response: 0.22, dampingFraction: 1), value: configuration.isPressed)
+            .contentShape(Rectangle())
     }
 }
 #endif
