@@ -51,7 +51,7 @@ enum MediaBridge {
                 && resources.allSatisfy { $0.type == wanted || ($0.type == .pairedVideo && asset.mediaSubtypes.contains(.photoLive)) }
                 && resources.filter { $0.type == .pairedVideo }.count == (asset.mediaSubtypes.contains(.photoLive) ? 1 : 0)
             let original = completeOriginal && asset.canPerform(.delete)
-                ? PhotoOriginal(identifier: identifier, modified: asset.modificationDate) : nil
+                ? PhotoOriginal(identifier: asset.localIdentifier, modified: asset.modificationDate) : nil
             guard let main = resources.first(where: { $0.type == wanted }) else { throw VaultError.missing }
             let url = try await extract(main)
             var companion: URL?
