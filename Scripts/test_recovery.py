@@ -20,6 +20,61 @@ SECRET = "C24144AF-B3E94438-97C89127-E373D053-9F19F720-E47CA588-7C38BF10-14C2AF3
 FIXTURES = Path(os.environ["C84_FIXTURE_DIR"])
 
 
+class UnicodeFilenameRecoveryTests(unittest.TestCase):
+    def test_legacy_and_portable_recovery_accept_unicode_and_budget_output_names(self):
+        names = ["e\u0301" * 100 + ".txt", "\u5199" * 100 + ".jpg"]
+        originals = [b"document", b"photo"]
+        vault_id = "00000000-0000-4000-8000-000000000001"
+        salt = bytes(32)
+        header = json.dumps({"version": 1, "id": vault_id, "rounds": 600000,
+                             "salt": base64.b64encode(salt).decode()}).encode()
+        key = hashlib.pbkdf2_hmac("sha256", SECRET.encode(), salt, 600000, 32)
+        context = f"Calc84/v1/{vault_id}"
+
+        def seal(key, plaintext, context):
+            nonce = os.urandom(12)
+            return nonce + AESGCM(key).encrypt(nonce, plaintext, context.encode())
+
+        def sized(data):
+            return struct.pack(">Q", len(data)) + data
+
+        items, records, resources = [], [], []
+        for index, (name, original) in enumerate(zip(names, originals), start=2):
+            ident = f"00000000-0000-4000-8000-{index:012d}"
+            encrypted = seal(key, original, f"{context}/{ident}")
+            items.append({"id": ident, "name": name, "byteCount": len(original), "added": 700000000})
+            records.append({"id": ident, "bytes": len(encrypted), "sha256": hashlib.sha256(encrypted).hexdigest()})
+            resources.append(encrypted)
+        index = seal(key, json.dumps({"version": 1, "items": items}).encode(), context + "/manifest")
+        legacy = b"C84B0002" + sized(header) + sized(index) + struct.pack(">Q", len(records))
+        legacy += b"".join(record["id"].encode() + sized(data) for record, data in zip(records, resources))
+
+        catalog = json.dumps({"index": base64.b64encode(index).decode(), "records": records,
+                              "headerSHA256": hashlib.sha256(header).hexdigest()}).encode()
+        catalog_key = HKDF(algorithm=hashes.SHA256(), length=32, salt=vault_id.encode(),
+                           info=b"Arithen/backup/v3/catalog").derive(key)
+        sealed = seal(catalog_key, catalog, f"Arithen/backup/v3/{vault_id}")
+        envelope = json.dumps({"version": 3, "snapshotID": vault_id, "vaultHeader": base64.b64encode(header).decode(),
+                               "sealedCatalog": base64.b64encode(sealed).decode()}).encode()
+        portable = b"ARITHB03" + sized(envelope) + b"".join(resources) + envelope + struct.pack(">Q", len(envelope)) + b"ARITHEND"
+
+        for label, archive in (("legacy", legacy), ("portable", portable)):
+            with self.subTest(format=label), tempfile.TemporaryDirectory() as directory:
+                folder = Path(directory)
+                source = folder / "backup"
+                source.write_bytes(archive)
+                self.assertEqual(recover(source, SECRET)["authenticatedRecords"], len(items))
+                output = folder / "recovered"
+                self.assertEqual(recover(source, SECRET, output)["recoverableResources"], len(items))
+                entries = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
+                self.assertEqual([item["name"] for item in entries], names)
+                for entry, original in zip(entries, originals):
+                    exported = output / entry["exportedFilename"]
+                    self.assertEqual(exported.suffix, Path(entry["name"]).suffix)
+                    self.assertLessEqual(len(exported.name.encode("utf-8")), 255)
+                    self.assertEqual(exported.read_bytes(), original)
+
+
 class RecoveryTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -32,7 +87,7 @@ class RecoveryTests(unittest.TestCase):
         output = self.base / "recovered"
         result = recover(FIXTURES / "v2.c84backup", SECRET.lower(), output)
         self.assertEqual(result["authenticatedRecords"], 3)
-        records = json.loads((output / "metadata.json").read_text())
+        records = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
         self.assertEqual(len(records), 3)
         for entry in records:
             file = output / entry["exportedFilename"]
@@ -58,7 +113,7 @@ class RecoveryTests(unittest.TestCase):
         for archive, secret in (("v2.c84backup", SECRET), ("fresh.c84backup", "F" * 64)):
             output = self.base / archive
             recover(FIXTURES / archive, secret, output)
-            records = json.loads((output / "metadata.json").read_text())
+            records = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
             photo = next(item for item in records if item["name"].endswith("AUX.jpg"))
             self.assertEqual(photo["album"], "Travel")
             self.assertEqual(photo["albums"], ["Travel", "Receipts"])
@@ -69,7 +124,7 @@ class RecoveryTests(unittest.TestCase):
         # Fixed public fixture key, never real user key material.
         result = recover(FIXTURES / "fresh.c84backup", "F" * 64, self.base / "fresh")
         self.assertEqual(result["authenticatedRecords"], 3)
-        records = json.loads((self.base / "fresh" / "metadata.json").read_text())
+        records = json.loads((self.base / "fresh" / "metadata.json").read_text(encoding="utf-8"))
         originals = {entry["name"]: (self.base / "fresh" / entry["exportedFilename"]).read_bytes() for entry in records}
         self.assertTrue(originals["../../AUX.jpg"] == b"portable original bytes")
         self.assertTrue(originals["video.mov"] == bytes([0xA7]) * (1024 * 1024 + 7))
@@ -107,7 +162,7 @@ class RecoveryTests(unittest.TestCase):
         output = self.base / "recovered"
         result = recover(catalog, SECRET, output)
         self.assertEqual(result["authenticatedRecords"], 3)
-        records = json.loads((output / "metadata.json").read_text())
+        records = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
         photo = next(item for item in records if item["name"].endswith("AUX.jpg"))
         self.assertEqual((output / photo["exportedFilename"]).read_bytes(), b"portable original bytes")
         self.assertEqual(photo["captureDateUTC"], "2023-03-28T10:40:00+00:00")
@@ -213,7 +268,7 @@ class RedundantRecoveryTests(unittest.TestCase):
         self.assertTrue(result["complete"])
         self.assertEqual(result["authenticatedRecords"], 3)
         self.assertEqual(result["metadataCopies"], ["front", "footer"])
-        metadata = json.loads((output / "metadata.json").read_text())
+        metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
         photo = next(item for item in metadata if item["name"].endswith("AUX.jpg"))
         self.assertEqual((output / photo["exportedFilename"]).read_bytes(), b"portable original bytes")
         self.assertEqual(photo["captureDateUTC"], "2023-03-28T10:40:00.125000+00:00")
@@ -272,7 +327,7 @@ class RedundantRecoveryTests(unittest.TestCase):
         self.assertEqual(result["authenticatedRecords"], 2)
         self.assertEqual(result["expectedRecords"], 3)
         self.assertEqual([record["id"] for record in result["omittedRecords"]], [self.catalog["records"][0]["id"]])
-        metadata = json.loads((output / "metadata.json").read_text())
+        metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
         self.assertEqual(len(metadata), 2)
         self.assertNotIn(self.catalog["records"][0]["id"], {item["id"] for item in metadata})
         self.assertEqual(json.loads((output / "recovery-report.json").read_text())["status"], "partial")
@@ -369,7 +424,7 @@ class RedundantRecoveryTests(unittest.TestCase):
         self.assertEqual(result["authenticatedRecords"], 3)
         self.assertEqual(result["metadataCopies"], ["front", "footer"])
         self.assertTrue(result["complete"])
-        metadata = json.loads((output / "metadata.json").read_text())
+        metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
         photo = next(item for item in metadata if item["name"].endswith("AUX.jpg"))
         self.assertEqual((output / photo["exportedFilename"]).read_bytes(), b"portable original bytes")
         self.assertEqual(photo["captureDateUTC"], "2023-03-28T10:40:00.125000+00:00")

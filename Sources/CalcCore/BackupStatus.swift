@@ -21,14 +21,19 @@ public enum BackupStatus {
 public struct RecoveryCheck: Codable, Equatable, Sendable {
     public let source: String
     public let snapshotID: String
+    public let catalogSHA256: String?
     public let checked: Date
     public let items: Int
-    public init(source: String, snapshotID: String, checked: Date = Date(), items: Int) {
-        self.source = source; self.snapshotID = snapshotID; self.checked = checked; self.items = items
+    public init(source: String, snapshotID: String, catalogSHA256: String? = nil, checked: Date = Date(), items: Int) {
+        self.source = source; self.snapshotID = snapshotID; self.catalogSHA256 = catalogSHA256
+        self.checked = checked; self.items = items
     }
-    public func matches(source: String, snapshotID: String?) -> Bool {
-        guard let snapshotID, !snapshotID.isEmpty else { return false }
-        return self.source == source && self.snapshotID == snapshotID
+    public func matchesFiles(digest: String) -> Bool {
+        !digest.isEmpty && source == "Files" && snapshotID == digest
+    }
+    public func matchesCloud(provider: CloudProvider, receipt: CloudReceipt) -> Bool {
+        guard let snapshotID = receipt.snapshotID, let catalogSHA256 = receipt.catalogSHA256, !catalogSHA256.isEmpty else { return false }
+        return source == provider.title && self.snapshotID == snapshotID.uuidString && self.catalogSHA256 == catalogSHA256
     }
 }
 

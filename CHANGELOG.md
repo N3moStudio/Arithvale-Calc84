@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.1 · Recovery and calculator reliability
+
+**November 23, 2026 · Build 26 · Test candidate**
+
+- Preserve Unicode filenames without loss in independent Python recovery.
+- Match cloud recovery evidence to the exact checked snapshot and avoid repeating unchanged automatic cloud backups. Keep Blomp cancellation from publishing incomplete transfers.
+- Show and announce calculator errors, and apply +/− to the current operand.
+- Retain the approved themes, native navigation and compact layout. Native build, simulator and IPA delivery evidence will be recorded after validation; this candidate is not yet a verified delivery.
+
 ## 0.13.0 · Recoverable backups
 
 **November 22, 2026 · Build 25 · Test build**

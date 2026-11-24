@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(CryptoKit)
+import CryptoKit
+#else
+import Crypto
+#endif
 
 /// Only ciphertext, opaque identifiers, lengths and hashes leave the vault.
 /// Each immutable catalog is published LAST, after every referenced object is checked.
@@ -47,10 +52,14 @@ public struct CloudPlan: Sendable {
     public let snapshot: CloudSnapshot
     public let sources: [UUID: URL]
     public let itemIDs: Set<UUID>
+    public let revision: Data
 }
 
 public enum CloudBackup {
     public static func hash(_ url: URL) throws -> String { try BackupCopy.digest(url).map { String(format: "%02x", $0) }.joined() }
+    public static func catalogSHA256(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
     /// Convert a downloaded set to the existing, independently recoverable archive.
     /// The repository's restore then authenticates all bytes with the recovery key.
     public static func assemble(_ snapshot: CloudSnapshot, objects: [UUID: URL], to destination: URL) throws {
@@ -118,9 +127,10 @@ public struct CloudTransferProgress: Sendable {
 public enum CloudTransfer {
     /// Checks existing objects too: a local receipt is not proof of remote durability.
     /// Verification costs download bandwidth, but does not trust upload acknowledgements.
+    @discardableResult
     public static func upload(_ plan: CloudPlan, store: any CloudStore, scratch: URL, previouslyVerified: Set<String> = [],
                               verified: @Sendable (String) async -> Void = { _ in },
-                              progress: @Sendable (CloudTransferProgress) async -> Void) async throws {
+                              progress: @Sendable (CloudTransferProgress) async -> Void) async throws -> String {
         try plan.snapshot.validate()
         try await store.refresh()
         let total = plan.snapshot.records.count + 1
@@ -163,6 +173,7 @@ public enum CloudTransfer {
         try await store.download(path: plan.snapshot.path, to: readBack, maximum: CloudSnapshot.maximumBytes)
         guard try Data(contentsOf: readBack) == data else { throw VaultError.invalidBackup }
         await progress(.init(completed: total, total: total, phase: "Backup verified", completedBytes: totalBytes, totalBytes: totalBytes))
+        return CloudBackup.catalogSHA256(data)
     }
     public static func download(_ snapshot: CloudSnapshot, store: any CloudStore, scratch: URL,
                                 destination: URL, progress: @Sendable (CloudTransferProgress) async -> Void) async throws {

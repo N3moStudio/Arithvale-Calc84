@@ -63,6 +63,51 @@ final class ReliabilityTests: XCTestCase {
         let counts = await probe.counts(); XCTAssertEqual(counts.0, 2); XCTAssertEqual(counts.1, 2)
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), ["library"], "Catalog scratch files must be cleaned")
     }
+    func testDiscoveryBindsSelectedCatalogAndReceiptToTheirExactBytes() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repo = VaultRepository(root: root.appendingPathComponent("library"))
+        try repo.create(password: "a disposable recovery secret")
+        let snapshot = try repo.cloudPlanIncludingAllForTest().snapshot
+        let original = try JSONEncoder().encode(snapshot)
+        let formatted = original + Data("\n".utf8)
+        XCTAssertEqual(try CloudSnapshot.decode(formatted).path, snapshot.path)
+
+        var receipt = CloudReceipt()
+        receipt.vaultID = snapshot.vaultID
+        receipt.snapshotID = snapshot.id
+        receipt.catalogSHA256 = CloudBackup.catalogSHA256(original)
+        let page = CloudListingPage(paths: [snapshot.path], next: nil)
+        let originalStore = CatalogStore([snapshot.path: original])
+        let probe = DiscoveryProbe()
+        try await CloudDiscovery.scan(page, store: originalStore, scratch: root, receipt: receipt,
+            found: { await probe.add($0) }, skipped: { await probe.skip() })
+        let found = await probe.found
+        let selected = try XCTUnwrap(found.first)
+        let loaded = try await CloudDiscovery.load(selected, store: originalStore, scratch: root, receipt: receipt)
+        XCTAssertEqual(loaded.sha256, receipt.catalogSHA256)
+
+        let formattedStore = CatalogStore([snapshot.path: formatted])
+        do {
+            _ = try await CloudDiscovery.load(selected, store: formattedStore, scratch: root)
+            XCTFail("Reload must use the exact bytes selected in the picker")
+        } catch CloudDiscovery.CatalogError.changed {}
+
+        let changed = DiscoveryProbe()
+        try await CloudDiscovery.scan(page, store: formattedStore, scratch: root, receipt: receipt,
+            found: { await changed.add($0) }, skipped: { await changed.skip() })
+        let counts = await changed.counts()
+        XCTAssertEqual(counts.0, 0)
+        XCTAssertEqual(counts.1, 1)
+
+        receipt.catalogSHA256 = nil
+        let legacy = DiscoveryProbe()
+        try await CloudDiscovery.scan(page, store: formattedStore, scratch: root, receipt: receipt,
+            found: { await legacy.add($0) }, skipped: { await legacy.skip() })
+        let legacyFound = await legacy.found
+        XCTAssertEqual(legacyFound.first?.catalogSHA256, CloudBackup.catalogSHA256(formatted))
+    }
     func testAuthenticationFailureIsRetryableNotReportedAsDamaged() async throws {
         let path = "c84/v1/" + UUID().uuidString + "/snapshots/" + UUID().uuidString + ".c84cloud"
         let probe = DiscoveryProbe(), store = CatalogStore([:], failing: path)

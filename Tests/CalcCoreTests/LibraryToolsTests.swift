@@ -217,14 +217,40 @@ final class LibraryToolsTests: XCTestCase {
     }
     func testRecoveryEvidenceOnlyMatchesTheExactSourceAndSnapshot() {
         let record = RecoveryCheck(source: "Files", snapshotID: "digest-a", items: 42)
-        XCTAssertTrue(record.matches(source: "Files", snapshotID: "digest-a"))
-        XCTAssertFalse(record.matches(source: "Files", snapshotID: "digest-b"))
-        XCTAssertFalse(record.matches(source: "MEGA", snapshotID: "digest-a"))
-        XCTAssertFalse(record.matches(source: "Files", snapshotID: nil))
+        XCTAssertTrue(record.matchesFiles(digest: "digest-a"))
+        XCTAssertFalse(record.matchesFiles(digest: "digest-b"))
+        XCTAssertFalse(RecoveryCheck(source: "MEGA", snapshotID: "digest-a", items: 42).matchesFiles(digest: "digest-a"))
+        XCTAssertFalse(record.matchesFiles(digest: ""))
         let a = UUID(), b = UUID()
         XCTAssertEqual(BackupCoverage.pending(eligible: [a, b], saved: [a], changed: false, sameLibrary: true), 1)
         XCTAssertEqual(BackupCoverage.pending(eligible: [a, b], saved: [a, b], changed: true, sameLibrary: true), 2)
         XCTAssertEqual(BackupCoverage.pending(eligible: [a, b], saved: [a, b], changed: false, sameLibrary: false), 2)
+    }
+    func testCloudRecoveryEvidenceRequiresProviderSnapshotAndCatalogDigest() throws {
+        let snapshotID = UUID()
+        let original = CloudBackup.catalogSHA256(Data("catalog-a".utf8))
+        let other = CloudBackup.catalogSHA256(Data("catalog-b".utf8))
+        let record = RecoveryCheck(source: "MEGA", snapshotID: snapshotID.uuidString, catalogSHA256: original, items: 42)
+        let legacyData = try JSONSerialization.data(withJSONObject: [
+            ["source": "MEGA", "snapshotID": snapshotID.uuidString, "checked": 0, "items": 42],
+            ["source": "Files", "snapshotID": "files-digest", "checked": 0, "items": 42]
+        ])
+        let legacy = try JSONDecoder().decode([RecoveryCheck].self, from: legacyData)
+        var receipt = CloudReceipt()
+        receipt.snapshotID = snapshotID
+        XCTAssertFalse(record.matchesCloud(provider: .mega, receipt: receipt))
+        XCTAssertFalse(legacy[0].matchesCloud(provider: .mega, receipt: receipt))
+        XCTAssertTrue(legacy[1].matchesFiles(digest: "files-digest"))
+
+        receipt.catalogSHA256 = original
+        XCTAssertTrue(record.matchesCloud(provider: .mega, receipt: receipt))
+        XCTAssertFalse(legacy[0].matchesCloud(provider: .mega, receipt: receipt))
+        XCTAssertFalse(record.matchesCloud(provider: .blomp, receipt: receipt))
+        receipt.catalogSHA256 = other
+        XCTAssertFalse(record.matchesCloud(provider: .mega, receipt: receipt))
+        receipt.catalogSHA256 = original
+        receipt.snapshotID = UUID()
+        XCTAssertFalse(record.matchesCloud(provider: .mega, receipt: receipt))
     }
     func testWallpaperEditClampsInvalidValuesAndSourceBoundaries() throws {
         var edit = WallpaperEdit(); edit.start = 100; edit.duration = 100; edit.still = 60

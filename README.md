@@ -4,10 +4,10 @@
 
 <h1 align="center">Arithen</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.13.0 testing · iOS 17+ · SwiftUI · Source available</p>
+<p align="center">0.13.1 candidate · iOS 17+ · SwiftUI · Source available</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
-  <a href="CHANGELOG.md#0130--recoverable-backups">What’s new</a> &nbsp;·&nbsp;
+  <a href="CHANGELOG.md#0131--recovery-and-calculator-reliability">What’s new</a> &nbsp;·&nbsp;
   <a href="CHANGELOG.md">Changelog</a> &nbsp;·&nbsp;
   <a href="Docs/CLOUD-BACKUP.md">Cloud choices</a> &nbsp;·&nbsp;
   <a href="Docs/BUILDING.md">Build from source</a>
@@ -21,7 +21,9 @@ control over which memories leave your phone. Previously **Arithvale / Calc 84**
 
 The **Native Settings Kit presentation update** adds larger branded appearance cards, theme tiles, simple rows and focused backup detail pages. Existing settings and data are retained. See the [feature map](Docs/SETTINGS-FEATURE-MAP.md) and [validation limits](Docs/SETTINGS-ADOPTION.md).
 
-The current verified test build is **0.13.0, build 25**. New `.arithenbackup` files have redundant authenticated recovery catalogs, individually verified encrypted resources and explicit intact-file recovery. Cloud catalogs use the same authenticated inventory. Existing library data, calculator access, themes and seven-copy folder retention remain. Update the existing installation to retain its library and code. See the [research, format and validation limits](Docs/BACKUP-DESIGN-2026-11-22.md).
+The current test candidate is **0.13.1, build 26**, with Unicode-name recovery, exact cloud recovery evidence, unchanged automatic-backup handling, Blomp cancellation safety and calculator fixes. Native build, simulator and IPA delivery validation are pending. The last verified delivery is **0.13.0, build 25**; its results do not establish this candidate's validation.
+
+New `.arithenbackup` files have redundant authenticated recovery catalogs, individually verified encrypted resources and explicit intact-file recovery. Cloud catalogs use the same authenticated inventory. Existing library data, calculator access, themes and seven-copy folder retention remain. Update the existing installation to retain its library and code. See the [research, format and prior validation limits](Docs/BACKUP-DESIGN-2026-11-22.md).
 
 - **Quicker entry.** Type your code and hold Equals for 0.5 seconds. Entry starts while held and reveals the library after verification, without a modal slide. Ordinary taps calculate; existing code security and throttling stay in place.
 

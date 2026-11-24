@@ -52,11 +52,35 @@ final class ArithenUITests: XCTestCase {
         XCTAssertEqual(display.value as? String, "13")
         capture("01-calculator")
 
+        enter("1"); tap("Divide"); tap("0"); tap("Equals")
+        XCTAssertEqual(display.value as? String, "Result is undefined.")
+        tap("Delete last character"); tap("2"); tap("Equals")
+        XCTAssertEqual(display.value as? String, "0.5")
+        enter("1"); tap("Add"); tap("Equals")
+        XCTAssertEqual(display.value as? String, "Check the expression.")
+        tap("2"); tap("Equals")
+        XCTAssertEqual(display.value as? String, "3")
+        enter("5"); tap("Add"); tap("3"); tap("Change sign"); tap("Equals")
+        XCTAssertEqual(display.value as? String, "2")
+        tap("Change sign"); tap("Equals")
+        XCTAssertEqual(display.value as? String, "-2")
+
         // Evaluating the starter entry must not turn a later hold into access.
+        enter("160159"); tap("Add"); tap("1"); tap("Equals")
+        tap("Change sign"); tap("Change sign"); holdEquals()
+        XCTAssertFalse(app.staticTexts["A space of your own."].exists)
+        XCTAssertFalse(app.staticTexts["Recover access."].exists)
+        // History results retain computed provenance even when edited down to
+        // the exact starter code; fresh digits after a result remain allowed.
+        enter("1601599"); tap("Add"); tap("1"); tap("Equals"); tap("History"); tap("1601599+1")
+        tap("Delete last character"); holdEquals()
+        XCTAssertFalse(app.staticTexts["A space of your own."].exists)
+        XCTAssertFalse(app.staticTexts["Recover access."].exists)
         enter("160160"); tap("Equals"); holdEquals()
         XCTAssertFalse(app.staticTexts["A space of your own."].exists)
         XCTAssertFalse(app.staticTexts["Recover access."].exists)
-        enter("160160"); holdEquals()
+        for digit in "160160" { tap(String(digit)) }
+        holdEquals()
         XCTAssertTrue(app.staticTexts["A space of your own."].waitForExistence(timeout: 15))
 
         // Create only this disposable simulator's vault through ordinary setup.

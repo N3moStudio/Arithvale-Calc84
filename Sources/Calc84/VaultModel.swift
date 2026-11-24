@@ -713,10 +713,10 @@ final class VaultModel: ObservableObject {
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastRecoveryTest")
         UserDefaults.standard.set(source + " · " + snapshot + " · Library " + library, forKey: "lastRecoveryTestIdentity")
     }
-    func recordRecoveryEvidence(source: String, snapshotID: String, items: Int) {
+    func recordRecoveryEvidence(source: String, snapshotID: String, catalogSHA256: String? = nil, items: Int) {
         var records = RecoveryEvidenceStore.load()
-        records.removeAll { $0.matches(source: source, snapshotID: snapshotID) }
-        records.append(RecoveryCheck(source: source, snapshotID: snapshotID, items: items))
+        records.removeAll { $0.source == source && $0.snapshotID == snapshotID && $0.catalogSHA256 == catalogSHA256 }
+        records.append(RecoveryCheck(source: source, snapshotID: snapshotID, catalogSHA256: catalogSHA256, items: items))
         RecoveryEvidenceStore.save(Array(records.suffix(40)))
     }
     func verifyBackup(url: URL, recovery: String) async -> Bool {

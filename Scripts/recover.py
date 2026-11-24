@@ -81,7 +81,19 @@ def recovery_key(header, secret):
     return key, context
 
 def safe_name(item):
-    original = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", item["name"]).strip(". ")[:150] or "original.bin"
+    original = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", item["name"]).strip(". ") or "original.bin"
+    # Budget in UTF-8 bytes so the UUID-prefixed component fits filesystems with
+    # byte limits. Reserve room for the extension if the name needs truncation.
+    budget = 150
+    encoded = original.encode("utf-8")
+    if len(encoded) > budget:
+        stem, suffix = os.path.splitext(original)
+        stem_budget = budget - len(suffix.encode("utf-8"))
+        shortened_stem = stem.encode("utf-8")[:max(0, stem_budget)].decode("utf-8", errors="ignore").rstrip(". ")
+        if shortened_stem:
+            original = shortened_stem + suffix
+        else:
+            original = encoded[:budget].decode("utf-8", errors="ignore").rstrip(". ")
     # A UUID prefix prevents traversal, collisions and Windows reserved-device basenames.
     return f'{item["id"]}_{original}'
 
@@ -136,7 +148,9 @@ def recover_legacy(backup: Path, secret: str, output: Path | None = None, includ
                 version = item.get("storageVersion")
                 if type(size) is not int or not 0 <= size <= (MAX_FILE if version == 2 else 128 * 1024**2) or version not in (None, 2):
                     raise ValueError("Invalid item size or storage version.")
-                if not isinstance(item["name"], str) or len(item["name"]) > 180:
+                # Swift's filename limit counts grapheme clusters. The bounded
+                # manifest already limits metadata size without counting code points.
+                if not isinstance(item["name"], str):
                     raise ValueError("Invalid filename metadata.")
                 total_size += size
                 if total_size >= MAX_BACKUP:
@@ -290,7 +304,7 @@ def _v3_items(opened):
             raise ValueError("Duplicate or invalid library item.")
         if not 0 <= size <= (MAX_FILE if version == 2 else 128 * 1024**2):
             raise ValueError("Unsupported resource size.")
-        if not isinstance(item["name"], str) or len(item["name"]) > 180:
+        if not isinstance(item["name"], str):
             raise ValueError("Invalid filename metadata.")
         total_size += size
         if total_size >= MAX_BACKUP:

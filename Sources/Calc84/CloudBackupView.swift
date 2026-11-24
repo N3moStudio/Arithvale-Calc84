@@ -153,7 +153,7 @@ struct CloudRestoreView: View {
     var setup: Binding<SetupSession>? = nil
     @EnvironmentObject private var vault: VaultModel
     @EnvironmentObject private var cloud: CloudBackupModel
-    @State private var selected: UUID?
+    @State private var selected: CloudSnapshotSummary?
     @State private var recovery = ""
     @State private var code = ""
     @State private var repeatCode = ""
@@ -164,15 +164,17 @@ struct CloudRestoreView: View {
                 Button("Find Backups") { selected = nil; cloud.findBackups(provider, vault: vault) }.disabled(vault.busy)
             }
             Section("Saved backups") {
-                ForEach(cloud.snapshots) { record in
-                    Button { selected = record.id } label: {
+                ForEach(cloud.snapshots, id: \.path) { record in
+                    Button { selected = record } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(record.created, format: .dateTime.year().month().day().hour().minute())
                                 Text("Library " + String(record.vaultID.uuidString.prefix(8))).font(.caption).foregroundStyle(ArithenPalette.color(.muted))
                             }
                             Spacer()
-                            if selected == record.id { Image(systemName: "checkmark").accessibilityLabel("Selected") }
+                            if selected == record {
+                                Image(systemName: "checkmark").accessibilityLabel("Selected")
+                            }
                         }.frame(minHeight: 44)
                     }.disabled(vault.busy)
                 }
@@ -180,21 +182,19 @@ struct CloudRestoreView: View {
             if cloud.nextPage != nil {
                 Button("Next Page of Backups") { selected = nil; cloud.findBackups(provider, vault: vault, next: true) }.disabled(vault.busy)
             }
-            if selected != nil {
+            if let selected, cloud.snapshots.contains(selected) {
                 if !testOnly, let setup { NewRecoveryKeySection(setup: setup).disabled(vault.busy) }
                 Section {
                     SecureField("Source backup’s recovery key", text: $recovery).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    if let snapshot = cloud.snapshots.first(where: { $0.id == selected }) { StorageEstimateView(bytes: snapshot.bytes) }
+                    StorageEstimateView(bytes: selected.bytes)
                     if !testOnly {
                         SecureField("New calculator code", text: $code).keyboardType(.numberPad)
                         SecureField("Repeat code", text: $repeatCode).keyboardType(.numberPad)
                     }
                     Button(testOnly ? "Test Recovery" : "Create Library from Backup") {
-                        if let snapshot = cloud.snapshots.first(where: { $0.id == selected }) {
-                            cloud.restore(snapshot, provider: provider, recovery: recovery, code: code, vault: vault, testOnly: testOnly,
-                                          newRecovery: testOnly ? nil : setup?.wrappedValue.recovery)
-                            recovery = ""; code = ""; repeatCode = ""
-                        }
+                        cloud.restore(selected, provider: provider, recovery: recovery, code: code, vault: vault, testOnly: testOnly,
+                                      newRecovery: testOnly ? nil : setup?.wrappedValue.recovery)
+                        recovery = ""; code = ""; repeatCode = ""
                     }.disabled(vault.busy || recovery.isEmpty || (!testOnly && (setup?.wrappedValue.canCreate != true || !VaultCode.valid(code) || code != repeatCode)))
                 } header: { Text("Unlock the source backup") } footer: {
                     Text(testOnly ? "This only checks the backup with its existing key. It does not create a library or change any key. Allow up to three times the backup size in free storage."
@@ -208,7 +208,7 @@ struct CloudRestoreView: View {
             }
         }
         .navigationTitle(testOnly ? "Test Recovery" : "Restore Library").navigationBarTitleDisplayMode(.inline)
-        .onAppear { cloud.snapshots = []; cloud.nextPage = nil }
+        .onAppear { selected = nil; cloud.snapshots = []; cloud.nextPage = nil }
         .onDisappear { recovery = ""; code = ""; repeatCode = "" }
     }
 }

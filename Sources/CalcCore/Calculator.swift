@@ -12,6 +12,38 @@ public enum CalculationError: Error, LocalizedError {
 
 /// A bounded recursive-descent parser. Never evaluates scripts or arbitrary code.
 public struct Calculator {
+    /// Toggle the last operand without changing the preceding calculation.
+    public static func toggleSign(_ expression: String) -> String {
+        let characters = Array(expression)
+        guard !characters.isEmpty else { return expression }
+        var depth = 0
+        var start = 0
+        for index in characters.indices.reversed() {
+            let character = characters[index]
+            if character == ")" { depth += 1; continue }
+            if character == "(" {
+                if depth > 0 { depth -= 1; continue }
+                start = index + 1; break
+            }
+            guard depth == 0, "+−-×÷*/^".contains(character) else { continue }
+            // Signs following an operator or an opening parenthesis are unary;
+            // signs immediately after a numeric exponent belong to the number.
+            if character == "+" || character == "-" || character == "−" {
+                if index == 0 || "+−-×÷*/^(".contains(characters[index - 1]) { continue }
+                if (characters[index - 1] == "e" || characters[index - 1] == "E"),
+                   index >= 2, characters[index - 2].isNumber || characters[index - 2] == "." { continue }
+            }
+            start = index + 1; break
+        }
+        let prefix = String(characters[..<start])
+        let operand = String(characters[start...])
+        guard !operand.isEmpty else { return expression }
+        if operand.hasPrefix("-("), operand.hasSuffix(")") {
+            return prefix + String(operand.dropFirst(2).dropLast())
+        }
+        return prefix + "-(" + operand + ")"
+    }
+
     public static func clearEntry(_ expression: String) -> String {
         guard let boundary = expression.lastIndex(where: { "+−×÷*/^".contains($0) }) else { return "" }
         return String(expression[...boundary])

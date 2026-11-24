@@ -2,6 +2,26 @@ import XCTest
 @testable import CalcCore
 
 final class CalculatorTests: XCTestCase {
+    func testToggleSignChangesOnlyCurrentOperand() throws {
+        for (expression, expected) in [("5+3", 2.0), ("5−3", 8.0), ("5×3", -15.0),
+                                       ("5+sqrt(9)", 2.0), ("5+(2+3)", 0.0),
+                                       ("5+1e-3", 4.999), ("5+2^3", 5.125)] {
+            let toggled = Calculator.toggleSign(expression)
+            XCTAssertEqual(try Calculator.evaluate(toggled), expected, accuracy: 1e-12, expression)
+            XCTAssertEqual(Calculator.toggleSign(toggled), expression)
+        }
+        XCTAssertEqual(Calculator.toggleSign("sqrt(9"), "sqrt(-(9)")
+        XCTAssertEqual(Calculator.toggleSign("5+"), "5+")
+        XCTAssertEqual(Calculator.toggleSign(""), "")
+    }
+
+    func testToggleSignOfDisplayedResult() throws {
+        let result = Calculator.display(try Calculator.evaluate("5+3"))
+        XCTAssertEqual(try Calculator.evaluate(Calculator.toggleSign(result)), -8)
+        XCTAssertEqual(try Calculator.evaluate(Calculator.toggleSign("-8")), 8)
+        XCTAssertEqual(try Calculator.evaluate(Calculator.toggleSign("1e+12")), -1e12)
+    }
+
     func testPrecedenceAndParentheses() throws {
         XCTAssertEqual(try Calculator.evaluate("2+3×4"), 14)
         XCTAssertEqual(try Calculator.evaluate("(2+3)×4"), 20)

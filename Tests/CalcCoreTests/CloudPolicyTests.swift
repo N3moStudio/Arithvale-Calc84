@@ -54,6 +54,72 @@ final class CloudPolicyTests: XCTestCase {
         let c = try add("new")
         XCTAssertEqual(try repo.cloudPlan(provider: .mega).itemIDs, [b.id, c.id])
     }
+    func testAutomaticPlanReusesCompletedRevisionAcrossUnlockAndUnrelatedChanges() throws {
+        let included = try add("included"), excluded = try add("excluded")
+        try repo.setCloudPolicy(.init(mode: .automatic, blocked: [excluded.id]), provider: .mega)
+        let plan = try XCTUnwrap(repo.automaticCloudPlan(provider: .mega, receipt: nil))
+        var receipt = completedReceipt(for: plan)
+        receipt.needsBackup = true
+
+        try repo.update(id: excluded.id, favorite: true)
+        try repo.setCloudPolicy(.init(selected: [excluded.id]), provider: .blomp)
+        repo.lock()
+        try repo.unlock(password: secret)
+        let persisted = try JSONDecoder().decode(CloudReceipt.self, from: JSONEncoder().encode(receipt))
+        XCTAssertNil(try repo.automaticCloudPlan(provider: .mega, receipt: persisted))
+
+        // Manual backup and forced recheck still prepare the upload.
+        let manual = try repo.cloudPlan(provider: .mega)
+        XCTAssertEqual(manual.revision, plan.revision)
+        XCTAssertNotEqual(manual.snapshot.id, plan.snapshot.id)
+        XCTAssertEqual(manual.itemIDs, [included.id])
+
+        try repo.setCloudPolicy(.init(mode: .automatic, blocked: [excluded.id]), provider: .blomp)
+        let otherProvider = try XCTUnwrap(repo.automaticCloudPlan(provider: .blomp, receipt: persisted))
+        XCTAssertEqual(otherProvider.itemIDs, manual.itemIDs)
+        XCTAssertNotEqual(otherProvider.revision, plan.revision)
+    }
+    func testAutomaticPlanDetectsCommittedChangesWithAnOldCleanReceipt() throws {
+        let first = try add("first")
+        try repo.setCloudPolicy(.init(mode: .automatic), provider: .mega)
+        let original = try repo.cloudPlan(provider: .mega)
+
+        try repo.update(id: first.id, favorite: true)
+        let edited = try XCTUnwrap(repo.automaticCloudPlan(provider: .mega, receipt: completedReceipt(for: original)))
+        XCTAssertEqual(edited.itemIDs, original.itemIDs)
+        XCTAssertNotEqual(edited.revision, original.revision)
+
+        let second = try add("second")
+        let imported = try XCTUnwrap(repo.automaticCloudPlan(provider: .mega, receipt: completedReceipt(for: edited)))
+        XCTAssertEqual(imported.itemIDs, [first.id, second.id])
+        try repo.setCloudPolicy(.init(mode: .automatic, blocked: [first.id]), provider: .mega)
+        let reduced = try XCTUnwrap(repo.automaticCloudPlan(provider: .mega, receipt: completedReceipt(for: imported)))
+        XCTAssertEqual(reduced.itemIDs, [second.id])
+    }
+    func testAutomaticPlanRequiresReceiptRevisionAndSkipsResourcePreparationOnMatch() throws {
+        let item = try add("item")
+        try repo.setCloudPolicy(.init(mode: .automatic), provider: .mega)
+        let plan = try repo.cloudPlan(provider: .mega)
+        let receipt = completedReceipt(for: plan)
+        var legacyJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(receipt)) as? [String: Any])
+        legacyJSON.removeValue(forKey: "revision")
+        let legacy = try JSONDecoder().decode(CloudReceipt.self, from: JSONSerialization.data(withJSONObject: legacyJSON))
+        XCTAssertNil(legacy.revision)
+        XCTAssertNotNil(try repo.automaticCloudPlan(provider: .mega, receipt: legacy))
+
+        try FileManager.default.removeItem(at: XCTUnwrap(plan.sources[item.id]))
+        XCTAssertNil(try repo.automaticCloudPlan(provider: .mega, receipt: receipt))
+        XCTAssertThrowsError(try repo.cloudPlan(provider: .mega))
+    }
+    private func completedReceipt(for plan: CloudPlan) -> CloudReceipt {
+        var receipt = CloudReceipt()
+        receipt.vaultID = plan.snapshot.vaultID
+        receipt.snapshotID = plan.snapshot.id
+        receipt.saved = plan.snapshot.created
+        receipt.needsBackup = false
+        receipt.revision = plan.revision
+        return receipt
+    }
     func testSelectionAndBlocksSurviveUnlockAndFullBackup() throws {
         let a = try add("a"), b = try add("b")
         let policy = CloudBackupPolicy(mode: .automatic, selected: [a.id], blocked: [b.id])

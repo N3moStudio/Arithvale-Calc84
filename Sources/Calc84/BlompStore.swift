@@ -4,20 +4,22 @@ import CalcCore
 
 /// A bounded HTTP request. Redirects are refused so tokens cannot leak to a
 /// different host. No cookies, disk cache, analytics or relaxed TLS settings.
-private final class CloudHTTP: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+final class CloudHTTP: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private let mutex = NSLock()
     private var continuation: CheckedContinuation<(Data, HTTPURLResponse), Error>?
     private var task: URLSessionTask?
     private var cancelled = false
     private var session: URLSession?
+    // The session's serial delegate queue owns the response and body state once started.
     private var response: HTTPURLResponse?
     private var data = Data()
     private var output: FileHandle?
+    private var bodyError: Error?
     private var count = 0
     private let limit: Int
     private init(limit: Int) { self.limit = limit }
     static func run(_ request: URLRequest, upload: URL? = nil, destination: URL? = nil,
-                    limit: Int, cellular: Bool) async throws -> (Data, HTTPURLResponse) {
+                    limit: Int, cellular: Bool, protocolClasses: [AnyClass]? = nil) async throws -> (Data, HTTPURLResponse) {
         let operation = CloudHTTP(limit: limit)
         var createdDestination = false
         do {
@@ -31,10 +33,14 @@ private final class CloudHTTP: NSObject, URLSessionDataDelegate, @unchecked Send
             return try await withTaskCancellationHandler {
                 try await withCheckedThrowingContinuation { completion in
                     operation.mutex.lock()
-                    defer { operation.mutex.unlock() }
-                    if operation.cancelled { completion.resume(throwing: CancellationError()); return }
+                    if operation.cancelled {
+                        operation.mutex.unlock()
+                        completion.resume(throwing: CancellationError())
+                        return
+                    }
                     operation.continuation = completion
                     let config = URLSessionConfiguration.ephemeral
+                    if let protocolClasses { config.protocolClasses = protocolClasses }
                     config.urlCache = nil; config.httpCookieStorage = nil
                     config.allowsCellularAccess = cellular
                     config.allowsExpensiveNetworkAccess = cellular
@@ -43,10 +49,16 @@ private final class CloudHTTP: NSObject, URLSessionDataDelegate, @unchecked Send
                     let session = URLSession(configuration: config, delegate: operation, delegateQueue: nil)
                     operation.session = session
                     let task: URLSessionTask = upload.map { session.uploadTask(with: request, fromFile: $0) } ?? session.dataTask(with: request)
-                    operation.task = task; task.resume()
+                    operation.task = task
+                    task.resume()
+                    operation.mutex.unlock()
                 }
             } onCancel: {
-                operation.mutex.lock(); operation.cancelled = true; operation.task?.cancel(); operation.mutex.unlock()
+                let task = operation.mutex.withLock {
+                    operation.cancelled = true
+                    return operation.task
+                }
+                task?.cancel()
             }
         } catch {
             try? operation.output?.close(); operation.output = nil
@@ -64,18 +76,35 @@ private final class CloudHTTP: NSObject, URLSessionDataDelegate, @unchecked Send
         self.response = http; completionHandler(.allow)
     }
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        guard bodyError == nil else { return }
         count += data.count
-        guard count <= limit else { dataTask.cancel(); return }
+        guard count <= limit else {
+            bodyError = CloudError.service
+            dataTask.cancel()
+            return
+        }
         do { if let output { try output.write(contentsOf: data) } else { self.data.append(data) } }
-        catch { dataTask.cancel() }
+        catch {
+            bodyError = error
+            dataTask.cancel()
+        }
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        try? output?.close(); output = nil
-        mutex.lock(); let completion = continuation; continuation = nil; mutex.unlock()
-        if let error { completion?.resume(throwing: error) }
+        var failure = bodyError ?? error
+        do { try output?.close() } catch { if failure == nil { failure = error } }
+        output = nil
+        let (completion, wasCancelled) = mutex.withLock {
+            let completion = continuation
+            continuation = nil
+            self.task = nil
+            self.session = nil
+            return (completion, cancelled)
+        }
+        session.finishTasksAndInvalidate()
+        if wasCancelled { completion?.resume(throwing: CancellationError()) }
+        else if let failure { completion?.resume(throwing: failure) }
         else if let response { completion?.resume(returning: (data, response)) }
         else { completion?.resume(throwing: CloudError.service) }
-        session.finishTasksAndInvalidate(); self.session = nil; self.task = nil
     }
 }
 
@@ -154,8 +183,8 @@ actor BlompStore: CloudStore {
         guard !FileManager.default.fileExists(atPath: to.path) else { throw CloudError.service }
         guard let expected = try await size(path: path) else { throw CloudError.missing }
         try DownloadLength.validate(actual: expected, expected: expected, maximum: maximum)
+        let (_, response) = try await CloudHTTP.run(request(path: path, method: "GET"), destination: to, limit: maximum, cellular: cellular)
         do {
-            let (_, response) = try await CloudHTTP.run(request(path: path, method: "GET"), destination: to, limit: maximum, cellular: cellular)
             try Self.check(response.statusCode)
             let actual = try to.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? -1
             try DownloadLength.validate(actual: actual, expected: expected, maximum: maximum)

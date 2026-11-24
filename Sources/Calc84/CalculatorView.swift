@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import UIKit
 import CalcCore
 
 enum CalcTheme {
@@ -27,6 +28,9 @@ struct CalculatorView: View {
     @State private var degrees = true
     @State private var scientific = false
     @State private var didEvaluate = false
+    @State private var calculationError: String?
+    // Editing a computed/history value must never turn it into an access code.
+    @State private var directCodeEntry = true
     @State private var access = false
     @State private var unlockInFlight = false
     @State private var showingHistory = false
@@ -64,11 +68,11 @@ struct CalculatorView: View {
                     VStack(alignment: .trailing, spacing: 6) {
                         Text(expression.isEmpty ? " " : expression).font(.title3).foregroundStyle(ink.opacity(0.52))
                             .lineLimit(2).minimumScaleFactor(0.65)
-                        Text(didEvaluate || expression.isEmpty ? result : expression)
+                        Text(calculationError ?? (didEvaluate || expression.isEmpty ? result : expression))
                             .font(.system(size: 52, weight: .regular, design: .rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.3)
                     }.frame(maxWidth: .infinity, alignment: .trailing).padding(.horizontal, 6).padding(.bottom, 16)
                         .accessibilityElement(children: .combine).accessibilityLabel("Calculator display")
-                        .accessibilityValue(didEvaluate || expression.isEmpty ? result : expression)
+                        .accessibilityValue(calculationError ?? (didEvaluate || expression.isEmpty ? result : expression))
                     if scientific {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 7), count: 4), spacing: 7) {
                             ForEach(["sin", "cos", "tan", "sqrt", "ln", "log", "π", "^", "(", ")", "e", degrees ? "DEG" : "RAD"], id: \.self) { key in
@@ -118,7 +122,7 @@ struct CalculatorView: View {
                     ThemedList {
                         if history.isEmpty { Text("Your calculations appear here.").foregroundStyle(ArithenPalette.color(.muted, theme: theme)) }
                         ForEach(history) { item in
-                            Button { expression = item.result; result = item.result; didEvaluate = true; showingHistory = false } label: {
+                            Button { expression = item.result; result = item.result; didEvaluate = true; directCodeEntry = false; calculationError = nil; showingHistory = false } label: {
                                 VStack(alignment: .trailing, spacing: 6) {
                                     Text(item.expression).font(.subheadline).foregroundStyle(ArithenPalette.color(.muted, theme: theme))
                                     Text(item.result).font(.title2).foregroundStyle(ArithenPalette.color(.text, theme: theme))
@@ -141,7 +145,7 @@ struct CalculatorView: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
                     vault.lock(); access = false; showingHistory = false; showingSettings = false
-                    expression = ""; result = "0"; didEvaluate = false; history = []
+                    expression = ""; result = "0"; didEvaluate = false; directCodeEntry = true; calculationError = nil; history = []
                 }
             }
     }
@@ -169,15 +173,15 @@ struct CalculatorView: View {
         }.accessibilityLabel(label(for: value))
     }
     private func unlockLibrary() {
-        guard VaultCode.isDirectEntry(expression, evaluated: didEvaluate),
+        guard directCodeEntry, VaultCode.isDirectEntry(expression, evaluated: didEvaluate),
               scenePhase == .active, !access, !unlockInFlight, !vault.busy else { return }
         let code = expression
         unlockInFlight = true
         Task {
             defer { unlockInFlight = false }
             if await vault.enter(code: code) {
-                guard expression == code, !didEvaluate, scenePhase == .active else { vault.lock(); return }
-                expression = ""; result = "0"; didEvaluate = false
+                guard expression == code, directCodeEntry, !didEvaluate, scenePhase == .active else { vault.lock(); return }
+                expression = ""; result = "0"; didEvaluate = false; directCodeEntry = true; calculationError = nil
                 // Authentication stays unchanged; only the successful reveal skips the modal slide.
                 var reveal = Transaction(animation: nil)
                 reveal.disablesAnimations = true
@@ -186,12 +190,20 @@ struct CalculatorView: View {
         }
     }
     private func press(_ value: String) {
+        calculationError = nil
         switch value {
-        case "AC": expression = ""; result = "0"; didEvaluate = false
-        case "C": expression = Calculator.clearEntry(expression); result = "0"; didEvaluate = false
-        case "⌫": if !expression.isEmpty { expression.removeLast() }; didEvaluate = false
+        case "AC": expression = ""; result = "0"; didEvaluate = false; directCodeEntry = true
+        case "C":
+            expression = Calculator.clearEntry(expression)
+            result = "0"; didEvaluate = false
+            if expression.isEmpty { directCodeEntry = true }
+        case "⌫":
+            if !expression.isEmpty { expression.removeLast() }
+            didEvaluate = false
+            if expression.isEmpty { directCodeEntry = true }
         case "2nd": scientific.toggle()
         case "=":
+            directCodeEntry = false
             do {
                 result = Calculator.display(try Calculator.evaluate(expression, degrees: degrees))
                 if !VaultCode.isDirectEntry(expression, evaluated: false) {
@@ -200,16 +212,23 @@ struct CalculatorView: View {
                 }
                 didEvaluate = true
             }
-            catch { result = error.localizedDescription; didEvaluate = false }
+            catch {
+                calculationError = error.localizedDescription; didEvaluate = false
+                UIAccessibility.post(notification: .announcement, argument: error.localizedDescription)
+            }
         case "+/−":
             guard !expression.isEmpty, expression.count < 252 else { return }
-            expression = "-(" + expression + ")"; didEvaluate = false
+            directCodeEntry = false
+            expression = Calculator.toggleSign(didEvaluate ? result : expression); didEvaluate = false
         default:
             guard expression.count < 248 else { return }
             if didEvaluate {
-                expression = ["+", "−", "×", "÷", "^", "%"].contains(value) ? result : ""
+                let continuesResult = ["+", "−", "×", "÷", "^", "%"].contains(value)
+                expression = continuesResult ? result : ""
+                directCodeEntry = !continuesResult
                 didEvaluate = false
             }
+            directCodeEntry = directCodeEntry && value.count == 1 && "0123456789".contains(value)
             expression += ["sin", "cos", "tan", "sqrt", "ln", "log"].contains(value) ? value + "(" : value
         }
     }

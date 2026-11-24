@@ -163,10 +163,9 @@ final class CloudBackupModel: ObservableObject {
         guard !providers.isEmpty else { if !automaticOnly { error = "Connect a service first." }; return }
         start(vault) {
             self.phase = "Checking your encrypted library…"
-            let scratch = try Self.scratch()
-            defer { try? FileManager.default.removeItem(at: scratch) }
             var failures: [String] = []
             var completed = 0
+            var current = 0
             var empty: [String] = []
             for provider in providers {
                 try Task.checkCancellation(); self.activeProvider = provider
@@ -174,13 +173,30 @@ final class CloudBackupModel: ObservableObject {
                     // Re-read the committed policy for each provider; never reuse another plan.
                     let preferences = try await vault.engine.cloudPreferences()
                     if automaticOnly && preferences[provider].mode != .automatic { continue }
-                    let plan = try await vault.engine.cloudPlan(provider: provider)
+                    let previous = self.receipts[provider] ?? .init()
+                    let plan: CloudPlan?
+                    if automaticOnly && !verifyAll {
+                        plan = try await vault.engine.automaticCloudPlan(provider: provider, receipt: previous)
+                    } else {
+                        plan = try await vault.engine.cloudPlan(provider: provider)
+                    }
                     try Task.checkCancellation()
+                    guard let plan else {
+                        if previous.needsBackup {
+                            var receipt = previous
+                            receipt.needsBackup = false
+                            self.receipts[provider] = receipt
+                            self.persist(provider)
+                        }
+                        current += 1
+                        continue
+                    }
                     guard !plan.itemIDs.isEmpty else { empty.append(provider.title); continue }
                     try StoragePreflight.require(bytes: Int64(plan.snapshot.records.map(\.bytes).max() ?? 0) + Int64(CloudSnapshot.maximumBytes) * 2)
+                    let scratch = try Self.scratch()
+                    defer { try? FileManager.default.removeItem(at: scratch) }
                     let store = try await self.store(provider)
-                    let previous = self.receipts[provider] ?? .init()
-                    try await CloudTransfer.upload(plan, store: store, scratch: scratch,
+                    let catalogSHA256 = try await CloudTransfer.upload(plan, store: store, scratch: scratch,
                         previouslyVerified: verifyAll || previous.vaultID != plan.snapshot.vaultID ? [] : previous.objects,
                         verified: { name in await self.recordObject(name, provider: provider) },
                         progress: { value in await self.showProgress(value, provider: provider) })
@@ -190,6 +206,8 @@ final class CloudBackupModel: ObservableObject {
                     receipt.itemIDs = plan.itemIDs
                     receipt.vaultID = plan.snapshot.vaultID; receipt.saved = Date(); receipt.needsBackup = false
                     receipt.snapshotID = plan.snapshot.id
+                    receipt.catalogSHA256 = catalogSHA256
+                    receipt.revision = plan.revision
                     self.receipts[provider] = receipt; self.persist(provider); completed += 1
                 } catch {
                     if Task.isCancelled { throw CancellationError() }
@@ -197,7 +215,10 @@ final class CloudBackupModel: ObservableObject {
                 }
             }
             self.error = failures.isEmpty ? nil : failures.joined(separator: "\n\n")
-            self.phase = failures.isEmpty ? (completed > 0 ? "Selected items backed up" : "No items eligible for backup") : "Some backups need attention"
+            if !failures.isEmpty { self.phase = "Some backups need attention" }
+            else if completed > 0 { self.phase = "Selected items backed up" }
+            else if current > 0 { self.phase = "Backups are up to date" }
+            else { self.phase = "No items eligible for backup" }
             if !empty.isEmpty { self.phase += ". Choose items for " + empty.joined(separator: ", ") + "." }
         }
     }
@@ -225,29 +246,31 @@ final class CloudBackupModel: ObservableObject {
             let page = try await store.listPage(prefix: "c84/v1/", after: cursor, limit: CloudDiscovery.pageSize)
             guard page.next == nil || page.next! > (cursor ?? "") else { throw CloudError.service }
             let scratch = try Self.scratch(); defer { try? FileManager.default.removeItem(at: scratch) }
-            try await CloudDiscovery.scan(page, store: store, scratch: scratch,
+            try await CloudDiscovery.scan(page, store: store, scratch: scratch, receipt: self.receipts[provider],
                 found: { value in await self.foundSnapshot(value) }, skipped: { await self.skippedSnapshot() })
             try Task.checkCancellation()
             self.nextPage = page.next
             self.phase = self.snapshots.isEmpty ? "No readable backups on this page." : "Choose a saved backup."
-            if self.skippedCatalogs > 0 { self.phase += " \(self.skippedCatalogs) damaged or missing catalogs skipped." }
+            if self.skippedCatalogs > 0 { self.phase += " \(self.skippedCatalogs) changed, damaged, or missing catalogs skipped." }
             if page.next != nil { self.phase += " More history is available on the next page." }
         }
     }
     private func foundSnapshot(_ value: CloudSnapshotSummary) {
         guard !Task.isCancelled else { return }
-        if !snapshots.contains(where: { $0.id == value.id && $0.vaultID == value.vaultID }) { snapshots.append(value) }
+        if !snapshots.contains(where: { $0.path == value.path }) { snapshots.append(value) }
         snapshots.sort { $0.created > $1.created }
     }
     private func skippedSnapshot() { if !Task.isCancelled { skippedCatalogs += 1 } }
     func restore(_ summary: CloudSnapshotSummary, provider: CloudProvider, recovery: String, code: String, vault: VaultModel, testOnly: Bool, newRecovery: String? = nil) {
+        guard listingProvider == provider, snapshots.contains(summary) else { return }
         guard testOnly ? vault.unlocked : !vault.exists else { return }
         guard testOnly || (newRecovery.map(VaultCode.validRecovery) == true) else { error = VaultError.invalidRecovery.localizedDescription; return }
         start(vault) {
             self.phase = "Checking recovery key…"
             let store = try await self.store(provider)
             let scratch = try Self.scratch(); defer { try? FileManager.default.removeItem(at: scratch) }
-            let snapshot = try await CloudDiscovery.load(path: summary.path, store: store, scratch: scratch)
+            let catalog = try await CloudDiscovery.load(summary, store: store, scratch: scratch, receipt: self.receipts[provider])
+            let snapshot = catalog.snapshot
             _ = try await Task.detached { try VaultRepository.validateCloudRecovery(snapshot, password: recovery) }.value
             try Task.checkCancellation()
             try StoragePreflight.require(bytes: snapshot.records.reduce(Int64(0)) { $0 + Int64($1.bytes) } * 3)
@@ -258,9 +281,10 @@ final class CloudBackupModel: ObservableObject {
             if testOnly {
                 let count = try await vault.engine.verifyBackup(from: archive, password: recovery)
                 try Task.checkCancellation()
-                vault.recordRecoveryTest(source: provider.title, snapshot: snapshot.id.uuidString, library: snapshot.vaultID.uuidString)
-                vault.recordRecoveryEvidence(source: provider.title, snapshotID: snapshot.id.uuidString, items: count)
-                self.phase = "Recovery test passed · \(count) items. Your library was not replaced."
+                vault.recordRecoveryTest(source: provider.title, snapshot: snapshot.id.uuidString + " · SHA-256 " + catalog.sha256,
+                                         library: snapshot.vaultID.uuidString)
+                vault.recordRecoveryEvidence(source: provider.title, snapshotID: snapshot.id.uuidString, catalogSHA256: catalog.sha256, items: count)
+                self.phase = "Recovery test passed · \(count) items in the selected backup."
             } else {
                 guard let newRecovery else { throw VaultError.invalidRecovery }
                 self.phase = "Copying into your new encrypted library…"

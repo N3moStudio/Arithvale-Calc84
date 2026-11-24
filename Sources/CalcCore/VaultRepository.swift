@@ -311,10 +311,31 @@ public final class VaultRepository {
     }
 
     public func cloudPlan(provider: CloudProvider) throws -> CloudPlan {
+        try prepareCloudPlan(cloudProjection(provider: provider))
+    }
+
+    public func automaticCloudPlan(provider: CloudProvider, receipt: CloudReceipt?) throws -> CloudPlan? {
+        let projection = try cloudProjection(provider: provider)
+        if receipt?.covers(revision: projection.revision, libraryID: projection.header.id) == true {
+            return nil
+        }
+        return try prepareCloudPlan(projection)
+    }
+
+    private struct CloudProjection {
+        let header: VaultHeader
+        let headerBytes: Data
+        let index: Data
+        let items: [VaultItem]
+        let selected: Set<UUID>
+        let revision: Data
+    }
+
+    private func cloudProjection(provider: CloudProvider) throws -> CloudProjection {
         guard let header, let key, let manifest else { throw VaultError.locked }
         guard !manifest.items.contains(where: { $0.pendingImport == true }) else { throw VaultError.changed }
-        let index = try Self.read(root.appendingPathComponent("index.enc"), limit: VaultLimits.manifestBytes)
-        let committed = try Self.decodeManifest(index, header: header, key: key)
+        let committedIndex = try Self.read(root.appendingPathComponent("index.enc"), limit: VaultLimits.manifestBytes)
+        let committed = try Self.decodeManifest(committedIndex, header: header, key: key)
         let policy = (committed.cloudPreferences ?? .init())[provider]
         let selected = policy.itemIDs(in: committed.items)
         let roots = committed.items.filter { selected.contains($0.id) }
@@ -337,11 +358,28 @@ public final class VaultRepository {
               }) else { throw VaultError.invalidBackup }
         // Never copy the full index: even names and other providers' choices stay local.
         // Cloud recovery starts with manual/empty preferences; Files backups retain them.
-        let filteredIndex = try VaultCrypto.seal(JSONEncoder().encode(subset), key: key,
-            context: Self.context(header, "manifest"))
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let headerBytes = try encoder.encode(header)
+        let index = try encoder.encode(subset)
+        // Resource contents are immutable for each ID. Hash the committed selection
+        // and its metadata before opening any media files or generating a catalog.
+        var fingerprint = HMAC<SHA256>(key: key)
+        fingerprint.update(data: Data("cloud-projection-v1:\(provider.rawValue)\n".utf8))
+        fingerprint.update(data: headerBytes)
+        fingerprint.update(data: Data([0x0A]))
+        fingerprint.update(data: index)
+        return CloudProjection(header: header, headerBytes: headerBytes, index: index, items: subset.items,
+            selected: selected, revision: Data(fingerprint.finalize()))
+    }
+
+    private func prepareCloudPlan(_ projection: CloudProjection) throws -> CloudPlan {
+        guard let key else { throw VaultError.locked }
+        let header = projection.header
+        let filteredIndex = try VaultCrypto.seal(projection.index, key: key, context: Self.context(header, "manifest"))
         var records: [CloudRecord] = []
         var sources: [UUID: URL] = [:]
-        for item in subset.items {
+        for item in projection.items {
             try Task.checkCancellation()
             if item.storageVersion == 2 {
                 try VaultStream.decrypt(assetURL(item.id), to: nil, size: item.byteCount, key: key, context: Self.context(header, item.id.uuidString))
@@ -351,13 +389,12 @@ public final class VaultRepository {
             records.append(CloudRecord(id: item.id, bytes: length, sha256: try CloudBackup.hash(url)))
             sources[item.id] = url
         }
-        let headerBytes = try JSONEncoder().encode(header)
-        let prepared = try ArithenBackupArchive.prepare(header: headerBytes, index: filteredIndex,
+        let prepared = try ArithenBackupArchive.prepare(header: projection.headerBytes, index: filteredIndex,
             records: records.map { .init(id: $0.id, bytes: $0.bytes, sha256: $0.sha256) }, key: key)
         var snapshot = CloudSnapshot(id: UUID(), vaultID: header.id, created: Date(),
-            header: headerBytes, index: filteredIndex, records: records)
+            header: projection.headerBytes, index: filteredIndex, records: records)
         snapshot.version = 2; snapshot.archiveEnvelope = prepared.envelope
-        return CloudPlan(snapshot: snapshot, sources: sources, itemIDs: selected)
+        return CloudPlan(snapshot: snapshot, sources: sources, itemIDs: projection.selected, revision: projection.revision)
     }
 
     /// Authenticate the small catalog before trusting its download inventory.

@@ -24,7 +24,7 @@ struct BackupCoverageView: View {
                     Text(filename).font(.caption).textSelection(.enabled)
                     if !folder.isEmpty { Text("Folder: \(folder)").font(.caption).textSelection(.enabled) }
                     Text("Saved \(Date(timeIntervalSince1970: lastExport).formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
-                    recovery(source: "Files", snapshotID: digest)
+                    recovery(records.last(where: { $0.matchesFiles(digest: digest) }))
                 } else {
                     Text("Create a backup of this library to start tracking it here.").foregroundStyle(ArithenPalette.color(.muted))
                 }
@@ -58,9 +58,9 @@ struct BackupCoverageView: View {
             } else if eligible.isEmpty { Text("No items chosen for this provider").foregroundStyle(ArithenPalette.color(.muted)) }
             else { Text(pending == 0 ? "\(eligible.count) chosen items in a current backup" : "\(pending) chosen items need a current backup") }
             Text("\(blocked) Never Upload · \(max(0, active.count - eligible.count - blocked)) not selected").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
-            if sameLibrary, let saved = receipt?.saved {
+            if sameLibrary, let receipt, let saved = receipt.saved {
                 Text("Last completed \(saved.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(ArithenPalette.color(.muted))
-                recovery(source: provider.title, snapshotID: receipt?.snapshotID?.uuidString)
+                recovery(records.last(where: { $0.matchesCloud(provider: provider, receipt: receipt) }))
             }
             HStack {
                 NavigationLink("Manage \(provider.title)") { CloudProviderView(provider: provider) }
@@ -71,12 +71,12 @@ struct BackupCoverageView: View {
             }.font(.subheadline).frame(minHeight: 44)
         }.padding(.vertical, 6)
     }
-    @ViewBuilder private func recovery(source: String, snapshotID: String?) -> some View {
-        if let record = records.last(where: { $0.matches(source: source, snapshotID: snapshotID) }) {
+    @ViewBuilder private func recovery(_ record: RecoveryCheck?) -> some View {
+        if let record {
             Label("This backup passed recovery · \(record.items) items · \(record.checked.formatted(date: .abbreviated, time: .omitted))", systemImage: "checkmark.shield")
                 .font(.caption)
         } else {
-            Label("Optional recovery check not run", systemImage: "questionmark.circle")
+            Label("No recovery check recorded for this backup", systemImage: "questionmark.circle")
                 .font(.caption).foregroundStyle(ArithenPalette.color(.muted))
         }
     }
