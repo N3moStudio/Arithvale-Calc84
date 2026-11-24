@@ -1,5 +1,11 @@
 # Arithen handoff
 
+## Delivered 0.13.1/build 26 — November 23, 2026
+
+The release workflow passed at `a2331f2234b62617174fcf1f9e48f0891594f356`. It ran 183 core tests, 28 independent recovery tests and 22 simulator tests on iPhone 17 Pro / iOS 26.2. The delivered unsigned IPA matches SHA-256 `6308b6fb32e5c790ef98ad589d2e7dd21914c86b92ee496ad0d2ed485531d931`. [Build and simulator evidence](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/45318353340)
+
+Build 26 binds cloud recovery checks to catalog bytes, skips unchanged automatic cloud snapshots, handles interrupted Blomp transfers, recovers Unicode filenames on desktop and corrects calculator errors, operand signs and direct-code entry. All 15 simulator screenshots were compared with build 25. Live provider accounts and physical-device installation remain untested in this release.
+
 ## Delivered 0.13.0/build 25 — November 22, 2026
 
 The user authorized the review fixes, a researched replacement backup format, GitHub build/simulator tests and replacement of the Desktop Arithen IPA. New `.arithenbackup` exports use redundant authenticated catalogs and explicit intact-file recovery; standard AES-GCM and installed library keys remain. Cloud catalogs authenticate their inventory before recovery downloads. Read the backup-design and reliability reports for decisions and limits. This supersedes the older current-build statements below.

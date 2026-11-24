@@ -57,6 +57,6 @@ Use **Save to Photos**. Arithen supplies the stored capture date; older items ca
 - Settings → Storage shows local storage, largest items and exact duplicates. Nothing is automatically permanently deleted.
 - Privacy & Access contains Change Calculator Code and Photo Indexing. Indexing runs locally after import; busy state, Low Power Mode, heat and inactivity defer work.
 - Backups contains Create, Import, Check, Connected Folder, Backup Status and private reminders. Backup Help includes recovery-key guidance.
-- About shows the current version/build. The current test candidate is **0.13.1 (26)**; the last verified delivery is **0.13.0 (25)**.
+- About shows the current verified test build, **0.13.1 (26)**. [Build and test evidence](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/45318353340)
 
 Native compilation and simulator evidence are recorded in the research report. FlareStore signing, actual cloud accounts and real Files-provider permissions still need validation on the intended installation.

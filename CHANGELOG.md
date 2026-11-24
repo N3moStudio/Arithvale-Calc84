@@ -2,12 +2,12 @@
 
 ## 0.13.1 · Recovery and calculator reliability
 
-**November 23, 2026 · Build 26 · Test candidate**
+**November 23, 2026 · Build 26 · Verified test build**
 
-- Preserve Unicode filenames without loss in independent Python recovery.
+- Recover originals with long Unicode names and preserve their full names in the metadata. Bound exported filenames to fit on disk.
 - Match cloud recovery evidence to the exact checked snapshot and avoid repeating unchanged automatic cloud backups. Keep Blomp cancellation from publishing incomplete transfers.
 - Show and announce calculator errors, and apply +/− to the current operand.
-- Retain the approved themes, native navigation and compact layout. Native build, simulator and IPA delivery evidence will be recorded after validation; this candidate is not yet a verified delivery.
+- Verified the arm64 IPA and 183 core, 28 independent recovery and 22 simulator tests at `a2331f2`. The simulator exercised the real Photos picker and save flow, calculator and library access, and interrupted transfers. Compared all 15 UI screenshots with build 25. [Verification run](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/45318353340)
 
 ## 0.13.0 · Recoverable backups
 
