@@ -43,15 +43,17 @@ extension ArithenUITests {
             }
             XCTAssertTrue(newFolder.waitForExistence(timeout: 5), host.debugDescription)
             newFolder.tap()
-            let field = host.textFields.firstMatch
-            XCTAssertTrue(field.waitForExistence(timeout: 5), host.debugDescription)
-            field.tap()
-            if let old = field.value as? String, !old.isEmpty && old != field.placeholderValue {
-                field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count))
+            let inline = host.textViews["DOC.inlineRenameField"]
+            if inline.waitForExistence(timeout: 5) {
+                // Files selects the initial name and focuses this inline editor.
+                inline.typeText("Downloads\n")
+            } else {
+                let field = host.textFields.firstMatch
+                XCTAssertTrue(field.waitForExistence(timeout: 5), host.debugDescription)
+                field.tap(); field.typeText("Downloads")
+                let create = host.buttons["Create"].firstMatch
+                if create.exists { create.tap() } else { field.typeText("\n") }
             }
-            field.typeText("Downloads")
-            let create = host.buttons["Create"].firstMatch
-            if create.exists { create.tap() } else { field.typeText("\n") }
         }
         let title = filesNavigation(host).descendants(matching: .any).matching(NSPredicate(
             format: "identifier != 'BackButton' AND (label == 'Downloads' OR label BEGINSWITH 'Downloads,')")).firstMatch

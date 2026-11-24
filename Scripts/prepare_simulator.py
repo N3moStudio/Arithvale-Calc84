@@ -65,6 +65,7 @@ spec = {'name': 'ArithenSimulator', 'options': {'deploymentTarget': {'iOS': '17.
                 'sources': [str(root / 'Tests/FilesSampleExporter')],
                 'dependencies': [{'package': 'Engine', 'product': 'Engine'}],
                 'settings': {'base': {'PRODUCT_BUNDLE_IDENTIFIER': 'studio.n3mo.files-sample-exporter',
+                                     'INFOPLIST_KEY_UILaunchScreen_Generation': 'YES',
                                      'GENERATE_INFOPLIST_FILE': 'YES'}}},
             'ArithenAppTests': {'type': 'bundle.unit-test', 'platform': 'iOS',
                 'sources': [str(root / 'Tests/ArithenAppTests')],
