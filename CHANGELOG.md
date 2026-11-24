@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.2 · Calculator taps
+
+**November 23, 2026 · Build 27 · Verified test build**
+
+- The keypad accepts taps across each button, including the full AC half of the shared capsule. Scrolling is available when the calculator needs more vertical space.
+- The iPhone 17 Pro simulator verified off-center taps, repeated digits, ordinary Equals and hold-to-unlock. All 234 automated tests passed. [Verification run](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/45325814299)
+
 ## 0.13.1 · Recovery and calculator reliability
 
 **November 23, 2026 · Build 26 · Verified test build**
