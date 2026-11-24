@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0 · Native Files import
+
+**November 24, 2026 · Build 28 · Verified test build**
+
+- Open the system Files picker from the unlocked library. Review an authenticated backup, including its incoming item names, before adding it. Ordinary documents also show their filenames before import.
+- Verified on iPhone 17 Pro / iOS 26.2 under **On My iPhone → Arithen Samples → Downloads**, a test-only app folder. The system picker selected a current .arithenbackup export, the same archive renamed .bin, a plain .txt file and an invalid archive. Cancel, retry and persistence after relaunch passed. A signed-in iCloud Drive provider and physical installations still need device testing. [Simulator and build results](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/45500316596/attempts/2)
+
 ## 0.13.2 · Calculator taps
 
 **November 23, 2026 · Build 27 · Verified test build**

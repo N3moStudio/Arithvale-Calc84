@@ -10,7 +10,7 @@ Install updates into the same app identity/data container. A normal update keeps
 
 ## Add photos, videos and files
 
-Use **+ → Photos & Videos** or **Import from Files**. Choose files directly where supported, or download them in Files and share to Arithen. With LiveContainer, share to **LiveContainer → Arithen**, then unlock the intended library.
+For photos and videos, open **+ → Photos & Videos**. For a document, open **+ → Import from Files → Import**, select it in Files, review its name and tap **Add to Library**. You can also share a downloaded file to Arithen. With LiveContainer, share to **LiveContainer → Arithen**, then unlock the intended library.
 
 After successful import, keeping originals is always an option. Removal is offered only after verification:
 
@@ -31,7 +31,7 @@ The new format stores encrypted resources with two authenticated recovery catalo
 
 ## Import another backup
 
-Open **Settings → Backups → Import Backup** or **+ → From a Backup**. Choose the file directly, or share the downloaded file from Files to Arithen (through LiveContainer when applicable). Unlock, select the received backup, enter that backup's key and tap **Import**.
+Open **Settings → Backups → Import Backup** or **+ → From a Backup**. Tap **Import** and choose the archive in Files. Enter its original recovery key and tap **Review Backup**. Review the item count and names. Tap **Add to Library** to merge, or **Cancel Review** to leave the library as it was. A backup selected through **+ → Import from Files** opens the same review. Sharing the downloaded archive from Files is also supported.
 
 The current library is preserved. Added items are encrypted under its current key; exact duplicate originals are skipped. Source Never Upload exclusions carry over. Newly created libraries, including setup from backups, receive a new key which must be saved separately. Every older archive still needs the key that belongs to it.
 
@@ -57,6 +57,6 @@ Use **Save to Photos**. Arithen supplies the stored capture date; older items ca
 - Settings → Storage shows local storage, largest items and exact duplicates. Nothing is automatically permanently deleted.
 - Privacy & Access contains Change Calculator Code and Photo Indexing. Indexing runs locally after import; busy state, Low Power Mode, heat and inactivity defer work.
 - Backups contains Create, Import, Check, Connected Folder, Backup Status and private reminders. Backup Help includes recovery-key guidance.
-- About shows the current verified test build, **0.13.2 (27)**. [Build and test evidence](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/45325814299)
+- About shows the current verified test build, **0.14.0 (28)**. [Build and test evidence](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/45500316596/attempts/2)
 
 Native compilation and simulator evidence are recorded in the research report. FlareStore signing, actual cloud accounts and real Files-provider permissions still need validation on the intended installation.
