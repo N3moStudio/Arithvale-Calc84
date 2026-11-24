@@ -71,9 +71,16 @@ extension ArithenUITests {
         let thumb = cell.images.firstMatch
         if thumb.exists && thumb.isHittable { thumb.tap() }
         else { cell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap() }
-        if !destination.waitForExistence(timeout: 3) {
-            let open = filesNavigation(app).buttons["Open"]
-            if open.waitForExistence(timeout: 3), open.isEnabled { open.tap() }
+        // The filename is visible both in Files and in Arithen. Confirm the
+        // multi-selection before treating the destination as the app's screen.
+        let picker = filesNavigation(app)
+        if !picker.waitForNonExistence(timeout: 2) {
+            let open = picker.buttons["Open"]
+            XCTAssertTrue(open.waitForExistence(timeout: 5), app.debugDescription)
+            let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: open)
+            XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 5), .completed)
+            open.tap()
+            XCTAssertTrue(picker.waitForNonExistence(timeout: 15), app.debugDescription)
         }
         XCTAssertTrue(destination.waitForExistence(timeout: 20), app.debugDescription)
     }
