@@ -130,6 +130,7 @@ final class ArithenUITests: XCTestCase {
     }
 
     func testCalculatorSetupLibraryAndBackupJourneys() throws {
+        saveSamples()
         app.launch()
         XCTAssertTrue(app.buttons["Equals"].waitForExistence(timeout: 15))
         tap("7"); tap("Add"); tap("6"); tap("Equals")

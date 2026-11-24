@@ -64,17 +64,9 @@ extension ArithenUITests {
         XCTAssertTrue(title.waitForExistence(timeout: 15), host.debugDescription)
     }
 
-    private func saveSamples() {
-        // First let the real local Files provider finish first-run setup.
-        let files = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
-        files.launch()
-        let browse = files.tabBars["DOC.browsingModeTabBar"].buttons["Browse"]
-        XCTAssertTrue(browse.waitForExistence(timeout: 60), files.debugDescription)
-        browse.tap(); browse.tap()
-        let local = files.staticTexts["On My iPhone"].firstMatch
-        XCTAssertTrue(local.waitForExistence(timeout: 30), files.debugDescription)
-        local.tap()
-
+    func saveSamples() {
+        // Let the system export picker host Files. Launching the standalone
+        // Documents app introduces an unrelated foreground-app handoff.
         let exporter = XCUIApplication(bundleIdentifier: "studio.n3mo.files-sample-exporter")
         exporter.launch()
         exporter.buttons["Save samples to Files"].tap()
@@ -105,7 +97,6 @@ extension ArithenUITests {
 
     func verifyNativeFilesImport() throws {
         app.terminate()
-        saveSamples()
         app.launchArguments = []
         app.launch()
         enter("963852"); holdEquals()
