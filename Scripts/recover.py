@@ -101,7 +101,7 @@ def recover(backup: Path, secret: str, output: Path | None = None, include_delet
     """Strict verification is the default. Salvage never bypasses authentication."""
     backup = Path(backup)
     if backup.stat().st_size > MAX_BACKUP:
-        raise ValueError("Backup exceeds the supported 64 GB limit.")
+        raise ValueError("Backup exceeds the supported 1 TiB limit.")
     with backup.open("rb") as stream:
         magic = stream.read(8)
         stream.seek(max(0, backup.stat().st_size - 8))
@@ -123,7 +123,7 @@ def recover_legacy(backup: Path, secret: str, output: Path | None = None, includ
             assemble_cloud(backup, secret, archive)
             return recover(archive, secret, output, include_deleted)
     if backup.stat().st_size > MAX_BACKUP:
-        raise ValueError("Backup exceeds the supported 64 GB limit.")
+        raise ValueError("Backup exceeds the supported 1 TiB limit.")
     output = Path(output).absolute() if output is not None else None
     if output is not None and output.exists():
         raise ValueError("Choose a new output folder. Existing folders are never overwritten.")
@@ -321,7 +321,7 @@ def _read_v3(stream, secret, salvage):
     stream.seek(0, os.SEEK_END)
     size = stream.tell()
     if size > MAX_BACKUP:
-        raise ValueError("Backup exceeds the supported 64 GB limit.")
+        raise ValueError("Backup exceeds the supported 1 TiB limit.")
     candidates, cached = {}, {}
     # Each location is bounded and authenticated independently. Damaged front
     # length fields never dictate where we seek to find the redundant footer.

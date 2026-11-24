@@ -125,6 +125,80 @@ public final class VaultRepository {
         } catch { try? fm.removeItem(at: path); throw error }
         return item
     }
+    /// Reserve the entire asset in one index update. Unlock cleans these reservations
+    /// after interruption. Only the final index update makes the photo visible.
+    func addMedia(file: URL, name: String, contentType: String, details: MediaDetails,
+                  companion: URL?, companionType: String?, thumbnail: Data?) throws {
+        guard let key, let header, let previous = manifest else { throw VaultError.locked }
+        func record(_ name: String, _ type: String, _ size: Int) throws -> VaultItem {
+            guard size >= 0, size <= VaultLimits.fileBytes else { throw VaultError.limit }
+            var item = VaultItem(id: UUID(), name: String(name.prefix(180)), contentType: String(type.prefix(120)),
+                                 byteCount: size, added: Date())
+            item.storageVersion = 2
+            item.pendingImport = true
+            return item
+        }
+        func fileRecord(_ url: URL, _ name: String, _ type: String) throws -> VaultItem {
+            var item = try record(name, type, url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max)
+            item.captured = details.captured
+            item.duration = details.duration
+            item.latitude = details.latitude
+            item.longitude = details.longitude
+            return item
+        }
+
+        var main = try fileRecord(file, name, contentType)
+        let motion = try companion.map { url -> VaultItem in
+            var item = try fileRecord(url, "Live Photo video.mov", companionType ?? "com.apple.quicktime-movie")
+            item.isCompanion = true
+            return item
+        }
+        let preview = try thumbnail.map { data -> VaultItem in
+            guard data.count <= VaultLimits.memoryBytes else { throw VaultError.limit }
+            var item = try record("thumbnail.jpg", "public.jpeg", data.count)
+            item.isThumbnail = true
+            return item
+        }
+        main.companionID = motion?.id
+        main.companionType = motion?.contentType
+        main.thumbnailID = preview?.id
+        let records = [preview, motion, main].compactMap { $0 }
+        guard previous.items.count + records.count <= VaultLimits.itemCount,
+              (previous.items + records).reduce(0, { $0 + $1.byteCount }) < VaultLimits.libraryBytes else { throw VaultError.limit }
+
+        var next = previous
+        next.items.insert(contentsOf: records, at: 0)
+        try persist(next, key: key, header: header)
+        manifest = next
+        func writeFile(_ url: URL, item: VaultItem) throws {
+            let path = assetURL(item.id)
+            let context = Self.context(header, item.id.uuidString)
+            try VaultStream.encrypt(url, to: path, size: item.byteCount, key: key, context: context)
+            try VaultStream.decrypt(path, to: nil, size: item.byteCount, key: key, context: context)
+        }
+        do {
+            try writeFile(file, item: main)
+            if let companion, let motion { try writeFile(companion, item: motion) }
+            if let thumbnail, let preview {
+                let path = assetURL(preview.id)
+                let context = Self.context(header, preview.id.uuidString)
+                try VaultStream.encrypt(thumbnail, to: path, key: key, context: context)
+                guard try VaultStream.read(path, size: preview.byteCount, key: key, context: context) == thumbnail else {
+                    throw VaultError.wrongPasswordOrDamaged
+                }
+            }
+            try Task.checkCancellation()
+            for index in records.indices { next.items[index].pendingImport = false }
+            try persist(next, key: key, header: header)
+            manifest = next
+        } catch {
+            for item in records { try? fm.removeItem(at: assetURL(item.id)) }
+            // A failed rollback leaves the persisted reservations for unlock to clean.
+            try persist(previous, key: key, header: header)
+            manifest = previous
+            throw error
+        }
+    }
     public func associate(primary: UUID, companion: UUID?, thumbnail: UUID?) throws {
         guard let key, let header, var next = manifest,
               let p = next.items.firstIndex(where: { $0.id == primary }) else { throw VaultError.locked }

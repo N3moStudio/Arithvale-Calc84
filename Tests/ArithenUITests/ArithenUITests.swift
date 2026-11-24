@@ -245,6 +245,15 @@ final class ArithenUITests: XCTestCase {
         // The count is a button that clears the active filter, not static text.
         XCTAssertTrue(app.buttons["1 Snap"].waitForExistence(timeout: 10), app.debugDescription)
         capture("populated-library")
+        let importedPhoto = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Photo, ")).firstMatch
+        XCTAssertTrue(importedPhoto.waitForExistence(timeout: 10))
+        importedPhoto.press(forDuration: 0.85)
+        tap("Share")
+        tap("Save to Photos")
+        XCTAssertTrue(app.staticTexts["Saved 1 to Photos with their stored dates."].waitForExistence(timeout: 30))
+        capture("save-original-to-photos")
+        tap("Done")
+        if app.buttons["Cancel"].exists { tap("Cancel") }
         tap("Lock & Return to Calculator")
         XCTAssertTrue(app.buttons["Equals"].waitForExistence(timeout: 10))
         enter("963852"); holdEquals()

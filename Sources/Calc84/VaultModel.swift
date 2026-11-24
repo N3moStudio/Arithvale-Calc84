@@ -396,11 +396,12 @@ final class VaultModel: ObservableObject {
             if PHPhotoLibrary.authorizationStatus(for: .readWrite) == .notDetermined {
                 _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
             }
+            let assets = MediaBridge.selectedAssets(selections.compactMap(\.itemIdentifier))
             for (position, selection) in selections.enumerated() {
                 guard ticket == generation, !Task.isCancelled else { failures += selections.dropFirst(position); break }
                 status = "Importing photo or video \(position + 1) of \(selections.count)…"
                 do {
-                    let media = try await MediaBridge.prepare(selection)
+                    let media = try await MediaBridge.prepare(selection, asset: selection.itemIdentifier.flatMap { assets[$0] })
                     defer { media.clean() }
                     try Task.checkCancellation()
                     guard ticket == generation else { break }
@@ -410,7 +411,8 @@ final class VaultModel: ObservableObject {
                     let result = try await engine.add(file: media.url, name: media.name, contentType: media.type,
                         details: media.details, companion: media.companion,
                         companionType: media.companion == nil ? nil : "com.apple.quicktime-movie", thumbnail: media.thumbnail)
-                    changed(); completed += 1
+                    if completed == 0 { changed() }
+                    completed += 1
                     guard ticket == generation else { break }
                     if let added = result.first(where: { $0.visible && !knownIDs.contains($0.id) }) {
                         if let source = media.original { originals.append(ImportedOriginal(vaultID: added.id, source: source)) }

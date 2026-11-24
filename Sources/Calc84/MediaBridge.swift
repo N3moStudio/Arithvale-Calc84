@@ -32,9 +32,17 @@ struct PreparedMedia {
 }
 
 enum MediaBridge {
-    static func prepare(_ selection: PhotosPickerItem) async throws -> PreparedMedia {
-        if let identifier = selection.itemIdentifier,
-           let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject {
+    static func selectedAssets(_ identifiers: [String]) -> [String: PHAsset] {
+        guard !identifiers.isEmpty else { return [:] }
+        var assets: [String: PHAsset] = [:]
+        PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil).enumerateObjects { asset, _, _ in
+            assets[asset.localIdentifier] = asset
+        }
+        return assets
+    }
+
+    static func prepare(_ selection: PhotosPickerItem, asset: PHAsset?) async throws -> PreparedMedia {
+        if let asset {
             let resources = PHAssetResource.assetResources(for: asset)
             let wanted: PHAssetResourceType = asset.mediaType == .video ? .video : .photo
             // Keep edited/alternate-resource assets: importing the original alone

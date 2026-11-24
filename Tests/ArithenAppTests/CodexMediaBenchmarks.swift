@@ -13,7 +13,7 @@ import CalcCore
 /// Opt-in fixtures are generated and bundled only in the dedicated QA workflow.
 @MainActor
 final class CodexMediaBenchmarks: XCTestCase {
-    func testLastWeeksPhotosAndThirtyMinuteVideosAcrossThreeBatches() async throws {
+    func testLastWeeksPhotosAndThirtyMinuteVideosAcrossRepeatedBatches() async throws {
         let bundle = Bundle(for: Self.self)
         guard let movie30 = bundle.url(forResource: "qa-30", withExtension: "mp4"),
               let movie60 = bundle.url(forResource: "qa-60", withExtension: "mp4") else {
@@ -34,7 +34,7 @@ final class CodexMediaBenchmarks: XCTestCase {
         }
         try screenshot.write(to: png)
         let tag = UUID().uuidString
-        let files = Array(repeating: png, count: 150) + [movie30, movie60]
+        let files = Array(repeating: png, count: 248) + [movie30, movie60]
         let date = Date(timeIntervalSince1970: floor(Date().timeIntervalSince1970) - 7 * 86400)
         try await PHPhotoLibrary.shared().performChanges {
             for (index, url) in files.enumerated() {
@@ -42,12 +42,12 @@ final class CodexMediaBenchmarks: XCTestCase {
                 add.creationDate = date.addingTimeInterval(Double(index))
                 let options = PHAssetResourceCreationOptions()
                 options.originalFilename = "\(tag)-\(index).\(url.pathExtension)"
-                add.addResource(with: index < 150 ? .photo : .video, fileURL: url, options: options)
+                add.addResource(with: index < 248 ? .photo : .video, fileURL: url, options: options)
             }
         }
         func assets() -> [PHAsset] {
             let options = PHFetchOptions()
-            options.predicate = NSPredicate(format: "creationDate >= %@ AND creationDate <= %@", date as NSDate, date.addingTimeInterval(152) as NSDate)
+            options.predicate = NSPredicate(format: "creationDate >= %@ AND creationDate <= %@", date as NSDate, date.addingTimeInterval(250) as NSDate)
             var matches: [PHAsset] = []
             PHAsset.fetchAssets(with: options).enumerateObjects { asset, _, _ in
                 if PHAssetResource.assetResources(for: asset).contains(where: { $0.originalFilename.hasPrefix(tag) }) { matches.append(asset) }
@@ -55,14 +55,14 @@ final class CodexMediaBenchmarks: XCTestCase {
             return matches.sorted { ($0.creationDate ?? .distantPast) < ($1.creationDate ?? .distantPast) }
         }
         let seeded = assets()
-        XCTAssertEqual(seeded.count, 152)
-        guard seeded.count == 152 else { return }
+        XCTAssertEqual(seeded.count, 250)
+        guard seeded.count == 250 else { return }
         let engine = VaultEngine(root: dir.appendingPathComponent("vault"))
         let password = "synthetic temporary test phrase"
         _ = try await engine.create(password: password)
         let model = VaultModel(engine: engine)
         model.unlocked = true
-        for batch in [150, 152, 152] {
+        for batch in [150, 150, 150, 250] {
             let selection = seeded.prefix(batch).map { PhotosPickerItem(itemIdentifier: $0.localIdentifier) }
             let prior = model.items.filter(\.visible).count
             let start = ProcessInfo.processInfo.systemUptime
@@ -78,8 +78,8 @@ final class CodexMediaBenchmarks: XCTestCase {
         }
         await engine.lock()
         let reopened = try await engine.unlock(password: password).filter(\.visible)
-        XCTAssertEqual(reopened.count, 454)
-        for index in [0, 150, 151] {
+        XCTAssertEqual(reopened.count, 700)
+        for index in [0, 248, 249] {
             let input = files[index]
             let name = "\(tag)-\(index).\(input.pathExtension)"
             let item = try XCTUnwrap(reopened.first { $0.name == name })
@@ -91,7 +91,7 @@ final class CodexMediaBenchmarks: XCTestCase {
             try await MediaBridge.saveToPhotos(item: item, main: original, companion: nil)
             let saved = try XCTUnwrap(assets().first { !prior.contains($0.localIdentifier) })
             XCTAssertEqual(try XCTUnwrap(saved.creationDate).timeIntervalSince1970, captured.timeIntervalSince1970, accuracy: 0.1)
-            if index >= 150 { XCTAssertEqual(saved.duration, 1800, accuracy: 0.2) }
+            if index >= 248 { XCTAssertEqual(saved.duration, 1800, accuracy: 0.2) }
             let returned = dir.appendingPathComponent("photos-\(index).\(input.pathExtension)")
             let resource = try XCTUnwrap(PHAssetResource.assetResources(for: saved).first { $0.originalFilename == name })
             try await PhotoResource.write(resource, to: returned)

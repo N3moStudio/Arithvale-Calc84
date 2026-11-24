@@ -29,26 +29,9 @@ public actor VaultEngine {
             try repository.add(file: file, name: name, contentType: contentType, details: details)
             return repository.items
         }
-        var created: [UUID] = []
-        do {
-            let primary = try repository.add(file: file, name: name, contentType: contentType, details: details, pending: true)
-            created.append(primary.id)
-            var companionID: UUID?
-            var thumbnailID: UUID?
-            if let companion {
-                let part = try repository.add(file: companion, name: "Live Photo video.mov", contentType: companionType ?? "com.apple.quicktime-movie", details: details, pending: true)
-                companionID = part.id; created.append(part.id)
-            }
-            if let thumbnail {
-                let part = try repository.add(data: thumbnail, name: "thumbnail.jpg", contentType: "public.jpeg", pending: true)
-                thumbnailID = part.id; created.append(part.id)
-            }
-            try repository.associate(primary: primary.id, companion: companionID, thumbnail: thumbnailID)
-            return repository.items
-        } catch {
-            for id in created.reversed() { try? repository.remove(id: id) }
-            throw error
-        }
+        try repository.addMedia(file: file, name: name, contentType: contentType, details: details,
+                                companion: companion, companionType: companionType, thumbnail: thumbnail)
+        return repository.items
     }
     public func contents(id: UUID) throws -> Data { try repository.contents(of: id) }
     public func albumPreferences() throws -> [String: AlbumPreference] { try repository.albumPreferences() }
