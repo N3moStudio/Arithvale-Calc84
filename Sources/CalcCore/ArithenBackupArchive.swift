@@ -260,8 +260,10 @@ public enum ArithenBackupArchive {
         var hash = SHA256(), remaining = count
         while remaining > 0 {
             try Task.checkCancellation()
-            let data = try VaultStream.exact(min(VaultLimits.chunkBytes, remaining), from: input)
-            hash.update(data: data); remaining -= data.count
+            try VaultStream.withChunkPool {
+                let data = try VaultStream.exact(min(VaultLimits.chunkBytes, remaining), from: input)
+                hash.update(data: data); remaining -= data.count
+            }
         }
         guard (try input.read(upToCount: 1) ?? Data()).isEmpty else { throw VaultError.changed }
         return hash.finalize().map { String(format: "%02x", $0) }.joined()
@@ -270,8 +272,10 @@ public enum ArithenBackupArchive {
         var hash = SHA256(), remaining = count
         while remaining > 0 {
             try Task.checkCancellation()
-            let data = try VaultStream.exact(min(VaultLimits.chunkBytes, remaining), from: input)
-            hash.update(data: data); try output.write(contentsOf: data); remaining -= data.count
+            try VaultStream.withChunkPool {
+                let data = try VaultStream.exact(min(VaultLimits.chunkBytes, remaining), from: input)
+                hash.update(data: data); try output.write(contentsOf: data); remaining -= data.count
+            }
         }
         guard hash.finalize().map({ String(format: "%02x", $0) }).joined() == expectedDigest else { throw VaultError.wrongPasswordOrDamaged }
     }

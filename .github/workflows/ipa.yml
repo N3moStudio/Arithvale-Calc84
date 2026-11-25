@@ -2,7 +2,7 @@ name: Build Arithen IPA
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, codex/arithen-media-release]
 permissions:
   contents: read
 jobs:

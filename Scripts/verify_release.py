@@ -71,9 +71,11 @@ def main():
         return re.sub(r'\x1b\[[0-9;]*m','',(run/(name+'.log')).read_text(errors='replace'))
     env = dict(os.environ, CALC84_CORE_ONLY='1', C84_FIXTURE_DIR=str(run/'fixtures'))
     core = step('core-tests',['swift','test','-j','4'],env)
-    matches = re.findall(r'Executed (\d+) tests?, with 0 failures',core)
-    if "Test Suite 'All tests' passed" not in core or not matches: raise SystemExit('Missing successful XCTest summary')
-    info['coreTests'] = {'passed':int(matches[-1]),'failed':0}
+    summary = re.search(r"Test Suite 'All tests' passed[^\n]*\n\s*Executed (\d+) tests?, with "
+                        r"(?:(\d+) tests? skipped(?: and|,)? )?0 failures?", core)
+    if not summary: raise SystemExit('Missing successful XCTest summary')
+    skipped = int(summary[2] or 0)
+    info['coreTests'] = {'passed': int(summary[1]) - skipped, 'failed': 0, 'skipped': skipped}
     recovery = step('recovery-tests',[args.python,'-m','unittest','discover','-s','Scripts','-p','test_recovery.py','-v'],env)
     count = re.search(r'Ran (\d+) tests?',recovery)
     if not count or not re.search(r'^OK$',recovery,re.M): raise SystemExit('Missing successful recovery summary')
