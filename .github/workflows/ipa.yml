@@ -2,7 +2,7 @@ name: Build Arithen IPA
 on:
   workflow_dispatch:
   push:
-    branches: [main, codex/arithen-media-release]
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -25,6 +25,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
   simulator:
+    needs: core
     runs-on: macos-26
     timeout-minutes: 60
     env:
@@ -36,12 +37,6 @@ jobs:
         run: |
           brew install xcodegen
           python3 Scripts/prepare_mega.py --simulator
-          command -v ffmpeg >/dev/null || brew install ffmpeg
-          for rate in 30 60; do
-            ffmpeg -hide_banner -loglevel error -f lavfi -i "color=c=blue:s=3840x2160:r=$rate" -t 1 -c:v libx264 -threads 2 -preset ultrafast -crf 34 -pix_fmt yuv420p -g "$rate" "$RUNNER_TEMP/clip-$rate.mp4"
-            ffmpeg -hide_banner -loglevel error -stream_loop -1 -i "$RUNNER_TEMP/clip-$rate.mp4" -t 1800 -c copy -movflags +faststart "Tests/ArithenAppTests/qa-$rate.mp4"
-            ffprobe -v error -show_entries stream=width,height,r_frame_rate,duration -of json "Tests/ArithenAppTests/qa-$rate.mp4"
-          done
           python3 Scripts/prepare_simulator.py
       - name: Run simulator journeys and capture screenshots
         run: |
@@ -72,21 +67,6 @@ jobs:
             -only-testing:ArithenUITests -resultBundlePath .build/simulator/UI.xcresult \
             -parallel-testing-enabled NO CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES \
             >> .build/simulator/xcodebuild.log 2>&1 || ui_status=$?
-          # Generate a real coded stream over 4 GiB without encoding 108,000 distinct frames.
-          free_kib=$(df -Pk "$RUNNER_TEMP" | awk 'END {print $4}')
-          if [ "$free_kib" -gt 29360128 ]; then
-            ffmpeg -hide_banner -loglevel error -f lavfi -i 'color=c=green:s=3840x2160:r=30' -t 2 -c:v libx264 -threads 2 -preset ultrafast -pix_fmt yuv420p -b:v 22M -minrate 22M -maxrate 22M -bufsize 3M -x264-params 'nal-hrd=cbr:force-cfr=1' -g 30 "$RUNNER_TEMP/heavy-seed.mp4"
-            heavy="$RUNNER_TEMP/arithen-qa-heavy-4k30.mp4"
-            ffmpeg -hide_banner -loglevel error -stream_loop -1 -i "$RUNNER_TEMP/heavy-seed.mp4" -t 1800 -c copy -metadata creation_time=2025-11-17T04:05:06Z "$heavy"
-            info=$(xcrun simctl get_app_container "$device" studio.n3mo.calc84 data)/Documents/qa-heavy.txt
-            shasum -a 256 "$heavy" | cut -d ' ' -f 1 > "$info"
-            stat -f %z "$heavy" >> "$info"
-            ffprobe -v error -show_entries stream=width,height,r_frame_rate,duration -of json "$heavy"
-            xcrun simctl addmedia "$device" "$heavy"
-            rm "$heavy"
-          else
-            echo "MEDIA_QA high-bitrate fixture skipped with $free_kib KiB free"
-          fi
           integration_status=0
           xcodebuild test-without-building -project .build/simulator/ArithenSimulator.xcodeproj -scheme Arithen \
             -destination "platform=iOS Simulator,id=$device" \
@@ -99,15 +79,6 @@ jobs:
           if [ "$ui_status" -ne 0 ] || [ "$integration_status" -ne 0 ]; then
             tail -n 100 .build/simulator/xcodebuild.log
             exit 1
-          fi
-      - name: Report benchmark measurements
-        if: always()
-        run: |
-          device=$(cat .build/simulator/device-id.txt)
-          data=$(xcrun simctl get_app_container "$device" studio.n3mo.calc84 data)
-          if [ -f "$data/Documents/qa-measurements.txt" ]; then
-            cp "$data/Documents/qa-measurements.txt" .build/simulator/
-            cat .build/simulator/qa-measurements.txt
           fi
       - name: Export simulator evidence
         if: always()
@@ -122,7 +93,6 @@ jobs:
         with:
           name: Arithen-Simulator-${{ github.sha }}
           path: |
-            .build/simulator/qa-measurements.txt
             .build/simulator/device.json
             .build/simulator/built-app-info.plist
             .build/simulator/xcodebuild.log

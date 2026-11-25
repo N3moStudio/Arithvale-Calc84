@@ -4,7 +4,7 @@
 
 <h1 align="center">Arithen</h1>
 <p align="center"><strong>Familiar calculations. A private library.</strong></p>
-<p align="center">0.14.0 test build · iOS 17+ · SwiftUI · Source available</p>
+<p align="center">0.15.0 test build · iOS 17+ · SwiftUI · Source available</p>
 <p align="center">
   <a href="SETUP.md">Get started</a> &nbsp;·&nbsp;
   <a href="CHANGELOG.md#0140--native-files-import">What’s new</a> &nbsp;·&nbsp;
@@ -21,7 +21,7 @@ control over which memories leave your phone. Previously **Arithvale / Calc 84**
 
 The **Native Settings Kit presentation update** adds larger branded appearance cards, theme tiles, simple rows and focused backup detail pages. Existing settings and data are retained. See the [feature map](Docs/SETTINGS-FEATURE-MAP.md) and [validation limits](Docs/SETTINGS-ADOPTION.md).
 
-The current verified test build is **0.14.0, build 28**. It adds native Files selection and a confirmation step for authenticated backup merges. An iPhone 17 Pro simulator running iOS 26.2 selected real files, canceled and retried, rejected an invalid archive, and found the imported items in the library after relaunch. [Verification run](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/45500316596/attempts/2)
+The current verified test build is **0.15.0, build 29**. Arithen’s Photos picker now accepts up to 250 selections. The vault streams originals up to 64 GiB each and reserves space for a backup up to 1 TiB. The library’s Save or Share sheet carries the selected items into the export. [Media measurements and device coverage](Docs/Testing/Media-results-0.15.0.md) · [Build and iPhone simulator run](https://github.com/N3moStudio/Arithvale-Calc84/actions/runs/45518011972)
 
 New `.arithenbackup` files have redundant authenticated recovery catalogs, individually verified encrypted resources and explicit intact-file recovery. Cloud catalogs use the same authenticated inventory. Existing library data, calculator access, themes and seven-copy folder retention remain. Update the existing installation to retain its library and code. See the [research, format and prior validation limits](Docs/BACKUP-DESIGN-2026-11-22.md).
 
