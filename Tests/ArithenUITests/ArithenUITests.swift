@@ -249,6 +249,7 @@ final class ArithenUITests: XCTestCase {
         XCTAssertTrue(importedPhoto.waitForExistence(timeout: 10))
         importedPhoto.press(forDuration: 0.85)
         tap("Share")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "1 selected")).firstMatch.waitForExistence(timeout: 10), app.debugDescription)
         tap("Save to Photos")
         XCTAssertTrue(app.staticTexts["Saved 1 to Photos with their stored dates."].waitForExistence(timeout: 30))
         capture("save-original-to-photos")

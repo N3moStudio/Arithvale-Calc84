@@ -24,6 +24,11 @@ struct LibraryView: View {
     }
 }
 
+private struct LibraryExportSelection: Identifiable {
+    let id = UUID()
+    let items: [VaultItem]
+}
+
 private struct LibraryPane: View {
     let pageTab: LibraryTab
     @Binding var navigation: LibraryTabNavigation
@@ -64,8 +69,7 @@ private struct LibraryPane: View {
     @State private var selection = Set<UUID>()
     @State private var deletion = false
     @State private var albumSheet = false
-    @State private var exportItems: [VaultItem] = []
-    @State private var showingExports = false
+    @State private var exportSelection: LibraryExportSelection?
     private var style: GalleryStyle { .clearGlass }
     private var showingAlbums: Bool { pageTab == .albums }
     private var albums: [String] { content.albums }
@@ -112,7 +116,9 @@ private struct LibraryPane: View {
         } }
         .sheet(isPresented: $adding, onDismiss: routeAdd) { addSheet }
         .sheet(isPresented: $addingBackup) { NavigationStack { BackupImportView() } }
-        .sheet(isPresented: $showingExports) { ExportMediaView(items: exportItems).environmentObject(vault) }
+        .sheet(item: $exportSelection) { selection in
+            ExportMediaView(items: selection.items).environmentObject(vault)
+        }
         .sheet(isPresented: $albumSheet) { albumEditor }
         .sheet(isPresented: $cloudChoices) { CloudBatchSelectionView(ids: selection).environmentObject(vault) }
         .sheet(isPresented: $files) { NavigationStack { SharedFilesImportView() } }
@@ -449,7 +455,10 @@ private struct LibraryPane: View {
                     selectionActionLabel("Restore", symbol: "arrow.uturn.backward")
                 }
             } else {
-                Button { exportItems = selectedItems; showingExports = true } label: {
+                Button {
+                    let items = selectedItems
+                    if !items.isEmpty { exportSelection = LibraryExportSelection(items: items) }
+                } label: {
                     selectionActionLabel("Share", symbol: "square.and.arrow.up")
                 }
                 Button { albumSheet = true } label: {
@@ -476,7 +485,7 @@ private struct LibraryPane: View {
     private func itemAction(_ action: String, _ item: VaultItem) {
         switch action {
         case "favorite": vault.update(item, favorite: item.favorite != true)
-        case "export": exportItems = [item]; showingExports = true
+        case "export": exportSelection = LibraryExportSelection(items: [item])
         case "album": selection = [item.id]; albumSheet = true
         case "delete": vault.update(item, deleted: true)
         case "restore": vault.update(item, deleted: false)
