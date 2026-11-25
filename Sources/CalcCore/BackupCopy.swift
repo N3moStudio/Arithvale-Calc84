@@ -11,7 +11,14 @@ public enum BackupCopy {
         let input = try FileHandle(forReadingFrom: url)
         defer { try? input.close() }
         var hash = SHA256()
-        while let bytes = try input.read(upToCount: 1024 * 1024), !bytes.isEmpty { try Task.checkCancellation(); hash.update(data: bytes) }
+        var reachedEnd = false
+        while !reachedEnd {
+            try Task.checkCancellation()
+            try VaultStream.withChunkPool {
+                if let bytes = try input.read(upToCount: VaultLimits.chunkBytes), !bytes.isEmpty { hash.update(data: bytes) }
+                else { reachedEnd = true }
+            }
+        }
         return Data(hash.finalize())
     }
 

@@ -274,10 +274,18 @@ struct PickedMedia: Transferable, Sendable {
             FileManager.default.createFile(atPath: url.path, contents: nil, attributes: [.protectionKey: FileProtectionType.complete])
             let output = try FileHandle(forWritingTo: url); defer { try? output.close() }
             var written = 0
-            while let chunk = try input.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+            var reachedEnd = false
+            while !reachedEnd {
                 try Task.checkCancellation()
-                written += chunk.count; guard written <= VaultLimits.fileBytes else { throw VaultError.limit }
-                try output.write(contentsOf: chunk)
+                try autoreleasepool {
+                    guard let chunk = try input.read(upToCount: VaultLimits.chunkBytes), !chunk.isEmpty else {
+                        reachedEnd = true
+                        return
+                    }
+                    written += chunk.count
+                    guard written <= VaultLimits.fileBytes else { throw VaultError.limit }
+                    try output.write(contentsOf: chunk)
+                }
             }
             try output.synchronize()
             return PickedMedia(url: url, name: incoming.file.lastPathComponent)

@@ -7,6 +7,15 @@ import Crypto
 
 /// Independently authenticated 1 MiB records. AAD binds vault, file, total size, and record position.
 enum VaultStream {
+    // Foundation file handles may return autoreleased buffers on Apple platforms.
+    // Drain them per record even when an entire movie is handled in one actor call.
+    static func withChunkPool<T>(_ body: () throws -> T) rethrows -> T {
+        #if canImport(ObjectiveC)
+        return try autoreleasepool(invoking: body)
+        #else
+        return try body()
+        #endif
+    }
     static func encryptedSize(_ size: Int) -> Int {
         16 + size + max(1, (size + VaultLimits.chunkBytes - 1) / VaultLimits.chunkBytes) * 36
     }
@@ -30,8 +39,10 @@ enum VaultStream {
         let count = max(1, (size + VaultLimits.chunkBytes - 1) / VaultLimits.chunkBytes)
         for index in 0..<count {
             try Task.checkCancellation()
-            let data = try exact(min(VaultLimits.chunkBytes, size - index * VaultLimits.chunkBytes), from: input)
-            try block(VaultCrypto.seal(data, key: key, context: "\(context)/chunk/\(index)/\(size)"), to: output)
+            try withChunkPool {
+                let data = try exact(min(VaultLimits.chunkBytes, size - index * VaultLimits.chunkBytes), from: input)
+                try block(VaultCrypto.seal(data, key: key, context: "\(context)/chunk/\(index)/\(size)"), to: output)
+            }
         }
         guard (try input.read(upToCount: 1) ?? Data()).isEmpty else { throw VaultError.changed }
         try output.synchronize(); completed = true
@@ -91,11 +102,13 @@ enum VaultStream {
         let count = max(1, (size + VaultLimits.chunkBytes - 1) / VaultLimits.chunkBytes)
         for index in 0..<count {
             try Task.checkCancellation()
-            let length = min(VaultLimits.chunkBytes, size - index * VaultLimits.chunkBytes)
-            let sealed = try block(from: input, limit: length + 28)
-            guard sealed.count == length + 28 else { throw VaultError.invalidBackup }
-            let plain = try VaultCrypto.open(sealed, key: key, context: "\(context)/chunk/\(index)/\(size)")
-            try consume(plain)
+            try withChunkPool {
+                let length = min(VaultLimits.chunkBytes, size - index * VaultLimits.chunkBytes)
+                let sealed = try block(from: input, limit: length + 28)
+                guard sealed.count == length + 28 else { throw VaultError.invalidBackup }
+                let plain = try VaultCrypto.open(sealed, key: key, context: "\(context)/chunk/\(index)/\(size)")
+                try consume(plain)
+            }
         }
         guard (try input.read(upToCount: 1) ?? Data()).isEmpty else { throw VaultError.invalidBackup }
     }
@@ -113,7 +126,7 @@ enum VaultStream {
     static func exact(_ count: Int, from handle: FileHandle) throws -> Data {
         var result = Data()
         while result.count < count {
-            guard let chunk = try handle.read(upToCount: min(1024 * 1024, count - result.count)), !chunk.isEmpty else { throw VaultError.invalidBackup }
+            guard let chunk = try handle.read(upToCount: min(VaultLimits.chunkBytes + 28, count - result.count)), !chunk.isEmpty else { throw VaultError.invalidBackup }
             if result.isEmpty && chunk.count == count { return chunk }
             result.append(chunk)
         }
@@ -123,8 +136,10 @@ enum VaultStream {
         var left = count
         while left > 0 {
             try Task.checkCancellation()
-            let data = try exact(min(VaultLimits.chunkBytes, left), from: input)
-            try output.write(contentsOf: data); left -= data.count
+            try withChunkPool {
+                let data = try exact(min(VaultLimits.chunkBytes, left), from: input)
+                try output.write(contentsOf: data); left -= data.count
+            }
         }
     }
 }

@@ -5,6 +5,7 @@ import XCTest
 final class CodexCapacityTests: XCTestCase {
     func testStreamedVaultCapacity() throws {
         guard ProcessInfo.processInfo.environment["ARITHEN_CAPACITY_QA"] == "1" else { throw XCTSkip("Opt-in disk benchmark") }
+        func report(_ line: String) { FileHandle.standardError.write(Data((line + "\n").utf8)) }
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
@@ -36,24 +37,24 @@ final class CodexCapacityTests: XCTestCase {
             // Allow room for output/materialization plus six GiB for the runner.
             let available = try XCTUnwrap((fm.attributesOfFileSystem(forPath: root.path)[.systemFreeSize] as? NSNumber)?.int64Value)
             guard available >= Int64(2 * size + 6 * gib) else {
-                print("MEDIA_QA storageStop freeBytes=\(available) nextBytes=\(size)")
+                report("MEDIA_QA storageStop freeBytes=\(available) nextBytes=\(size)")
                 break
             }
             let source = try sparseFile(bytes: size, name: "stage-\(size).bin")
             defer { try? fm.removeItem(at: source) }
-            print("MEDIA_QA startingBytes=\(size) freeBytes=\(available)")
+            report("MEDIA_QA startingBytes=\(size) freeBytes=\(available)")
             let start = ProcessInfo.processInfo.systemUptime
             let item = try repo.add(file: source, name: "stage-\(size)", contentType: "public.data")
             let added = ProcessInfo.processInfo.systemUptime - start
             let exported = root.appendingPathComponent("verified.bin")
             try repo.materialize(id: item.id, to: exported)
-            XCTAssertTrue(fm.contentsEqual(atPath: source.path, andPath: exported.path))
+            XCTAssertEqual(try BackupCopy.digest(source), try BackupCopy.digest(exported))
             try fm.removeItem(at: exported)
             stored += size
             repo.lock()
             try repo.unlock(password: password)
             XCTAssertEqual(repo.items.reduce(0) { $0 + $1.byteCount }, stored)
-            print("MEDIA_QA streamedBytes=\(size) vaultBytes=\(stored) committedSeconds=\(added) freeBefore=\(available) reopened=true comparedAllBytes=true")
+            report("MEDIA_QA streamedBytes=\(size) vaultBytes=\(stored) committedSeconds=\(added) freeBefore=\(available) reopened=true comparedAllBytes=true")
         }
         XCTAssertGreaterThanOrEqual(stored, gib / 2)
     }
