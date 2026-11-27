@@ -38,6 +38,7 @@ struct CalculatorView: View {
     @State private var history: [CalculationRecord] = []
     private var ink: Color { ArithenPalette.color(.text, theme: theme) }
     private var glassTint: GlassTint { GlassTint(rawValue: glassTintValue) ?? .plum }
+    private var displayValue: String { calculationError ?? (didEvaluate || expression.isEmpty ? result : expression) }
 
     var body: some View {
         GeometryReader { geometry in
@@ -46,9 +47,7 @@ struct CalculatorView: View {
             let panel = ArithenGlassGroup {
                 VStack(spacing: 0) {
                     HStack(spacing: 8) {
-                        Button("History", systemImage: "clock.arrow.circlepath") { showingHistory = true }
-                            .labelStyle(.iconOnly).frame(width: 44, height: 44)
-                            .modifier(ArithenGlass(tint: glassTint, shape: Circle()))
+                        toolbarButton("History", symbol: "clock.arrow.circlepath") { showingHistory = true }
                         Spacer(minLength: 2)
                         if !textSize.isAccessibilitySize { calculatorTitle }
                         Spacer(minLength: 2)
@@ -58,20 +57,33 @@ struct CalculatorView: View {
                         } label: {
                             Image(systemName: "plus.forwardslash.minus").frame(width: 44, height: 44).modifier(ArithenGlass(tint: glassTint, shape: Circle()))
                         }.accessibilityLabel("Calculator mode")
-                        Button("Settings", systemImage: "gearshape") { showingSettings = true }
-                            .labelStyle(.iconOnly).frame(width: 44, height: 44)
-                            .modifier(ArithenGlass(tint: glassTint, shape: Circle()))
+                        toolbarButton("Settings", symbol: "gearshape") { showingSettings = true }
                     }.font(.system(size: 22)).padding(.top, 6)
                     if textSize.isAccessibilitySize { calculatorTitle.padding(.top, 8) }
                     Spacer(minLength: 32)
                     VStack(alignment: .trailing, spacing: 6) {
-                        Text(expression.isEmpty ? " " : expression).font(.title3).foregroundStyle(ink.opacity(0.52))
+                        Text((didEvaluate || calculationError != nil) && expression != displayValue ? expression : " ")
+                            .font(.title3).foregroundStyle(ink.opacity(0.52))
                             .lineLimit(2).minimumScaleFactor(0.65)
-                        Text(calculationError ?? (didEvaluate || expression.isEmpty ? result : expression))
-                            .font(.system(size: 52, weight: .regular, design: .rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.3)
+                        if let calculationError {
+                            Text(calculationError).font(.title).multilineTextAlignment(.trailing)
+                        } else {
+                            ViewThatFits(in: .horizontal) {
+                                Text(displayValue).font(.system(size: 52, design: .rounded)).fixedSize()
+                                ScrollViewReader { reader in
+                                    ScrollView(.horizontal) {
+                                        HStack(spacing: 0) {
+                                            Text(displayValue).font(.system(size: 34, design: .rounded)).fixedSize()
+                                            Color.clear.frame(width: 1).id("entryEnd")
+                                        }
+                                    }.defaultScrollAnchor(.trailing)
+                                        .onChange(of: displayValue) { _, _ in reader.scrollTo("entryEnd", anchor: .trailing) }
+                                }.fixedSize(horizontal: false, vertical: true)
+                            }.monospacedDigit()
+                        }
                     }.frame(maxWidth: .infinity, alignment: .trailing).padding(.horizontal, 6).padding(.bottom, 16)
                         .accessibilityElement(children: .combine).accessibilityLabel("Calculator display")
-                        .accessibilityValue(calculationError ?? (didEvaluate || expression.isEmpty ? result : expression))
+                        .accessibilityValue(displayValue)
                     if scientific {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 7), count: 4), spacing: 7) {
                             ForEach(["sin", "cos", "tan", "sqrt", "ln", "log", "π", "^", "(", ")", "e", degrees ? "DEG" : "RAD"], id: \.self) { key in
@@ -158,6 +170,12 @@ struct CalculatorView: View {
                     expression = ""; result = "0"; didEvaluate = false; directCodeEntry = true; calculationError = nil; history = []
                 }
             }
+    }
+    private func toolbarButton(_ title: LocalizedStringKey, symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).frame(width: 44, height: 44).contentShape(Rectangle())
+        }.accessibilityLabel(title)
+            .modifier(ArithenGlass(tint: glassTint, shape: Circle()))
     }
     private var calculatorTitle: some View {
         Text(AppBrand.name).font(.subheadline.weight(.semibold))

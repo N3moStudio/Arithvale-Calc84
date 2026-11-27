@@ -105,6 +105,14 @@ final class ArithenUITests: XCTestCase {
         app.launch()
         let one = app.buttons["1"]
         XCTAssertTrue(one.waitForExistence(timeout: 15))
+        for title in ["History", "Settings"] {
+            let button = app.buttons[title]
+            XCTAssertGreaterThanOrEqual(button.frame.width, 43.9)
+            XCTAssertGreaterThanOrEqual(button.frame.height, 43.9)
+            button.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.5)).tap()
+            XCTAssertTrue(app.navigationBars[title == "History" ? "History" : "Calculator Settings"].waitForExistence(timeout: 5))
+            tap("Done")
+        }
         let six = app.buttons["6"]
         let display = app.descendants(matching: .any).matching(identifier: "Calculator display").firstMatch
         // Use the regular key grid to target the AC half of the shared capsule,
@@ -211,7 +219,10 @@ final class ArithenUITests: XCTestCase {
         tap("Library"); tap("Settings")
         capture("04-settings")
         tap("Privacy & Access"); tap("Photo Indexing")
-        XCTAssertTrue(app.switches["Photo Indexing"].waitForExistence(timeout: 5))
+        let indexing = app.switches["Photo Indexing"]
+        XCTAssertTrue(indexing.waitForExistence(timeout: 5))
+        let indexingToggle = indexing.switches.firstMatch.exists ? indexing.switches.firstMatch : indexing
+        if indexing.value as? String == "1" { indexingToggle.tap() }
         back(); back()
         tap("Backups")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Create Backup")).firstMatch.exists)
@@ -227,6 +238,16 @@ final class ArithenUITests: XCTestCase {
         capture("06-backup-check")
         checkFilesPickerAndCancel()
         back(); back(); tap("Done")
+        tap("Search")
+        let namesOnly = app.textFields["Search names, albums or tags"]
+        XCTAssertTrue(namesOnly.waitForExistence(timeout: 5))
+        namesOnly.tap(); namesOnly.typeText("no-such-photo\n")
+        tap("Photo Indexing")
+        XCTAssertTrue(indexing.waitForExistence(timeout: 5))
+        indexingToggle.tap()
+        tap("Done")
+        XCTAssertTrue(app.textFields["Search names, albums, tags or text"].waitForExistence(timeout: 5))
+        tap("Library")
         tap("Add to Library"); tap("Import from Files")
         XCTAssertTrue(app.buttons["Import"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["files.apply"].isEnabled)
@@ -252,6 +273,8 @@ final class ArithenUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "1 selected")).firstMatch.waitForExistence(timeout: 10), app.debugDescription)
         tap("Save to Photos")
         XCTAssertTrue(app.staticTexts["Saved 1 to Photos with their stored dates."].waitForExistence(timeout: 30))
+        XCTAssertFalse(app.buttons["Save to Photos"].isEnabled)
+        XCTAssertTrue(app.buttons["Share Photo Copies without Metadata"].exists)
         capture("save-original-to-photos")
         tap("Done")
         if app.buttons["Cancel"].exists { tap("Cancel") }

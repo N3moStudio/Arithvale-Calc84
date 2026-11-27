@@ -18,15 +18,20 @@ struct MediaExport: Identifiable {
     let folder: URL
 }
 struct ExportMediaView: View {
+    private enum Mode { case photos, files, share, privatePhotos }
     let items: [VaultItem]
     @EnvironmentObject private var vault: VaultModel
     @Environment(\.dismiss) private var dismiss
-    @State private var working = false
+    @State private var activeMode: Mode?
+    @State private var stopping = false
+    @State private var savedPhotos = 0
+    @State private var prepared = 0
     @State private var result = ""
     @State private var error: String?
     @State private var export: MediaExport?
     @State private var operation: Task<Void, Never>?
     private var allMedia: Bool { items.allSatisfy { UTType($0.contentType)?.conforms(to: .image) == true || UTType($0.contentType)?.conforms(to: .movie) == true } }
+    private var allImages: Bool { items.allSatisfy { UTType($0.contentType)?.conforms(to: .image) == true } }
     var body: some View {
         NavigationStack {
             ThemedForm {
@@ -37,14 +42,23 @@ struct ExportMediaView: View {
                         .font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
                 }
                 Section {
-                    Button("Save to Photos", systemImage: "photo.badge.arrow.down") { start(mode: "photos") }.disabled(!allMedia)
-                    Button("Save Originals to Files", systemImage: "folder") { start(mode: "files") }
-                    Button("Share / AirDrop Originals", systemImage: "square.and.arrow.up") { start(mode: "share") }
-                    Button("Share Photo Copies without Metadata", systemImage: "location.slash") { start(mode: "privatePhotos") }
-                        .disabled(!items.allSatisfy { UTType($0.contentType)?.conforms(to: .image) == true })
-                    Text("Photo copies are new JPEGs up to 4096 pixels, with location and original metadata omitted. Live Photos become stills. Visible details in the picture remain. Originals stay unchanged.").font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
-                }.disabled(working || vault.busy)
-                if working { Section { ProgressView("Preparing originals…") } }
+                    Button(savedPhotos > 0 && savedPhotos < items.count ? "Save Remaining to Photos" : "Save to Photos", systemImage: "photo.badge.arrow.down") { start(mode: .photos) }
+                        .disabled(!allMedia || savedPhotos == items.count)
+                    Button("Save Originals to Files", systemImage: "folder") { start(mode: .files) }
+                    Button("Share / AirDrop Originals", systemImage: "square.and.arrow.up") { start(mode: .share) }
+                    if allImages {
+                        Button("Share Photo Copies without Metadata", systemImage: "location.slash") { start(mode: .privatePhotos) }
+                        Text("Photo copies are new JPEGs up to 4096 pixels, with location and original metadata omitted. Live Photos become stills. Visible details in the picture remain. Originals stay unchanged.").font(.footnote).foregroundStyle(ArithenPalette.color(.muted))
+                    }
+                }.disabled(activeMode != nil || vault.busy)
+                if let activeMode {
+                    Section {
+                        let count = activeMode == .photos ? savedPhotos : prepared
+                        ProgressView(value: Double(count), total: Double(max(1, items.count))) {
+                            Text(activeMode == .photos ? "Saved \(count) of \(items.count) to Photos" : "Prepared \(count) of \(items.count)")
+                        }
+                    }
+                }
                 if !result.isEmpty { Section { Label(result, systemImage: "checkmark.circle") } }
                 if items.contains(where: { $0.companionID != nil }) {
                     Section {
@@ -53,7 +67,14 @@ struct ExportMediaView: View {
                     }
                 }
             }.navigationTitle("Save or Share").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button(working ? "Cancel" : "Done") { operation?.cancel(); dismiss() } } }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(activeMode == nil ? "Done" : stopping ? "Stopping…" : "Cancel") {
+                            if activeMode == nil { dismiss() }
+                            else { stopping = true; operation?.cancel() }
+                        }.disabled(stopping)
+                    }
+                }
                 .sheet(item: $export, onDismiss: { export = nil }) { request in
                     if request.share {
                         ActivitySheet(urls: request.urls, folder: request.folder) { completed in
@@ -68,16 +89,17 @@ struct ExportMediaView: View {
                 .alert("Couldn’t Complete", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                     Button("Close", role: .cancel) { error = nil }
                 } message: { Text(error ?? "") }
-        }.onDisappear { operation?.cancel() }
+        }.interactiveDismissDisabled(activeMode != nil)
+            .onDisappear { operation?.cancel() }
     }
-    private func start(mode: String) {
-        working = true; result = ""; let ticket = vault.generation
+    private func start(mode: Mode) {
+        guard activeMode == nil, !items.isEmpty else { return }
+        activeMode = mode; prepared = 0; result = ""; let ticket = vault.generation
         operation = Task {
             var directory: URL?
             var handedOff = false
-            var saved = 0
             defer {
-                working = false
+                activeMode = nil; stopping = false; operation = nil
                 if !handedOff, let directory { try? FileManager.default.removeItem(at: directory) }
             }
             do {
@@ -86,7 +108,9 @@ struct ExportMediaView: View {
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
                     attributes: [.protectionKey: FileProtectionType.complete])
                 var urls: [URL] = []
-                for (index, item) in items.enumerated() {
+                let first = mode == .photos ? savedPhotos : 0
+                for index in first..<items.count {
+                    let item = items[index]
                     try Task.checkCancellation()
                     guard vault.unlocked, ticket == vault.generation else { throw VaultError.locked }
                     let base = (item.name as NSString).lastPathComponent
@@ -94,11 +118,12 @@ struct ExportMediaView: View {
                     let main = folder.appendingPathComponent("\(index + 1)-\(safe)")
                     try await vault.engine.materialize(id: item.id, to: main)
                     if let captured = item.captured { try? FileManager.default.setAttributes([.creationDate: captured, .modificationDate: captured], ofItemAtPath: main.path) }
-                    if mode == "privatePhotos" {
+                    if mode == .privatePhotos {
                         let copy = folder.appendingPathComponent("Photo-\(index + 1).jpg")
                         try await Task.detached(priority: .utility) { try PrivatePhotoCopy.make(from: main, to: copy) }.value
                         try? FileManager.default.removeItem(at: main)
                         urls.append(copy)
+                        prepared += 1
                         continue
                     }
                     var companion: URL?
@@ -108,19 +133,28 @@ struct ExportMediaView: View {
                     }
                     try Task.checkCancellation()
                     guard vault.unlocked, ticket == vault.generation else { throw VaultError.locked }
-                    if mode == "photos" {
+                    if mode == .photos {
                         try await MediaBridge.saveToPhotos(item: item, main: main, companion: companion)
-                        saved += 1
+                        savedPhotos += 1
                         try? FileManager.default.removeItem(at: main)
                         if let companion { try? FileManager.default.removeItem(at: companion) }
-                    } else { urls.append(main); if let companion { urls.append(companion) } }
+                    } else {
+                        urls.append(main)
+                        if let companion { urls.append(companion) }
+                        prepared += 1
+                    }
                 }
                 try Task.checkCancellation()
                 guard vault.unlocked, ticket == vault.generation else { throw VaultError.locked }
-                if mode == "photos" { result = "Saved \(saved) to Photos with their stored dates." }
-                else { export = MediaExport(urls: urls, share: mode == "share" || mode == "privatePhotos", folder: folder); handedOff = true }
+                if mode == .photos { result = "Saved \(savedPhotos) to Photos with their stored dates." }
+                else { export = MediaExport(urls: urls, share: mode == .share || mode == .privatePhotos, folder: folder); handedOff = true }
             } catch {
-                if !Task.isCancelled, ticket == vault.generation { self.error = (saved > 0 ? "Saved \(saved) items. " : "") + error.localizedDescription }
+                guard ticket == vault.generation, vault.unlocked else { return }
+                if Task.isCancelled {
+                    result = mode == .photos ? "Saved \(savedPhotos) of \(items.count) to Photos." : "Export canceled."
+                } else {
+                    self.error = (mode == .photos ? "Saved \(savedPhotos) of \(items.count) to Photos. " : "") + error.localizedDescription
+                }
             }
         }
     }

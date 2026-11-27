@@ -58,6 +58,8 @@ private struct LibraryPane: View {
         nonmutating set { regularFilter = newValue }
     }
     @State private var search = ""
+    @State private var photoIndexingEnabled = false
+    @State private var showingPhotoIndexing = false
     private var searching: Bool { pageTab == .search }
     private var isActive: Bool { navigation.selected == pageTab }
     @State private var adding = false
@@ -111,6 +113,12 @@ private struct LibraryPane: View {
         }
         .background(ArithenPalette.color(.canvas, theme: theme).ignoresSafeArea())
         .sheet(isPresented: $settings) { NavigationStack { VaultSettingsView().environmentObject(vault) } }
+        .sheet(isPresented: $showingPhotoIndexing) {
+            NavigationStack {
+                PrivateSearchSettings(search: vault.textSearch)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showingPhotoIndexing = false } } }
+            }
+        }
         .sheet(isPresented: $backupCenter) { NavigationStack { BackupSettingsView()
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { backupCenter = false } } }
         } }
@@ -156,6 +164,7 @@ private struct LibraryPane: View {
             content.update(items: vault.items, query: value)
         }
         .onReceive(vault.textSearch.$index) { index in
+            photoIndexingEnabled = index.enabled
             guard isActive else { return }
             content.update(items: vault.items, query: query, recognizedText: index.enabled ? index.entries : [:])
         }
@@ -193,7 +202,8 @@ private struct LibraryPane: View {
             if searching {
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(ArithenPalette.color(.muted, theme: theme))
-                    TextField("Search names, albums, tags or text", text: $search).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField(photoIndexingEnabled ? "Search names, albums, tags or text" : "Search names, albums or tags", text: $search)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
                     Button("Clear", systemImage: "xmark.circle.fill") { search = "" }.labelStyle(.iconOnly).font(.system(size: 22)).frame(width: 44, height: 44)
                 }.padding(.leading, 14).background(ArithenPalette.color(.surface, theme: theme), in: RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 16).padding(.bottom, 8)
@@ -241,13 +251,16 @@ private struct LibraryPane: View {
         ContentUnavailableView {
             Label(emptyTitle, systemImage: filter == "Recently Deleted" ? "trash" : "photo.on.rectangle")
         } description: {
-            Text(!search.isEmpty ? "Try a different name, album, tag or word inside a photo."
+            Text(!search.isEmpty ? (photoIndexingEnabled ? "Try a different name, album, tag or word inside an indexed photo." : "Try a different name, album or tag. Turn on Photo Indexing to search words in photos.")
                 : filter == "Recently Deleted" ? "Deleted items stay here until you remove them permanently."
                 : filter == "Favorites" ? "Open a snap and use its options menu to add it to Favs."
                 : filter.hasPrefix("album:") ? "Select snaps in Library and choose Add to Album."
                 : "Tap + to add photos, videos, files or a backup.")
         } actions: {
-            if !search.isEmpty { Button("Clear Search") { search = "" } }
+            if !search.isEmpty {
+                if !photoIndexingEnabled { Button("Photo Indexing") { showingPhotoIndexing = true } }
+                Button("Clear Search") { search = "" }
+            }
             else if !showingAlbums && filter != "All" { Button("Show All Snaps") { filter = "All"; selection = [] } }
         }
     }
